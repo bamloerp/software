@@ -67,7 +67,8 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, currency 
     // Let's use 10% of (Measured Works + P&Gs) for now as a safe default.
     
     const subtotalWithPg = totalMeasuredWorks + pgAmount;
-    const contingencyAmount = BigInt(Math.round(Number(subtotalWithPg) * (contingencyRate / 100)));
+    //const contingencyAmount = BigInt(Math.round(Number(subtotalWithPg) * (contingencyRate / 100)));
+    const contingencyAmount = BigInt(Math.round(Number(pgAmount) * (contingencyRate / 100))); // Following the template's apparent logic
     
     const grandTotal = subtotalWithPg + contingencyAmount;
 

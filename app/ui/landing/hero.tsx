@@ -23,7 +23,7 @@ export default function Hero() {
             transition={{ duration: 0.8 }}
             className="text-4xl font-bold tracking-tight text-white sm:text-6xl"
           >
-            Bamlo Quotation Generator
+            Barmlo Quotation Generator
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -31,7 +31,7 @@ export default function Hero() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="mt-6 text-lg leading-8 text-gray-300"
           >
-            Streamline your construction and agricultural processing quotes with our advanced enterprise solution. Brought to you by Bamlo Construction.
+            Streamline your construction and agricultural processing quotes with our advanced enterprise solution. Brought to you by Barmlo Construction.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}

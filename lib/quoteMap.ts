@@ -12,9 +12,9 @@ export type QuoteLineSource = {
 export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   // FOUNDATION (examples)
   { code: 'A15', description: 'Common bricks', unit: 'no', rate: 0.16, section: 'FOUNDATIONS' },
-  { code: 'B8+8', description: 'River sand', unit: 'm3', rate: 20.0, section: 'FOUNDATIONS' },
-  { code: 'C8+1', description: 'Pit sand', unit: 'm3', rate: 20.0, section: 'FOUNDATIONS' },
-  { code: 'D8+8', description: '19mm Grenite Quarry Stone aggregate', unit: 'm3', rate: 45.0, section: 'FOUNDATIONS' },
+  { code: 'B8', description: 'River sand', unit: 'm3', rate: 20.0, section: 'FOUNDATIONS' },
+  { code: 'C8', description: 'Pit sand', unit: 'm3', rate: 20.0, section: 'FOUNDATIONS' },
+  { code: 'D8', description: '19mm Grenite Quarry Stone aggregate', unit: 'm3', rate: 45.0, section: 'FOUNDATIONS' },
   { code: 'G7', description: 'Imported  inert granular fill/Hrdcore', unit: 'm3', rate: 15.0, section: 'FOUNDATIONS' },
   { code: 'G15', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.50, section: 'FOUNDATIONS' },
   //{ code: 'F15', description: 'Cement (50kg bag)', unit: 'bags', rate: 12.50, section: 'FOUNDATIONS' },
@@ -29,7 +29,7 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   { code: 'B45', description: 'Pit sand', unit: 'm3', rate: 20, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'A45+1', description: 'River Sand', unit: 'm3', rate: 20, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'D22+D33+G22', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.5, section: 'SUPERSTRUCTURE BRICKWORK' },
-  // {code: '', description: '19mm Grenite Quarry Stone aggrecates', unit: 'm3', rate: 45, section: 'SUPERSTRUCTURE BRICKWORK' },
+   {code: 'C45', description: '19mm Grenite Quarry Stone aggrecates', unit: 'm3', rate: 45, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'A36+A25', description: 'Common bricks', unit: 'no', rate: 0.16, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'B54', description: 'Damp proof course for one brick wall (20 metre rolls) (230mm)', unit: 'rolls', rate: 3.0, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'A54', description: 'Damp proof course for half brick wall (20 metre rolls) (115mm)', unit: 'rolls', rate: 2.0, section: 'SUPERSTRUCTURE BRICKWORK' },

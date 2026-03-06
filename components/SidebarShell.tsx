@@ -290,7 +290,7 @@ export default function SidebarShell({ children, currentUser }: { children: Reac
             </div>
             {!collapsed && (
                 <div className="flex flex-col">
-                    <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Bamlo</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Barmlo</span>
                     <span className="text-[10px] text-gray-500 font-medium uppercase tracking-widest leading-none">Construction</span>
                 </div>
             )}

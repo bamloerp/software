@@ -6,10 +6,10 @@ const montserrat = Montserrat({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | Bamlo Enterprise',
-    default: 'Bamlo Enterprise',
+    template: '%s | Barmlo Enterprise',
+    default: 'Barmlo Enterprise',
   },
-  description: 'The official Website for Bamlo Enterprise',
+  description: 'The official Website for Barmlo Enterprise',
   metadataBase: new URL('https://barmlo.co.zw/index.php/services/agricultural-processing'),
   icons: {
     icon: '/barmlo_logo111.png',
