@@ -109,13 +109,46 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
     groups[section].subtotal += l.lineTotalMinor;
   });
   
-  // Sort groups if needed (Materials, Labour, Others)
-  const sortedGroups = Object.values(groups).sort((a, b) => {
-    const order = { 'MATERIALS': 1, 'LABOUR': 2, 'FIX_SUPPLY': 3 };
-    const orderA = order[a.section as keyof typeof order] || 99;
-    const orderB = order[b.section as keyof typeof order] || 99;
-    return orderA - orderB;
+  // Sort groups — separate materials and labour into distinct groups
+  const order: Record<string, number> = {
+    'FOUNDATIONS': 1,
+    'SUPERSTRUCTURE BRICKWORK': 2,
+    'METALWORK': 3,
+    'PLASTERING': 4,
+    'SCREEDS': 5,
+    'ROOF COVERINGS': 6,
+    'ELECTRICALS': 7,
+    'ELECTRICALS TUBING': 8,
+    'MATERIALS': 90,
+    'LABOUR': 91,
+    'FIX_SUPPLY': 92,
+  };
+
+  type DocGroup = { section: string; label: string; isLabour: boolean; lines: PdfLine[]; subtotal: number };
+  const matGroups: Map<string, DocGroup> = new Map();
+  const labGroups: Map<string, DocGroup> = new Map();
+
+  Object.values(groups).forEach(g => {
+    for (const line of g.lines) {
+      const itemType = line.itemType || 'MATERIAL';
+      if (itemType === 'LABOUR') {
+        if (!labGroups.has(g.section)) labGroups.set(g.section, { section: g.section, label: `LABOUR – ${g.section}`, isLabour: true, lines: [], subtotal: 0 });
+        const lg = labGroups.get(g.section)!;
+        lg.lines.push(line);
+        lg.subtotal += line.lineTotalMinor;
+      } else {
+        if (!matGroups.has(g.section)) matGroups.set(g.section, { section: g.section, label: g.section, isLabour: false, lines: [], subtotal: 0 });
+        const mg = matGroups.get(g.section)!;
+        mg.lines.push(line);
+        mg.subtotal += line.lineTotalMinor;
+      }
+    }
   });
+
+  const sortByOrder = (a: DocGroup, b: DocGroup) => (order[a.section] || 99) - (order[b.section] || 99);
+  const sortedMat = [...matGroups.values()].sort(sortByOrder);
+  const sortedLab = [...labGroups.values()].sort(sortByOrder);
+  const allDocGroups: DocGroup[] = [...sortedMat, ...sortedLab];
 
   // LABOUR vs MATERIALS calculation based on itemType
   const labourLines = lines.filter(l => l.itemType === 'LABOUR');
@@ -174,39 +207,58 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
         </View>
         
         {/* Line Items by Group */}
-        {sortedGroups.map((group) => (
-          <View key={group.section} wrap={false}>
-            <Text style={styles.sectionTitle}>{group.section}</Text>
+        {(() => {
+          const firstLabourIdx = allDocGroups.findIndex(g => g.isLabour);
+          return allDocGroups.map((group, gIdx) => (
+            <View key={`${group.section}-${group.isLabour ? 'L' : 'M'}`}>
+              {/* Materials total banner before first labour group */}
+              {gIdx === firstLabourIdx && firstLabourIdx > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 6 }}>
+                  <View style={{ backgroundColor: '#dbeafe', borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6 }}>
+                    <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1e3a5f' }}>TOTAL MATERIALS: {currencySymbol} {formatMoney(totalMaterials, currency)}</Text>
+                  </View>
+                </View>
+              )}
+              {gIdx === firstLabourIdx && firstLabourIdx > 0 && (
+                <View style={{ backgroundColor: '#fffbeb', borderWidth: 2, borderColor: '#fbbf24', borderRadius: 6, padding: 8, marginBottom: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', color: '#78350f', letterSpacing: 0.5 }}>LABOUR</Text>
+                </View>
+              )}
+
+              <View wrap={false}>
+                <Text style={styles.sectionTitle}>{group.label}</Text>
             
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.colIdx, styles.th]}>#</Text>
-              <Text style={[styles.colDesc, styles.th]}>Description</Text>
-              <Text style={[styles.colUnit, styles.th]}>Unit</Text>
-              <Text style={[styles.colQty, styles.th]}>Qty</Text>
-              <Text style={[styles.colRate, styles.th]}>Rate</Text>
-              <Text style={[styles.colAmt, styles.th]}>Amount</Text>
-            </View>
+                {/* Table Header */}
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.colIdx, styles.th]}>#</Text>
+                  <Text style={[styles.colDesc, styles.th]}>Description</Text>
+                  <Text style={[styles.colUnit, styles.th]}>Unit</Text>
+                  <Text style={[styles.colQty, styles.th]}>Qty</Text>
+                  <Text style={[styles.colRate, styles.th]}>Rate</Text>
+                  <Text style={[styles.colAmt, styles.th]}>Amount</Text>
+                </View>
             
-            {/* Rows */}
-            {group.lines.map((line, idx) => (
-              <View key={line.id} style={styles.tableRow}>
-                <Text style={[styles.colIdx, styles.td]}>{idx + 1}</Text>
-                <Text style={[styles.colDesc, styles.td]}>{line.description}</Text>
-                <Text style={[styles.colUnit, styles.td]}>{line.unit}</Text>
-                <Text style={[styles.colQty, styles.td]}>{line.quantity}</Text>
-                <Text style={[styles.colRate, styles.td]}>{formatMoney((line.lineTotalMinor / (line.quantity || 1)), '')}</Text>
-                <Text style={[styles.colAmt, styles.td]}>{formatMoney(line.lineTotalMinor, '')}</Text>
+                {/* Rows */}
+                {group.lines.map((line, idx) => (
+                  <View key={line.id} style={styles.tableRow}>
+                    <Text style={[styles.colIdx, styles.td]}>{idx + 1}</Text>
+                    <Text style={[styles.colDesc, styles.td]}>{line.description}</Text>
+                    <Text style={[styles.colUnit, styles.td]}>{line.unit}</Text>
+                    <Text style={[styles.colQty, styles.td]}>{line.quantity}</Text>
+                    <Text style={[styles.colRate, styles.td]}>{formatMoney((line.lineTotalMinor / (line.quantity || 1)), '')}</Text>
+                    <Text style={[styles.colAmt, styles.td]}>{formatMoney(line.lineTotalMinor, '')}</Text>
+                  </View>
+                ))}
+            
+                {/* Group Subtotal */}
+                <View style={styles.sectionSubtotal}>
+                  <Text style={styles.subtotalLabel}>Subtotal {group.label}</Text>
+                  <Text style={styles.subtotalValue}>{currencySymbol} {formatMoney(group.subtotal, currency)}</Text>
+                </View>
               </View>
-            ))}
-            
-            {/* Group Subtotal */}
-            <View style={styles.sectionSubtotal}>
-              <Text style={styles.subtotalLabel}>Subtotal {group.section}</Text>
-              <Text style={styles.subtotalValue}>{currencySymbol} {formatMoney(group.subtotal, currency)}</Text>
             </View>
-          </View>
-        ))}
+          ));
+        })()}
 
         {/* Summary Footer which can break across pages if needed, but preferable kept together */}
         <View style={styles.summaryContainer} wrap={false}>

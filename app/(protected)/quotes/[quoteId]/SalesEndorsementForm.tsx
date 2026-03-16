@@ -76,7 +76,7 @@ export default function SalesEndorsementForm({ action, defaults, grandTotal }: P
 
   useEffect(() => {
     const { commenceOn, deposit, installment, installmentDueDate } = values;
-    
+
     // Client-side validation
     let validationError = null;
     const today = new Date();
@@ -103,7 +103,7 @@ export default function SalesEndorsementForm({ action, defaults, grandTotal }: P
       deposit.trim() !== '' &&
       installment.trim() !== '' &&
       installmentDueDate.trim() !== '';
-    
+
     setIsValid(isFilled && !validationError);
   }, [values]);
 

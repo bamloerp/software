@@ -1837,6 +1837,210 @@ export async function generateQuotePdf(quoteId: string): Promise<ActionResult<{ 
   });
 }
 
+export async function deleteQuoteLine(
+  quoteId: string,
+  lineId: string,
+): Promise<ActionResult> {
+  return runAction('deleteQuoteLine', async () => {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    const role = assertRole(user.role);
+    if (role !== 'SENIOR_QS' && role !== 'ADMIN') {
+      throw new Error('Only Senior QS or Admin can delete line items');
+    }
+    const userOffice = resolveOfficeForRole(role, user.office ?? null);
+
+    const include = { customer: true, lines: true } satisfies Prisma.QuoteInclude;
+    const { quote, ensuredOffice } = await fetchQuoteWithOffice(quoteId, include, role, userOffice);
+
+    if (quote.status !== 'SUBMITTED_REVIEW') {
+      throw new Error('Lines can only be deleted when the quote is in Submitted for Review status');
+    }
+
+    const line = (quote as any).lines.find((l: any) => l.id === lineId);
+    if (!line) throw new Error('Line not found');
+
+    await prisma.$transaction(async (tx) => {
+      await tx.quoteLine.delete({ where: { id: lineId } });
+
+      const refreshed = await tx.quote.findUniqueOrThrow({
+        where: { id: quoteId },
+        include: { customer: true, lines: true },
+      });
+      const snapshot = buildQuoteSnapshot({ quote: refreshed });
+      const totals = snapshot.totals;
+
+      await tx.quote.update({
+        where: { id: quoteId },
+        data: {
+          metaJson: JSON.stringify({ ...(snapshot.meta ?? {}), totals }),
+          ...(quote.office ? {} : ensuredOffice ? { office: ensuredOffice } : {}),
+        },
+      });
+
+      await createQuoteVersionTx(tx, {
+        quote: refreshed,
+        label: `Line deleted: ${line.description}`,
+        status: refreshed.status as QuoteStatus,
+        byRole: role,
+      });
+    }, TX_OPTS);
+
+    revalidatePath(`/quotes/${quoteId}`);
+    revalidatePath(`/client/quotes/${quoteId}`);
+    revalidatePath('/quotes');
+    return undefined;
+  });
+}
+
+export async function deleteQuoteSection(
+  quoteId: string,
+  section: string,
+  itemType: 'MATERIAL' | 'LABOUR',
+): Promise<ActionResult> {
+  return runAction('deleteQuoteSection', async () => {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    const role = assertRole(user.role);
+    if (role !== 'SENIOR_QS' && role !== 'ADMIN') {
+      throw new Error('Only Senior QS or Admin can delete sections');
+    }
+    const userOffice = resolveOfficeForRole(role, user.office ?? null);
+
+    const include = { customer: true, lines: true } satisfies Prisma.QuoteInclude;
+    const { quote, ensuredOffice } = await fetchQuoteWithOffice(quoteId, include, role, userOffice);
+
+    if (quote.status !== 'SUBMITTED_REVIEW') {
+      throw new Error('Sections can only be deleted when the quote is in Submitted for Review status');
+    }
+
+    const linesToDelete = (quote as any).lines.filter(
+      (l: any) => l.section === section && (l.itemType ?? 'MATERIAL') === itemType
+    );
+    if (linesToDelete.length === 0) throw new Error('No matching lines found in this section');
+
+    await prisma.$transaction(async (tx) => {
+      await tx.quoteLine.deleteMany({
+        where: {
+          quoteId,
+          section,
+          itemType,
+        },
+      });
+
+      const refreshed = await tx.quote.findUniqueOrThrow({
+        where: { id: quoteId },
+        include: { customer: true, lines: true },
+      });
+      const snapshot = buildQuoteSnapshot({ quote: refreshed });
+      const totals = snapshot.totals;
+
+      await tx.quote.update({
+        where: { id: quoteId },
+        data: {
+          metaJson: JSON.stringify({ ...(snapshot.meta ?? {}), totals }),
+          ...(quote.office ? {} : ensuredOffice ? { office: ensuredOffice } : {}),
+        },
+      });
+
+      await createQuoteVersionTx(tx, {
+        quote: refreshed,
+        label: `Section deleted: ${itemType === 'LABOUR' ? 'LABOUR – ' : ''}${section} (${linesToDelete.length} items)`,
+        status: refreshed.status as QuoteStatus,
+        byRole: role,
+      });
+    }, TX_OPTS);
+
+    revalidatePath(`/quotes/${quoteId}`);
+    revalidatePath(`/client/quotes/${quoteId}`);
+    revalidatePath('/quotes');
+    return undefined;
+  });
+}
+
+export async function addQuoteLineItem(
+  quoteId: string,
+  input: {
+    description: string;
+    quantity: number;
+    unitRate: number;
+    unit: string;
+    section: string;
+    itemType: string;
+  },
+): Promise<ActionResult> {
+  return runAction('addQuoteLineItem', async () => {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    const role = assertRole(user.role);
+    if (role !== 'SENIOR_QS' && role !== 'ADMIN') {
+      throw new Error('Only Senior QS or Admin can add line items');
+    }
+    const userOffice = resolveOfficeForRole(role, user.office ?? null);
+
+    const { description, quantity, unitRate, unit, section, itemType } = input;
+    if (!description || description.trim().length === 0) throw new Error('Description is required');
+    if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('Quantity must be a positive number');
+    if (!Number.isFinite(unitRate) || unitRate < 0) throw new Error('Rate must be a non-negative number');
+
+    const include = { customer: true, lines: true } satisfies Prisma.QuoteInclude;
+    const { quote, ensuredOffice } = await fetchQuoteWithOffice(quoteId, include, role, userOffice);
+
+    if (quote.status !== 'SUBMITTED_REVIEW') {
+      throw new Error('Lines can only be added when the quote is in Submitted for Review status');
+    }
+
+    const vatRate = fromBps(quote.vatBps);
+    const amounts = computeLineAmounts(quantity, unitRate, vatRate);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.quoteLine.create({
+        data: {
+          quoteId,
+          description: description.trim(),
+          quantity,
+          unit,
+          unitPriceMinor: amounts.unitPriceMinor,
+          lineSubtotalMinor: amounts.lineSubtotalMinor,
+          lineDiscountMinor: amounts.lineDiscountMinor,
+          lineTaxMinor: amounts.lineTaxMinor,
+          lineTotalMinor: amounts.lineTotalMinor,
+          section,
+          itemType,
+          source: 'Manual',
+        },
+      });
+
+      const refreshed = await tx.quote.findUniqueOrThrow({
+        where: { id: quoteId },
+        include: { customer: true, lines: true },
+      });
+      const snapshot = buildQuoteSnapshot({ quote: refreshed });
+      const totals = snapshot.totals;
+
+      await tx.quote.update({
+        where: { id: quoteId },
+        data: {
+          metaJson: JSON.stringify({ ...(snapshot.meta ?? {}), totals }),
+          ...(quote.office ? {} : ensuredOffice ? { office: ensuredOffice } : {}),
+        },
+      });
+
+      await createQuoteVersionTx(tx, {
+        quote: refreshed,
+        label: `Line added: ${description.trim()}`,
+        status: refreshed.status as QuoteStatus,
+        byRole: role,
+      });
+    }, TX_OPTS);
+
+    revalidatePath(`/quotes/${quoteId}`);
+    revalidatePath(`/client/quotes/${quoteId}`);
+    revalidatePath('/quotes');
+    return undefined;
+  });
+}
+
 export async function updateQuoteNotes(
   quoteId: string,
   assumptions: string[],

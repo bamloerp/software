@@ -4,12 +4,12 @@ import { useRouter } from 'next/navigation';
 import { Parser } from 'expr-eval';
 import { SHEET_COLUMNS, TAKEOFF_LAYOUT } from '@/lib/takeoffLayout';
 import { createQuote, upsertCustomer } from '@/app/(protected)/actions';
-import { QUOTE_LINE_MAP } from '@/lib/quoteMap';
+import { QUOTE_LINE_MAP, ELECTRICAL_ITEMS_CATALOG, type ElectricalItem } from '@/lib/quoteMap';
 import { normalizeContext, missingVars, evalExpr } from '@/lib/expr';
 import { DEFAULT_NOTES } from '@/lib/quoteDefaults';
 import ClearableNumberInput from './ClearableNumberInput';
 import Money from '@/components/Money';
-import { UserIcon, EnvelopeIcon, PhoneIcon, BuildingOfficeIcon, MapPinIcon, WrenchScrewdriverIcon, BeakerIcon, ArrowDownTrayIcon, PlusIcon, TrashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { UserIcon, EnvelopeIcon, PhoneIcon, BuildingOfficeIcon, MapPinIcon, WrenchScrewdriverIcon, BeakerIcon, ArrowDownTrayIcon, PlusIcon, TrashIcon, CheckCircleIcon, BoltIcon } from '@heroicons/react/24/outline';
 
 const parser = new Parser({ allowMemberAccess: false });
 
@@ -62,6 +62,15 @@ export default function TakeOffSheet() {
   ]);
   const [notesText, setNotesText] = useState(DEFAULT_NOTES);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Tiles toggle (the 'Concrete tiles Double Roman black' item under ROOF COVERINGS)
+  const [includeTiles, setIncludeTiles] = useState(true);
+
+  // Electricals section
+  const [includeElectricals, setIncludeElectricals] = useState(false);
+  const [electricalItems, setElectricalItems] = useState<ElectricalItem[]>(
+    ELECTRICAL_ITEMS_CATALOG.map(item => ({ ...item }))
+  );
 
 
   // Per-cell numeric literal overrides, by literal index
@@ -205,6 +214,7 @@ export default function TakeOffSheet() {
     // Add common fallback ones if not present
     s.add('PRELIMINARIES');
     s.add('LABOUR');
+    s.add('ELECTRICALS');
     return Array.from(s).sort();
   }, []);
 
@@ -214,6 +224,9 @@ export default function TakeOffSheet() {
 
     // 1) QUOTE_LINE_MAP items
     for (const m of QUOTE_LINE_MAP) {
+      // Skip tiles if toggled off
+      if (!includeTiles && m.description === 'Concrete tiles  Double Roman black') continue;
+
       const qty = evalExpr(ctx, m.code); 
       if (!(qty > 0)) continue;
 
@@ -229,7 +242,24 @@ export default function TakeOffSheet() {
       });
     }
 
-    // 2) custom items
+    // 2) Electrical items (optional)
+    if (includeElectricals) {
+      for (const ei of electricalItems) {
+        if (!ei.description || !(Number.isFinite(ei.qty) && ei.qty > 0)) continue;
+        lines.push({
+          description: ei.description,
+          quantity: Math.ceil(Number(ei.qty)),
+          unitPrice: Number(ei.rate || 0),
+          section: ei.section || 'ELECTRICALS',
+          itemType: ei.itemType || 'MATERIAL',
+          lineTotalMinor: BigInt(Math.round(Math.ceil(Number(ei.qty)) * Number(ei.rate || 0) * 100)),
+          unit: ei.unit,
+          code: 'ELECTRICAL',
+        });
+      }
+    }
+
+    // 3) custom items
     for (const ci of customItems) {
       if (!ci.description || !(Number.isFinite(ci.qty) && ci.qty > 0)) continue;
       
@@ -250,7 +280,7 @@ export default function TakeOffSheet() {
       });
     }
     return lines;
-  }, [context, customItems]); // Removed 'tab' dependency
+  }, [context, customItems, includeTiles, includeElectricals, electricalItems]);
 
   const summary = useMemo(() => {
     let totalLabour = 0n;
@@ -609,6 +639,7 @@ export default function TakeOffSheet() {
                         {isInput ? (
                           cell!.code === 'A2' ? (
                             <select
+                              aria-label="Select block size"
                               className="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400"
                               value={value ?? TAKEOFF_DEFAULTS.A2}
                               onChange={(e) =>
@@ -663,6 +694,143 @@ export default function TakeOffSheet() {
           })}
         </div>
       </div>
+
+      {/* Options: Tiles toggle & Electricals */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:bg-gray-800 dark:border-gray-700 transition-all hover:shadow-md">
+        <div className="mb-4 border-b border-gray-100 pb-2 dark:border-gray-700">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Optional Sections</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Toggle sections to include or exclude from this quotation</p>
+        </div>
+
+        <div className="space-y-4">
+          {/* Tiles toggle */}
+          <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-gray-100 p-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={includeTiles}
+              onChange={(e) => setIncludeTiles(e.target.checked)}
+              className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <div>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">Include Concrete Tiles (Double Roman Black)</span>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Under Roof Coverings</p>
+            </div>
+          </label>
+
+          {/* Electricals toggle */}
+          <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-gray-100 p-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={includeElectricals}
+              onChange={(e) => setIncludeElectricals(e.target.checked)}
+              className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <div>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">Include Electricals</span>
+              <p className="text-xs text-gray-500 dark:text-gray-400">D/Box, Meterboard, Conduits, PVC Couplings, Tubing &amp; Chopping</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Electricals items (shown when enabled) */}
+      {includeElectricals && (
+        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:bg-gray-800 dark:border-gray-700 transition-all hover:shadow-md">
+          <div className="mb-6 flex items-center gap-3 border-b border-gray-100 pb-4 dark:border-gray-700">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-900/20">
+              <BoltIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Electricals</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Edit quantities, rates, or remove items as needed</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {electricalItems.map((ei, idx) => (
+              <div key={ei.id} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:bg-gray-900/50 dark:border-gray-700 md:flex-row md:items-start">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Description</label>
+                  <input
+                    className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    value={ei.description}
+                    onChange={(e) =>
+                      setElectricalItems((arr) =>
+                        arr.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x))
+                      )
+                    }
+                  />
+                </div>
+                <div className="w-full md:w-24 space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Unit</label>
+                  <input
+                    className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    value={ei.unit}
+                    onChange={(e) =>
+                      setElectricalItems((arr) =>
+                        arr.map((x, i) => (i === idx ? { ...x, unit: e.target.value } : x))
+                      )
+                    }
+                  />
+                </div>
+                <div className="w-full md:w-24 space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Qty</label>
+                  <ClearableNumberInput
+                    className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    value={Number.isFinite(ei.qty) ? ei.qty : ''}
+                    onChange={(e) => {
+                      const raw = e.currentTarget.value;
+                      setElectricalItems((arr) =>
+                        arr.map((x, i) =>
+                          i === idx ? { ...x, qty: raw === '' ? Number.NaN : Number(raw) } : x
+                        )
+                      );
+                    }}
+                  />
+                </div>
+                <div className="w-full md:w-24 space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Rate</label>
+                  <ClearableNumberInput
+                    className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    value={Number.isFinite(ei.rate) ? ei.rate : ''}
+                    onChange={(e) => {
+                      const raw = e.currentTarget.value;
+                      setElectricalItems((arr) =>
+                        arr.map((x, i) =>
+                          i === idx ? { ...x, rate: raw === '' ? Number.NaN : Number(raw) } : x
+                        )
+                      );
+                    }}
+                  />
+                </div>
+                <div className="pt-6">
+                  <button
+                    type="button"
+                    title="Remove electrical item"
+                    className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 transition-colors"
+                    onClick={() => setElectricalItems((arr) => arr.filter((_, i) => i !== idx))}
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="flex items-center gap-2 text-sm font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400"
+              onClick={() =>
+                setElectricalItems((arr) => [
+                  ...arr,
+                  { id: `elec-custom-${Date.now()}`, description: '', unit: 'no', qty: 0, rate: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+                ])
+              }
+            >
+              <PlusIcon className="h-4 w-4" />
+              Add Electrical Item
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Manual additional items */}
       <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:bg-gray-800 dark:border-gray-700 transition-all hover:shadow-md">
@@ -739,6 +907,7 @@ export default function TakeOffSheet() {
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Section</label>
                 <div className="space-y-1.5">
                   <select
+                    aria-label="Section"
                     className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                     value={sections.includes((ci.section || '').toUpperCase()) ? (ci.section || '').toUpperCase() : 'OTHER'}
                     onChange={(e) => {
@@ -772,6 +941,7 @@ export default function TakeOffSheet() {
               <div className="pt-6">
                 <button
                   type="button"
+                  title="Remove manual item"
                   className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 transition-colors"
                   onClick={() => setCustomItems((arr) => arr.filter((_, i) => i !== idx))}
                 >

@@ -51,12 +51,13 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   { code: 'E22+E33', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.5, section: 'PLASTERING' },
   { code: 'H22-150', description: 'One coat 1:4 cement sand plaster finished with a wood float on internal walls.', unit: 'm2', rate: 2.50, section: 'PLASTERING', itemType: 'LABOUR' },
   { code: 'I22', description: 'One coat 1:4 cement sand plaster finished with a wood float on extenal wall', unit: 'm3', rate: 2.50, section: 'PLASTERING', itemType: 'LABOUR' },
+  {code : 'A51*3/8', description: 'Pit sand internal', unit: 'cm3', rate: 19.5, section: 'PLASTERING' },
   // { code: 'D71', description: 'Transport', unit: 'Km', rate: 0.65, section: 'PLASTERING' },
 
   //EXTERNAL PLASTERING
   //EXTERNAL PLASTERING
   { code: 'F22+F33+8', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.5, section: 'PLASTERING' },
-  { code: 'D52', description: 'Pit sand', unit: 'cm3', rate: 20, section: 'PLASTERING' },
+  { code: 'D52', description: 'Pit sand external', unit: 'cm3', rate: 20, section: 'PLASTERING' },
   { code: 'G51', description: 'Internal Airvents', unit: 'no', rate: 5.0, section: 'PLASTERING' },
   { code: 'H51', description: 'External Airvents', unit: 'no', rate: 5.0, section: 'PLASTERING' },
   // { code: 'H71', description: 'River sand', unit: 'm3', rate: 20, section: 'EXTERNAL PLASTERING' },
@@ -118,5 +119,28 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   //{ code: 'D4*1.5', description: 'Extra over roll top ridges', unit: 'no', rate: 1.00, section: 'ROOFING' },
 
 
+];
+
+// Electrical items that can be optionally included during quote creation.
+// These are NOT computed from takeoff cells — they are fixed catalog items with editable qty/rate.
+export type ElectricalItem = {
+  id: string;
+  description: string;
+  unit: string;
+  rate: number;
+  qty: number;
+  section: string;
+  itemType: 'MATERIAL' | 'LABOUR';
+};
+
+export const ELECTRICAL_ITEMS_CATALOG: ElectricalItem[] = [
+  { id: 'elec-1',  description: 'D/Box',                   unit: 'no',  rate: 25.00, qty: 1, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-2',  description: 'Meterboard',              unit: 'no',  rate: 45.00, qty: 1, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-3',  description: '25mm conduit 6m',         unit: 'no',  rate: 3.50,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-4',  description: '25mm PVC Couplings',      unit: 'no',  rate: 0.30,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-5',  description: '25mm PVC Nipples',        unit: 'no',  rate: 0.25,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-6',  description: '19mm Conduits 6m',        unit: 'no',  rate: 2.50,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-7',  description: '20mm PVC Couplings',      unit: 'no',  rate: 0.25,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-8',  description: 'Tubing and chopping labour', unit: 'item', rate: 650.00, qty: 1, section: 'ELECTRICALS', itemType: 'LABOUR' },
 ];
 

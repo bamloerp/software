@@ -14,9 +14,10 @@ interface DownloadPdfButtonProps {
   className?: string;
   quoteId: string;
   generatePdf: (quoteId: string) => Promise<ActionResult<{ base64: string; filename: string }>>;
+  size?: 'default' | 'xs';
 }
 
-export default function DownloadPdfButton({ className, quoteId, generatePdf }: DownloadPdfButtonProps) {
+export default function DownloadPdfButton({ className, quoteId, generatePdf, size = 'default' }: DownloadPdfButtonProps) {
   const [loading, setLoading] = useState(false);
 
   const handleDownload = async () => {
@@ -57,18 +58,22 @@ export default function DownloadPdfButton({ className, quoteId, generatePdf }: D
     }
   };
 
+  const sizeClasses = size === 'xs'
+    ? 'rounded border border-blue-500 px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/20'
+    : 'rounded-xl bg-blue-600 px-8 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 min-w-[200px]';
+
   return (
     <button
       onClick={handleDownload}
       disabled={loading}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-8 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 min-w-[200px] ${className || ''} ${loading ? 'opacity-70 cursor-wait' : ''}`}
+      className={`inline-flex items-center justify-center gap-1.5 transition-all ${sizeClasses} ${className || ''} ${loading ? 'opacity-70 cursor-wait' : ''}`}
     >
       {loading ? (
-        <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        <span className={`animate-spin rounded-full border-2 border-current border-t-transparent ${size === 'xs' ? 'h-3 w-3' : 'h-5 w-5'}`} />
       ) : (
-        <ArrowDownTrayIcon className="h-5 w-5" />
+        <ArrowDownTrayIcon className={size === 'xs' ? 'h-3.5 w-3.5' : 'h-5 w-5'} />
       )}
-      {loading ? 'Generating...' : 'Download PDF'}
+      {loading ? (size === 'xs' ? '...' : 'Generating...') : (size === 'xs' ? 'PDF' : 'Download PDF')}
     </button>
   );
 }

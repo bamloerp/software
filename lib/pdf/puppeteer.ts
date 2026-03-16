@@ -6,7 +6,6 @@ import { BARMLO_LOGO_BASE64 } from "./logo";
 import { prisma } from "@/lib/db";
 import fs from "fs";
 import path from "path";
-import QuoteDoc from './QuoteDoc';
 
 function money(minor: number, cur = "USD") {
   return `${cur === "USD" ? "US$" : ""}${(Number(minor || 0) / 100).toFixed(2)}`;
@@ -103,19 +102,48 @@ export class PuppeteerRenderer implements PdfRenderer {
       }
     }
 
-    // Sort groups
+    // Sort groups — separate materials and labour into distinct groups
     const orderMap: Record<string, number> = {
       'FOUNDATIONS': 1,
       'SUPERSTRUCTURE BRICKWORK': 2,
-      'ROOF COVERINGS': 3,
+      'METALWORK': 3,
       'PLASTERING': 4,
       'SCREEDS': 5,
-      'ELECTRICALS TUBING': 6,
+      'ROOF COVERINGS': 6,
+      'ELECTRICALS': 7,
+      'ELECTRICALS TUBING': 8,
       'MATERIALS': 90,
       'LABOUR': 91,
       'FIX_SUPPLY': 92
     };
-    groupOrder.sort((a, b) => (orderMap[a] || 99) - (orderMap[b] || 99));
+
+    // Split each original group into material-only and labour-only groups
+    type PdfGroup = { section: string; label: string; isLabour: boolean; rows: any[]; subtotal: number };
+    const matGroups: Map<string, PdfGroup> = new Map();
+    const labGroups: Map<string, PdfGroup> = new Map();
+
+    for (const section of groupOrder) {
+      const g = groups[section];
+      for (const row of g.rows) {
+        const itemType = (row as any).itemType || 'MATERIAL';
+        if (itemType === 'LABOUR') {
+          if (!labGroups.has(section)) labGroups.set(section, { section, label: `LABOUR – ${section}`, isLabour: true, rows: [], subtotal: 0 });
+          const lg = labGroups.get(section)!;
+          lg.rows.push(row);
+          lg.subtotal += (row as any).amt;
+        } else {
+          if (!matGroups.has(section)) matGroups.set(section, { section, label: section, isLabour: false, rows: [], subtotal: 0 });
+          const mg = matGroups.get(section)!;
+          mg.rows.push(row);
+          mg.subtotal += (row as any).amt;
+        }
+      }
+    }
+
+    const sortByOrder = (a: PdfGroup, b: PdfGroup) => (orderMap[a.section] || 99) - (orderMap[b.section] || 99);
+    const sortedMat = [...matGroups.values()].sort(sortByOrder);
+    const sortedLab = [...labGroups.values()].sort(sortByOrder);
+    const allGroups: PdfGroup[] = [...sortedMat, ...sortedLab];
 
     // Calculate totals matching QuoteDoc.tsx logic
     const baseTotal = totalLabour + totalMaterials;
@@ -303,12 +331,23 @@ export class PuppeteerRenderer implements PdfRenderer {
 
     <!-- Line Items -->
     <div style="display: flex; flex-direction: column; gap: 2rem;">
-      ${groupOrder.map(section => {
-      const group = groups[section];
+      ${allGroups.map((group, gIdx) => {
+      const firstLabourIdx = allGroups.findIndex(g => g.isLabour);
+      const materialsTotalBanner = gIdx === firstLabourIdx && firstLabourIdx > 0
+        ? `<div class="flex justify-end mb-4">
+             <div style="background:#dbeafe; border-radius:0.5rem; padding:0.75rem 1.5rem;">
+               <span class="font-bold text-sm" style="color:#1e3a5f;">TOTAL MATERIALS: ${money(totalMaterials, currency)}</span>
+             </div>
+           </div>
+           <div style="background:#fffbeb; border:2px solid #fbbf24; border-radius:0.75rem; padding:1rem; margin-bottom:1rem;" class="flex items-center gap-3">
+             <h2 class="font-bold uppercase text-sm" style="color:#78350f; letter-spacing:0.05em; margin:0;">LABOUR</h2>
+           </div>`
+        : '';
       return `
+        ${materialsTotalBanner}
         <div>
           <div class="rounded-xl bg-blue-50 p-4 border border-blue-100 flex items-center gap-3 mb-4">
-             <h3 class="font-bold text-blue-900 uppercase text-sm" style="letter-spacing: 0.05em; margin:0;">${section}</h3>
+             <h3 class="font-bold text-blue-900 uppercase text-sm" style="letter-spacing: 0.05em; margin:0;">${group.label}</h3>
           </div>
           
           <div class="border border-gray-200 rounded-xl overflow-hidden">
@@ -324,7 +363,8 @@ export class PuppeteerRenderer implements PdfRenderer {
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200">
-                ${group.rows.map((row, idx) => `
+                ${group.rows.map((row: any, idx: number) => {
+                  return `
                 <tr style="border-top: 1px solid #e5e7eb;">
                   <td class="px-2 py-3 text-sm text-gray-500">${idx + 1}</td>
                   <td class="px-2 py-3 text-sm font-medium text-gray-700">
@@ -339,7 +379,8 @@ export class PuppeteerRenderer implements PdfRenderer {
                     ${money(row.amt, currency)}
                   </td>
                 </tr>
-                `).join("")}
+                `;
+                }).join("")}
               </tbody>
               <tfoot class="bg-gray-50">
                 <tr style="border-top: 1px solid #e5e7eb;">
@@ -500,7 +541,7 @@ export class PuppeteerRenderer implements PdfRenderer {
 
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: "networkidle0" });
+      await page.setContent(html, { waitUntil: "domcontentloaded" });
 
       const pdfUint8 = await page.pdf({
         format: "A4",
@@ -523,4 +564,375 @@ export class PuppeteerRenderer implements PdfRenderer {
       await browser.close();
     }
   }
+}
+
+/* ── Shared helpers ── */
+
+function loadLogo(): string {
+  const logoPath = path.join(process.cwd(), "public", "barmlo_logo.png");
+  try {
+    if (fs.existsSync(logoPath)) {
+      const buf = fs.readFileSync(logoPath);
+      return `data:image/png;base64,${buf.toString("base64")}`;
+    }
+  } catch { /* ignore */ }
+  return BARMLO_LOGO_BASE64;
+}
+
+async function launchBrowser(): Promise<Browser> {
+  const isServerless = !!process.env.VERCEL;
+  const executablePath = isServerless
+    ? await chromium.executablePath()
+    : getLocalBrowserPath();
+
+  return puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: { width: 1920, height: 1080 },
+    headless: true,
+    executablePath,
+  });
+}
+
+async function htmlToPdf(html: string): Promise<Buffer> {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    const pdfUint8 = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "10mm", right: "10mm", bottom: "12mm", left: "10mm" },
+    });
+    return Buffer.from(pdfUint8);
+  } finally {
+    await browser.close();
+  }
+}
+
+/** Escape HTML entities */
+function esc(s: string | null | undefined): string {
+  return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+const BASE_STYLES = `
+  @page { margin: 15mm 15mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 12px; color: #1f2937; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 0.7rem; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.04em; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #166534; }
+  .logo-img { width: 160px; height: 70px; object-fit: contain; }
+  .company-info { text-align: right; font-size: 10px; color: #166534; }
+  .company-info .title { font-size: 18px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+  .info-grid { display: flex; justify-content: space-between; margin-bottom: 20px; }
+  .info-box { width: 48%; border: 1px solid #d1d5db; }
+  .info-box-header { background: #eff6ff; padding: 4px 6px; border-bottom: 1px solid #d1d5db; font-size: 10px; font-weight: 700; text-transform: uppercase; color: #1f2937; }
+  .info-row { display: flex; padding: 3px 6px; }
+  .info-label { font-size: 10px; font-weight: 700; color: #374151; width: 70px; flex-shrink: 0; }
+  .info-value { font-size: 10px; color: #374151; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .section-title { margin-top: 12px; margin-bottom: 4px; padding: 4px 6px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; font-size: 11px; font-weight: 700; color: #374151; text-transform: uppercase; }
+  .tbl-header { background: #f3f4f6; }
+  .tbl-header th { padding: 5px 6px; }
+  .tbl-row td { padding: 4px 6px; border-bottom: 1px solid #f3f4f6; font-size: 11px; }
+  .text-right { text-align: right; }
+  .text-center { text-align: center; }
+  .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 9px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding: 10px 0; }
+  .note-box { margin-top: 12px; padding: 8px; background: #f9fafb; border-radius: 4px; border: 1px solid #e5e7eb; }
+  .note-title { font-size: 10px; font-weight: 700; color: #374151; margin-bottom: 4px; }
+  .note-text { font-size: 10px; color: #4b5563; }
+`;
+
+function companyHeader(logoBase64: string, title: string): string {
+  return `<div class="header">
+    <div>${logoBase64 ? `<img src="${logoBase64}" class="logo-img" />` : ''}
+    </div>
+    <div class="company-info">
+      <div style="font-weight:700">BARMLO CONSTRUCTION</div>
+      <div>3294, Light Industry, Mberengwa</div>
+      <div>info@barmlo.co.zw</div>
+      <div>www.barmlo.co.zw</div>
+      <div class="title">${esc(title)}</div>
+    </div>
+  </div>`;
+}
+
+/* ── Requisition PDF ── */
+
+export async function renderRequisitionPdf(requisitionId: string): Promise<PdfResult> {
+  const req = await prisma.procurementRequisition.findUnique({
+    where: { id: requisitionId },
+    include: {
+      items: { include: { quoteLine: { select: { metaJson: true } } } },
+      project: { include: { quote: { include: { customer: true, project: true } } } },
+      submittedBy: { select: { name: true } },
+    },
+  });
+  if (!req) throw new Error("Requisition not found");
+
+  const quote = req.project.quote;
+  const customer = quote.customer;
+  const project = quote.project;
+  const validUntil = new Date(quote.createdAt);
+  validUntil.setDate(validUntil.getDate() + 30);
+
+  const getSection = (item: (typeof req.items)[number]) => {
+    const raw = item.quoteLine?.metaJson;
+    if (typeof raw === "string" && raw.trim()) {
+      try {
+        const p = JSON.parse(raw) as { section?: string; category?: string };
+        const s = p?.section?.trim() || p?.category?.trim() || null;
+        if (s) return s;
+      } catch { /* ignore */ }
+    }
+    return "Uncategorized";
+  };
+
+  // Group items by section
+  const groups = new Map<string, (typeof req.items)>();
+  for (const item of req.items) {
+    const sec = getSection(item);
+    const bucket = groups.get(sec) ?? [];
+    bucket.push(item);
+    groups.set(sec, bucket);
+  }
+
+  const logoBase64 = loadLogo();
+  const statusColors: Record<string, { bg: string; text: string }> = {
+    DRAFT: { bg: "#fef3c7", text: "#92400e" },
+    SUBMITTED: { bg: "#dbeafe", text: "#1e40af" },
+    APPROVED: { bg: "#dcfce7", text: "#166534" },
+  };
+  const sc = statusColors[req.status] ?? statusColors.DRAFT;
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><style>${BASE_STYLES}</style></head><body>
+    ${companyHeader(logoBase64, "Purchase Requisition")}
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-box-header">Customer Info</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Name:</span><span class="info-value">${esc(customer.displayName)}</span></div>
+          <div class="info-row"><span class="info-label">Address:</span><span class="info-value">${esc(customer.city || (customer.addressJson as any)?.city || "N/A")}</span></div>
+          <div class="info-row"><span class="info-label">Phone:</span><span class="info-value">${esc(customer.phone || customer.email || "N/A")}</span></div>
+          <div class="info-row"><span class="info-label">Ref:</span><span class="info-value">${esc(project?.name)}</span></div>
+        </div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-header">Requisition Details</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Quote #:</span><span class="info-value">${esc(quote.number || quote.id.slice(0, 8))}</span></div>
+          <div class="info-row"><span class="info-label">Date:</span><span class="info-value">${new Date(quote.createdAt).toLocaleDateString("en-GB")}</span></div>
+          <div class="info-row"><span class="info-label">Valid Until:</span><span class="info-value">${validUntil.toLocaleDateString("en-GB")}</span></div>
+          <div class="info-row"><span class="info-label">Status:</span><span class="badge" style="background:${sc.bg};color:${sc.text}">${esc(req.status)}</span></div>
+        </div>
+      </div>
+    </div>
+
+    ${req.submittedBy?.name ? `<div style="margin-bottom:10px;font-size:10px;color:#6b7280;">Submitted by: ${esc(req.submittedBy.name)}</div>` : ""}
+
+    <table>
+      <thead class="tbl-header"><tr>
+        <th style="text-align:left;padding:5px 6px">Description</th>
+        <th style="text-align:center;padding:5px 6px;width:60px">Unit</th>
+        <th style="text-align:right;padding:5px 6px;width:60px">Qty</th>
+      </tr></thead>
+      <tbody>
+      ${[...groups.entries()].map(([section, items]) => `
+        <tr><td colspan="3" class="section-title">${esc(section)}</td></tr>
+        ${items.map(it => `<tr class="tbl-row">
+          <td>${esc(it.description)}</td>
+          <td class="text-center">${esc(it.unit || "-")}</td>
+          <td class="text-right">${Number(it.qtyRequested ?? 0)}</td>
+        </tr>`).join("")}
+      `).join("")}
+      </tbody>
+    </table>
+
+    ${req.items.length === 0 ? '<div style="padding:20px;text-align:center;color:#6b7280;font-size:11px">No items in this requisition.</div>' : ""}
+
+    <div class="footer">Requisition Ref: ${esc(project?.name || req.id.slice(0, 10))} | Generated ${new Date().toLocaleDateString("en-GB")}</div>
+  </body></html>`;
+
+  const buffer = await htmlToPdf(html);
+  return { buffer, filename: `Requisition-${project?.name || req.id.slice(0, 10)}.pdf` };
+}
+
+/* ── Dispatch PDF ── */
+
+export async function renderDispatchPdf(dispatchId: string): Promise<PdfResult> {
+  const dispatch = await prisma.dispatch.findUnique({
+    where: { id: dispatchId },
+    include: {
+      items: { orderBy: { id: "asc" } },
+      project: { include: { quote: { include: { customer: true, project: true } } } },
+      createdBy: { select: { name: true } },
+    },
+  });
+  if (!dispatch) throw new Error("Dispatch not found");
+
+  const project = dispatch.project;
+  const quote = project?.quote;
+  const customer = quote?.customer;
+
+  const statusColors: Record<string, { bg: string; text: string }> = {
+    DRAFT: { bg: "#f3f4f6", text: "#374151" },
+    SUBMITTED: { bg: "#dbeafe", text: "#1e40af" },
+    APPROVED: { bg: "#dcfce7", text: "#166534" },
+    DISPATCHED: { bg: "#e0e7ff", text: "#3730a3" },
+    IN_TRANSIT: { bg: "#fef3c7", text: "#92400e" },
+    DELIVERED: { bg: "#dcfce7", text: "#166534" },
+  };
+  const sc = statusColors[dispatch.status] || statusColors.DRAFT;
+  const logoBase64 = loadLogo();
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><style>${BASE_STYLES}</style></head><body>
+    ${companyHeader(logoBase64, "Dispatch Form")}
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-box-header">Customer Info</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Name:</span><span class="info-value">${esc(customer?.displayName)}</span></div>
+          <div class="info-row"><span class="info-label">Address:</span><span class="info-value">${esc(customer?.city || (customer?.addressJson as any)?.city || "N/A")}</span></div>
+          <div class="info-row"><span class="info-label">Phone:</span><span class="info-value">${esc(customer?.phone || customer?.email || "N/A")}</span></div>
+          <div class="info-row"><span class="info-label">Project:</span><span class="info-value">${esc(project?.name ?? quote?.project?.name)}</span></div>
+        </div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-header">Dispatch Details</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Quote #:</span><span class="info-value">${esc(quote?.number || quote?.id?.slice(0, 8))}</span></div>
+          <div class="info-row"><span class="info-label">Date:</span><span class="info-value">${new Date(dispatch.createdAt).toLocaleDateString("en-GB")}</span></div>
+          <div class="info-row"><span class="info-label">Created by:</span><span class="info-value">${esc(dispatch.createdBy?.name)}</span></div>
+          <div class="info-row"><span class="info-label">Status:</span><span class="badge" style="background:${sc.bg};color:${sc.text}">${esc(dispatch.status)}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead class="tbl-header"><tr>
+        <th style="text-align:left;padding:5px 6px">Description</th>
+        <th style="text-align:center;padding:5px 6px;width:55px">Unit</th>
+        <th style="text-align:right;padding:5px 6px;width:55px">Qty</th>
+        <th style="text-align:center;padding:5px 6px;width:75px">Handed Out</th>
+      </tr></thead>
+      <tbody>
+      ${dispatch.items.map(it => `<tr class="tbl-row">
+        <td>${esc(it.description)}</td>
+        <td class="text-center">${esc(it.unit || "-")}</td>
+        <td class="text-right">${Number(it.qty ?? 0)}</td>
+        <td class="text-center">${it.handedOutAt ? "Yes" : "-"}</td>
+      </tr>`).join("")}
+      </tbody>
+    </table>
+
+    ${dispatch.items.length === 0 ? '<div style="padding:20px;text-align:center;color:#6b7280;font-size:11px">No items.</div>' : ""}
+
+    ${dispatch.note ? `<div class="note-box"><div class="note-title">Note:</div><div class="note-text">${esc(dispatch.note)}</div></div>` : ""}
+
+    <div class="footer">Dispatch Ref: ${esc(dispatch.id.slice(0, 10))} | Generated ${new Date().toLocaleDateString("en-GB")}</div>
+  </body></html>`;
+
+  const buffer = await htmlToPdf(html);
+  return { buffer, filename: `Dispatch-${dispatch.id.slice(0, 10)}.pdf` };
+}
+
+/* ── Purchase Order PDF ── */
+
+export async function renderPurchaseOrderPdf(poId: string): Promise<PdfResult> {
+  const po = await prisma.purchaseOrder.findUnique({
+    where: { id: poId },
+    include: {
+      items: { include: { quoteLine: true } },
+      requisition: { include: { project: { include: { quote: { include: { customer: true } } } } } },
+      project: { include: { quote: { include: { customer: true } } } },
+      purchases: true,
+      createdBy: { select: { name: true } },
+    },
+  });
+  if (!po) throw new Error("Purchase order not found");
+
+  const project = po.requisition?.project || po.project;
+  const customer = project?.quote?.customer;
+  const vendorName = po.vendor || "Unknown Vendor";
+  const vendorPhone = po.purchases?.[0]?.vendorPhone || "";
+
+  const totalMinor = po.items.reduce(
+    (acc, it) => acc + Number(it.unitPriceMinor ?? 0) * Number(it.qty ?? 0), 0,
+  );
+
+  const statusColors: Record<string, { bg: string; text: string }> = {
+    DRAFT: { bg: "#f3f4f6", text: "#374151" },
+    SUBMITTED: { bg: "#dbeafe", text: "#1e40af" },
+    APPROVED: { bg: "#dcfce7", text: "#166534" },
+    REJECTED: { bg: "#fee2e2", text: "#991b1b" },
+    PURCHASED: { bg: "#e9d5ff", text: "#6b21a8" },
+    RECEIVED: { bg: "#dcfce7", text: "#166534" },
+    COMPLETE: { bg: "#dcfce7", text: "#166534" },
+  };
+  const sc = statusColors[po.status] || statusColors.DRAFT;
+  const logoBase64 = loadLogo();
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><style>${BASE_STYLES}</style></head><body>
+    ${companyHeader(logoBase64, "Purchase Order")}
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-box-header">Vendor Info</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Vendor:</span><span class="info-value">${esc(vendorName)}</span></div>
+          <div class="info-row"><span class="info-label">Phone:</span><span class="info-value">${esc(vendorPhone || "N/A")}</span></div>
+          <div class="info-row"><span class="info-label">Customer:</span><span class="info-value">${esc(customer?.displayName)}</span></div>
+          <div class="info-row"><span class="info-label">Project:</span><span class="info-value">${esc(project?.name)}</span></div>
+        </div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-header">Order Details</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">PO ID:</span><span class="info-value">${esc(po.id.slice(0, 12))}</span></div>
+          <div class="info-row"><span class="info-label">Quote #:</span><span class="info-value">${esc(project?.quote?.number || project?.quote?.id?.slice(0, 8))}</span></div>
+          <div class="info-row"><span class="info-label">Date:</span><span class="info-value">${new Date(po.createdAt).toLocaleDateString("en-GB")}</span></div>
+          <div class="info-row"><span class="info-label">Status:</span><span class="badge" style="background:${sc.bg};color:${sc.text}">${esc(po.status)}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead class="tbl-header"><tr>
+        <th style="text-align:left;padding:5px 6px">Description</th>
+        <th style="text-align:center;padding:5px 6px;width:45px">Unit</th>
+        <th style="text-align:right;padding:5px 6px;width:45px">Qty</th>
+        <th style="text-align:right;padding:5px 6px;width:70px">Unit Price</th>
+        <th style="text-align:right;padding:5px 6px;width:75px">Total</th>
+      </tr></thead>
+      <tbody>
+      ${po.items.map(it => {
+        const qty = Number(it.qty ?? 0);
+        const price = Number(it.unitPriceMinor ?? 0);
+        const lineTotal = qty * price;
+        return `<tr class="tbl-row">
+          <td>${esc(it.description)}</td>
+          <td class="text-center">${esc(it.unit || "-")}</td>
+          <td class="text-right">${qty}</td>
+          <td class="text-right">${money(price)}</td>
+          <td class="text-right">${money(lineTotal)}</td>
+        </tr>`;
+      }).join("")}
+      </tbody>
+    </table>
+
+    ${po.items.length === 0 ? '<div style="padding:20px;text-align:center;color:#6b7280;font-size:11px">No items.</div>' : ""}
+
+    <div style="border-top:2px solid #166534;margin-top:10px;padding-top:8px;display:flex;justify-content:flex-end">
+      <div style="display:flex;gap:10px;font-size:12px;font-weight:700">
+        <span>TOTAL:</span>
+        <span style="color:#166534">${money(totalMinor)}</span>
+      </div>
+    </div>
+
+    ${po.note ? `<div class="note-box"><div class="note-title">Note:</div><div class="note-text">${esc(po.note)}</div></div>` : ""}
+
+    <div class="footer">PO Ref: ${esc(po.id.slice(0, 12))} | Generated ${new Date().toLocaleDateString("en-GB")}</div>
+  </body></html>`;
+
+  const buffer = await htmlToPdf(html);
+  return { buffer, filename: `PurchaseOrder-${po.id.slice(0, 10)}.pdf` };
 }

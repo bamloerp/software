@@ -11,6 +11,8 @@ import Money from '@/components/Money';
 import { ArrowLeftIcon, PaperAirplaneIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
 import PurchaseOrderHeader from '@/components/PurchaseOrderHeader';
 import PrintButton from '@/components/PrintButton';
+import DownloadPdfButton from '@/components/DownloadPdfButton';
+import { generatePurchaseOrderPdf } from './pdf-actions';
 import PurchaseOrderApproval from './PurchaseOrderApproval';
 import VerifyGrnForm from '../VerifyGrnForm';
 import VerifyPoGrnsForm from '../VerifyPoGrnsForm';
@@ -130,6 +132,7 @@ export default async function POPage(props: { params: Promise<{ poId: string }> 
             </Link>
             <div className="flex items-center gap-3">
                <POStatusBadge status={po.status} />
+               <DownloadPdfButton quoteId={poId} generatePdf={generatePurchaseOrderPdf} />
                <PrintButton />
             </div>
         </div>

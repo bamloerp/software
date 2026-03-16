@@ -3677,46 +3677,17 @@ export async function createScheduleFromQuote(projectId: string) {
   if (!quote) throw new Error('No quote found for project');
 
   const labourLines = quote.lines.filter((l) => {
-    // 1. Check native fields first if strict filtering requested
-    // The user requested "LABOUR SUB-STRUCTURE". This maps to section='FOUNDATIONS' and itemType='LABOUR' in quoteMap.ts
-
     const meta = typeof l.metaJson === 'string' ? JSON.parse(l.metaJson || '{}') : (l.metaJson || {});
-    const section = (l.section || meta.section || '').toUpperCase();
     const type = (l.itemType || meta.itemType || meta.type || '').toUpperCase();
+    const section = (l.section || meta.section || '').toUpperCase();
 
-    // Strict filter: MUST be Labour type
+    // Only include FOUNDATIONS labour items
     const isLabour = type === 'LABOUR' || meta.isLabour === true;
-    if (!isLabour) return false;
-
-    // Optional strict section filter: if user wants ONLY "LABOUR SUB-STRUCTURE", we check for FOUNDATIONS
-    // However, usually we want ALL labour items. But user was specific.
-    // Let's modify logic to include ALL labour items for now, but prioritize FOUNDATIONS if we need to distinguish.
-    // Wait, user said "Restrict schedule items to... items categorized under 'LABOUR SUB-STRUCTURE'".
-    // This implies EXCLUDING huge lists of materials.
-    // If I include ALL labour, does that fulfill request? probably.
-
-    // Filter for Labour Sub-structure specifically:
-    // In quoteMap.ts, these are section='FOUNDATIONS'.
-    // If I comment this out, I get all labour. I will check for 'FOUNDATIONS' or 'SUBSTRUCTURE' in section.
-
-    if (section === 'FOUNDATIONS' || section.includes('SUBSTRUCTURE') || section.includes('SUB-STRUCTURE')) return true;
-
-    // Also allow explicit Tiler or other labour if needed?
-    // If user wants ONLY sub-structure labour, ignore others.
-    // But maybe they want all labour? "only include items categorized under 'LABOUR SUB-STRUCTURE'".
-    // I will adhere strictly to that request.
-
-    return false;
+    const isFoundation = section.includes('FOUNDATION') || section.includes('SUBSTRUCTURE');
+    return isLabour && isFoundation;
   });
 
-  // Fallback: If no labour found (maybe old quote format), try loose description matching BUT restricted
-  // Actually, better to return nothing than wrong stuff if strict mode.
-  // I will relax slightly to include 'LABOUR' items generally if they look like labour, to avoid breaking other projects?
-  // No, user request is specific.
-
-  const selectedLines = labourLines; // Remove fallback to all lines
-
-  const items = selectedLines.map((ln) => {
+  const items = labourLines.map((ln) => {
     const meta = typeof ln.metaJson === 'string' ? JSON.parse(ln.metaJson || '{}') : (ln.metaJson || {});
     const title = ln.description ?? meta.title ?? 'Labour task';
     const unit = ln.unit ?? meta.unit ?? null;
@@ -3736,7 +3707,6 @@ export async function createScheduleFromQuote(projectId: string) {
     };
   });
 
-  // Sort items based on specific user request
   const preferredOrder = [
     'Site clearance',
     'Setting out',
@@ -3744,34 +3714,29 @@ export async function createScheduleFromQuote(projectId: string) {
     'Concrete works',
     'Footing brickwork',
     'Ramming',
-    'Floor slab'
+    'Floor slab',
   ];
 
   items.sort((a, b) => {
     const getOrderIndex = (title: string) => {
       const lowerTitle = title.toLowerCase();
-      // Find index where the key is contained in the title
       const index = preferredOrder.findIndex(key => lowerTitle.includes(key.toLowerCase()));
       return index === -1 ? 999 : index;
     };
-
     const indexA = getOrderIndex(a.title);
     const indexB = getOrderIndex(b.title);
-
-    if (indexA !== indexB) {
-      return indexA - indexB;
-    }
-
-    // If same order index (or both not found), sort by original line ID (proxy for creation order)
+    if (indexA !== indexB) return indexA - indexB;
     return a.quoteLineId.localeCompare(b.quoteLineId);
   });
+
+  const cleanItems = items;
 
   const schedule = await prisma.schedule.create({
     data: {
       projectId,
       createdById: user.id,
-      status: 'DRAFT', // Explicitly DRAFT
-      items: { create: items },
+      status: 'DRAFT',
+      items: { create: cleanItems },
     },
     include: { items: true },
   });
@@ -3810,6 +3775,20 @@ export async function saveSchedule(
   await ensureProjectAccess(projectId, user);
 
   await ensureProjectIsPlanned(projectId);
+
+  // Validate: schedule start date must be today or in the future
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  for (const it of payload.items) {
+    if (it.plannedStart) {
+      const d = new Date(it.plannedStart);
+      d.setHours(0, 0, 0, 0);
+      if (d < todayStart) {
+        throw new Error('Schedule start date must be today or in the future');
+      }
+      break; // only need to check the first item (project start)
+    }
+  }
 
   const settings = await getProductivitySettings(projectId);
   const enrichedItems = await computeEstimatesForItems(payload.items, settings);
@@ -4325,6 +4304,9 @@ export async function rescheduleOverdueTasks(projectId: string) {
     30,
     productivity
   );
+
+  // Preserve the first overdue task's original start date — work already began
+  updatedItems[firstOverdueIndex].plannedStart = minimalItems[firstOverdueIndex].plannedStart;
 
   // Update Database
   const toUpdate = updatedItems.slice(firstOverdueIndex);

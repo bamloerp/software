@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import QuoteHeader from '@/components/QuoteHeader';
 import { getDrivers } from '@/app/(protected)/dispatches/driver-actions';
+import { getCurrentUser } from '@/lib/auth';
 
 export default async function NewDispatchPage({ 
   params 
@@ -13,6 +14,9 @@ export default async function NewDispatchPage({
   params: Promise<{ projectId: string }> 
 }) {
   const { projectId } = await params;
+
+  const me = await getCurrentUser();
+  if (!me) return <div className="p-6">Auth required.</div>;
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -58,6 +62,7 @@ export default async function NewDispatchPage({
           projectId={projectId} 
           availableItems={availableItems as any} 
           drivers={drivers}
+          userRole={me.role}
         />
       </div>
     </div>

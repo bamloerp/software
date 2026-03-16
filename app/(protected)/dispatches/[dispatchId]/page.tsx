@@ -18,6 +18,8 @@ import DispatchAcknowledgment from '@/components/dispatch-acknowledgment';
 import QuoteHeader from '@/components/QuoteHeader';
 import { getDrivers } from '../driver-actions';
 import AssignDriverForm from '@/components/AssignDriverForm';
+import DownloadPdfButton from '@/components/DownloadPdfButton';
+import { generateDispatchPdf } from './pdf-actions';
 
 export const runtime = 'nodejs';
 
@@ -245,7 +247,7 @@ export default async function DispatchDetail({
         
         {/* Navigation */}
         <div className="flex flex-col gap-4">
-          <nav className="flex items-center text-sm font-medium text-gray-500">
+          <nav className="flex items-center justify-between text-sm font-medium text-gray-500">
             <Link 
               href="/dispatches" 
               className="hover:text-green-600 transition-colors flex items-center bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm"
@@ -253,6 +255,7 @@ export default async function DispatchDetail({
               <ArrowLeftIcon className="h-4 w-4 mr-1.5 text-green-600" />
               Back to Dispatches
             </Link>
+            <DownloadPdfButton quoteId={dispatchId} generatePdf={generateDispatchPdf} />
           </nav>
 
           {/* Letterhead */}

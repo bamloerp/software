@@ -89,22 +89,20 @@ export async function batchCheckConflicts(
     const start = new Date(item.plannedStart);
     const end = new Date(item.plannedEnd);
 
-    // Check for overlaps in DB
     const conflicts = await prisma.scheduleItem.findMany({
       where: {
         schedule: {
           projectId: { not: projectId },
-          status: { not: 'DRAFT' } // Only conflict with active schedules? Or all? Usually active.
+          status: { not: 'DRAFT' }
         },
         assignees: {
           some: {
             id: { in: item.employeeIds }
           }
         },
-        // Overlap: (StartA <= EndB) and (EndA >= StartB)
-        plannedEnd: { gte: start },
         plannedStart: { lte: end },
-        status: { not: 'DONE' }
+        plannedEnd: { gte: start },
+        status: { not: 'DONE' },
       },
       include: {
         schedule: {
@@ -166,8 +164,6 @@ export async function checkEmployeeAvailability(
   const start = new Date(startStr);
   const end = new Date(endStr);
 
-  // Find overlapping items for these employees in OTHER projects
-  // OR in the same project but different item (if excludeItemId provided)
   const conflicts = await prisma.scheduleItem.findMany({
     where: {
       AND: [
@@ -178,19 +174,12 @@ export async function checkEmployeeAvailability(
             }
           }
         },
-        {
-          plannedStart: { lte: end },
-          plannedEnd: { gte: start }
-        },
-        {
-          status: { not: 'DONE' }
-        },
+        { plannedStart: { lte: end } },
+        { plannedEnd: { gte: start } },
+        { status: { not: 'DONE' } },
         {
           OR: [
-            { schedule: { projectId: { not: projectId }, status: { not: 'DRAFT' } } }, // Conflict with other active projects
-            // If checking within same project, we might want to flag overlap too? 
-            // Usually we only care about double-booking. 
-            // If we are editing an item, exclude it.
+            { schedule: { projectId: { not: projectId }, status: { not: 'DRAFT' } } },
             {
               AND: [
                 { schedule: { projectId: projectId } },
@@ -224,7 +213,7 @@ export async function checkEmployeeAvailability(
         details[a.id] = {
           conflictProject: c.schedule.project.projectNumber,
           conflictStart: c.plannedStart,
-          conflictEnd: c.plannedEnd
+          conflictEnd: c.plannedEnd,
         };
       }
     }
@@ -233,4 +222,55 @@ export async function checkEmployeeAvailability(
   return { busy, details };
 }
 
+/** Fetch booked date ranges for given employees within a window (for calendar view). */
+export async function getEmployeeBookings(
+  employeeIds: string[],
+  windowStart: string,
+  windowEnd: string,
+  excludeProjectId?: string,
+) {
+  if (!employeeIds.length) return {};
 
+  const start = new Date(windowStart);
+  const end = new Date(windowEnd);
+
+  const items = await prisma.scheduleItem.findMany({
+    where: {
+      assignees: { some: { id: { in: employeeIds } } },
+      plannedStart: { lte: end },
+      plannedEnd: { gte: start },
+      status: { not: 'DONE' },
+      schedule: {
+        status: { not: 'DRAFT' },
+        ...(excludeProjectId ? { projectId: { not: excludeProjectId } } : {}),
+      },
+    },
+    select: {
+      title: true,
+      plannedStart: true,
+      plannedEnd: true,
+      schedule: {
+        select: { project: { select: { projectNumber: true, name: true } } },
+      },
+      assignees: {
+        where: { id: { in: employeeIds } },
+        select: { id: true },
+      },
+    },
+  });
+
+  // Group by employee ID -> array of bookings
+  const bookings: Record<string, { project: string; task: string; start: string; end: string }[]> = {};
+  for (const it of items) {
+    for (const a of it.assignees) {
+      if (!bookings[a.id]) bookings[a.id] = [];
+      bookings[a.id].push({
+        project: it.schedule.project.projectNumber ?? it.schedule.project.name ?? '',
+        task: it.title,
+        start: it.plannedStart?.toISOString().slice(0, 10) ?? '',
+        end: it.plannedEnd?.toISOString().slice(0, 10) ?? '',
+      });
+    }
+  }
+  return bookings;
+}

@@ -1,4 +1,3 @@
-
 import clsx from 'clsx';
 
 import Link from 'next/link';
@@ -22,12 +21,16 @@ import {
   generateQuotePdf,
 } from '@/app/(protected)/quotes/[quoteId]/actions';
 
-import { 
-  DocumentTextIcon, 
-  CalendarIcon, 
-  MapPinIcon, 
-  UserIcon, 
-  BeakerIcon, 
+import DeleteLineButton from '@/components/DeleteLineButton';
+import AddLineForm from '@/components/AddLineForm';
+import DeleteSectionButton from '@/components/DeleteSectionButton';
+
+import {
+  DocumentTextIcon,
+  CalendarIcon,
+  MapPinIcon,
+  UserIcon,
+  BeakerIcon,
   WrenchScrewdriverIcon,
   TagIcon,
   LockClosedIcon,
@@ -191,12 +194,18 @@ type LineRow = {
   cycle: number;
 
   isCurrentCycle: boolean;
-  
+
   itemType: string | null;
 };
 
 type LineGroup = {
   section: string;
+
+  /** Display label (e.g. "FOUNDATIONS" or "LABOUR - FOUNDATIONS") */
+  label: string;
+
+  /** true when this group holds labour items */
+  isLabour: boolean;
 
   rows: LineRow[];
 
@@ -261,14 +270,18 @@ function buildLineGroups(
 
   activeCycle: number
 ): LineGroup[] {
-  const groups = new Map<string, LineGroup>();
+  // Two maps: one for material rows, one for labour rows, keyed by section
+  const matGroups = new Map<string, LineGroup>();
+  const labGroups = new Map<string, LineGroup>();
 
   lines.forEach((line) => {
     const meta = parseJson<Record<string, unknown>>(line.metaJson);
 
-    // Prioritize DB section, then meta section, then fallback
-    const section = line.section || 
-      (typeof meta?.section === 'string' && meta.section.trim().length > 0 ? meta.section : 'Items');
+    const section =
+      line.section ||
+      (typeof meta?.section === 'string' && meta.section.trim().length > 0
+        ? meta.section
+        : 'Items');
 
     const unitFromMeta = typeof meta?.unit === 'string' ? meta.unit : null;
 
@@ -282,41 +295,38 @@ function buildLineGroups(
       amount = negotiation.proposedTotal;
     }
 
-    if (!groups.has(section)) {
-      groups.set(section, { section, rows: [], subtotal: 0 });
+    const cycle = typeof line.cycle === 'number' ? line.cycle : 0;
+    const isCurrentCycle = cycle === activeCycle;
+    const isLabour = line.itemType === 'LABOUR';
+    const targetMap = isLabour ? labGroups : matGroups;
+    const groupKey = section;
+
+    if (!targetMap.has(groupKey)) {
+      targetMap.set(groupKey, {
+        section,
+        label: isLabour ? `LABOUR - ${section}` : section,
+        isLabour,
+        rows: [],
+        subtotal: 0,
+      });
     }
 
-    const group = groups.get(section)!;
-
-    const cycle = typeof line.cycle === 'number' ? line.cycle : 0;
-
-    const isCurrentCycle = cycle === activeCycle;
+    const group = targetMap.get(groupKey)!;
 
     group.rows.push({
       id: line.id,
-
       description: line.description,
-      
       itemType: line.itemType,
-
       unit: line.unit ?? unitFromMeta,
-
       qty: Number(line.quantity),
-
       rate,
-
       amount,
-
       source: line.source ?? null,
-
       addedVersion: line.addedInVersionId
         ? (versionNumberById.get(line.addedInVersionId) ?? null)
         : null,
-
       negotiation,
-
       cycle,
-
       isCurrentCycle,
     });
 
@@ -324,28 +334,47 @@ function buildLineGroups(
   });
 
   // Sort rows within groups: PENDING items first
-  groups.forEach((group) => {
+  const sortRows = (group: LineGroup) => {
     group.rows.sort((a, b) => {
       const aPending = a.negotiation?.status === 'PENDING';
       const bPending = b.negotiation?.status === 'PENDING';
       if (aPending && !bPending) return -1;
       if (!aPending && bPending) return 1;
-      return 0; // maintain relative order otherwise
+      return 0;
     });
-  });
+  };
+  matGroups.forEach(sortRows);
+  labGroups.forEach(sortRows);
 
-  const sortedGroups = Array.from(groups.values());
-  
-  // Sort groups: those with PENDING items first
-  sortedGroups.sort((a, b) => {
+  const SECTION_ORDER: Record<string, number> = {
+    FOUNDATIONS: 1,
+    'SUPERSTRUCTURE BRICKWORK': 2,
+    METALWORK: 3,
+    PLASTERING: 4,
+    SCREEDS: 5,
+    'ROOF COVERINGS': 6,
+    ELECTRICALS: 7,
+    'ELECTRICALS TUBING': 8,
+    MATERIALS: 90,
+    LABOUR: 91,
+  };
+
+  const sectionSort = (a: LineGroup, b: LineGroup) => {
+    const aOrder = SECTION_ORDER[a.section] ?? 50;
+    const bOrder = SECTION_ORDER[b.section] ?? 50;
+    if (aOrder !== bOrder) return aOrder - bOrder;
     const aHasPending = a.rows.some((r) => r.negotiation?.status === 'PENDING');
     const bHasPending = b.rows.some((r) => r.negotiation?.status === 'PENDING');
     if (aHasPending && !bHasPending) return -1;
     if (!aHasPending && bHasPending) return 1;
     return 0;
-  });
+  };
 
-  return sortedGroups;
+  const sortedMat = Array.from(matGroups.values()).sort(sectionSort);
+  const sortedLab = Array.from(labGroups.values()).sort(sectionSort);
+
+  // Materials first, then labour groups at the bottom
+  return [...sortedMat, ...sortedLab];
 }
 
 function computeLineTotals(lines: QuoteLine[]): QuoteTotals {
@@ -595,7 +624,10 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
     const result = await assignProjectManager(quote.id, managerId);
 
     if (!result?.ok) {
-      setFlashMessage({ type: 'error', message: (result as any)?.error ?? 'Unable to assign manager.' });
+      setFlashMessage({
+        type: 'error',
+        message: (result as any)?.error ?? 'Unable to assign manager.',
+      });
     } else {
       setFlashMessage({ type: 'success', message: 'Manager assigned successfully.' });
     }
@@ -610,7 +642,10 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
 
     const result = await closeNegotiation(negotiationId);
     if (!result?.ok) {
-      setFlashMessage({ type: 'error', message: (result as any)?.error ?? 'Unable to close negotiation.' });
+      setFlashMessage({
+        type: 'error',
+        message: (result as any)?.error ?? 'Unable to close negotiation.',
+      });
     } else {
       setFlashMessage({ type: 'success', message: 'Negotiation closed.' });
     }
@@ -895,7 +930,10 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
       return;
     }
     setFlashMessage({ type: 'success', message: 'Quote endorsed successfully.' });
-    const project = await prisma.project.findUnique({ where: { quoteId: quote.id }, select: { id: true } });
+    const project = await prisma.project.findUnique({
+      where: { quoteId: quote.id },
+      select: { id: true },
+    });
     if (project?.id) {
       revalidatePath(`/projects/${project.id}`);
       return redirect(`/projects/${project.id}/payments`);
@@ -905,9 +943,13 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
   console.log('jkjdfjfdhjdfhjdfhjfhjernamz ns');
   console.log(quote?.project);
 
+  const materialTotal = groups.filter((g) => !g.isLabour).reduce((s, g) => s + g.subtotal, 0);
+  const labourTotal = groups.filter((g) => g.isLabour).reduce((s, g) => s + g.subtotal, 0);
+  const firstLabourIdx = groups.findIndex((g) => g.isLabour);
+
   return (
     <div className="space-y-6">
-      <QuoteHeader quote={quote} title={isSales ? "Sales Endorsement" : undefined} />
+      <QuoteHeader quote={quote} title={isSales ? 'Sales Endorsement' : undefined} />
 
       {/* Summary section hidden as per request */}
       {/* <section className="rounded border bg-white p-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
@@ -920,47 +962,50 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
       {canSalesEndorse && (
         <div className="space-y-4 py-6">
           <div className="rounded-xl bg-blue-50 p-4 border border-blue-100 dark:bg-blue-900/20 dark:border-blue-800 flex items-center justify-center gap-3">
-             <ClipboardDocumentCheckIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <h3 className="font-bold text-blue-900 dark:text-blue-100 uppercase tracking-wider text-sm">Sales Endorsement</h3>
+            <ClipboardDocumentCheckIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <h3 className="font-bold text-blue-900 dark:text-blue-100 uppercase tracking-wider text-sm">
+              Sales Endorsement
+            </h3>
           </div>
-          
-          <section className="rounded-xl border border-gray-200 bg-white p-8 shadow-lg dark:bg-gray-800 dark:border-gray-700">
-          {project && (
-            <div className="mt-4 grid grid-cols-2 gap-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-900/50 dark:text-gray-300 border border-gray-100 dark:border-gray-700">
-              <div>
-                <span className="font-semibold text-gray-900 dark:text-white">Project ID:</span> {project.id}
-              </div>
-              <div>
-                <span className="font-semibold text-gray-900 dark:text-white">Commences:</span>{' '}
-                {project.commenceOn ? new Date(project.commenceOn).toLocaleDateString() : 'TBD'}
-              </div>
-              <div>
-                <span className="font-semibold text-gray-900 dark:text-white">Deposit:</span>{' '}
-                <Money value={projectDefaults.deposit} />
-              </div>
-              <div>
-                <span className="font-semibold text-gray-900 dark:text-white">Installment:</span>{' '}
-                <Money value={projectDefaults.installment} />
-              </div>
-              {projectDefaults.installmentDueOn && (
-                <div>
-                  <span className="font-semibold text-gray-900 dark:text-white">Due Date:</span>{' '}
-                  {project.installmentDueOn
-                    ? new Date(project.installmentDueOn).toLocaleDateString()
-                    : 'TBD'}
-                </div>
-              )}
-            </div>
-          )}
 
-          {canEndorse && (
-            <SalesEndorsementForm
-              action={endorseProjectAction}
-              defaults={projectDefaults}
-              grandTotal={totals.grandTotal}
-            />
-          )}
-        </section>
+          <section className="rounded-xl border border-gray-200 bg-white p-8 shadow-lg dark:bg-gray-800 dark:border-gray-700">
+            {project && (
+              <div className="mt-4 grid grid-cols-2 gap-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-900/50 dark:text-gray-300 border border-gray-100 dark:border-gray-700">
+                <div>
+                  <span className="font-semibold text-gray-900 dark:text-white">Project ID:</span>{' '}
+                  {project.id}
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-900 dark:text-white">Commences:</span>{' '}
+                  {project.commenceOn ? new Date(project.commenceOn).toLocaleDateString() : 'TBD'}
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-900 dark:text-white">Deposit:</span>{' '}
+                  <Money value={projectDefaults.deposit} />
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-900 dark:text-white">Installment:</span>{' '}
+                  <Money value={projectDefaults.installment} />
+                </div>
+                {projectDefaults.installmentDueOn && (
+                  <div>
+                    <span className="font-semibold text-gray-900 dark:text-white">Due Date:</span>{' '}
+                    {project.installmentDueOn
+                      ? new Date(project.installmentDueOn).toLocaleDateString()
+                      : 'TBD'}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {canEndorse && (
+              <SalesEndorsementForm
+                action={endorseProjectAction}
+                defaults={projectDefaults}
+                grandTotal={totals.grandTotal}
+              />
+            )}
+          </section>
         </div>
       )}
 
@@ -968,7 +1013,9 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
         <section className="rounded border bg-white p-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
           <div className="flex flex-col gap-6 lg:flex-row lg:justify-between">
             <div className="lg:max-w-md">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Project Assignment</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Project Assignment
+              </h2>
 
               <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
                 <div>
@@ -1184,313 +1231,488 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
 
       {!canSalesEndorse && (
         <>
+          {/* Material & Labour running totals */}
           <div className="space-y-8">
-            {groups.map((group) => (
-          <div key={group.section} className="space-y-4">
-            <div className="rounded-xl bg-blue-50 p-4 border border-blue-100 dark:bg-blue-900/20 dark:border-blue-800 flex items-center gap-3">
-              {group.section === 'MATERIALS' ? (
-                <BeakerIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              ) : group.section === 'LABOUR' ? (
-                <WrenchScrewdriverIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              ) : (
-                <TagIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              )}
-              <h3 className="font-bold text-blue-900 dark:text-blue-100 uppercase tracking-wider text-sm">{group.section}</h3>
-            </div>
-
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-900/50">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-12">#</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Description</th>
-                    <th scope="col" className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-24">Unit</th>
-                    <th scope="col" className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-24">Qty</th>
-                    <th scope="col" className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-64">Rate</th>
-                    <th scope="col" className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-32">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
-                  {group.rows.map((row, idx) => (
-                    <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{idx + 1}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                        <div className="line-clamp-2">{row.description}</div>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          {row.source === 'Manual' && (
-                            <span className="inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                              MANUAL{row.addedVersion ? ` (v${row.addedVersion})` : ''}
-                            </span>
-                          )}
-                          {!row.isCurrentCycle && (
-                            <span className="inline-flex items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-400">
-                              <LockClosedIcon className="h-3 w-3" />
-                              LOCKED (CYCLE {row.cycle})
-                            </span>
-                          )}
-                          {row.negotiation && (
-                            <span className={clsx(
-                              'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold',
-                              NEGOTIATION_BADGE_CLASSES[row.negotiation.status]
-                            )}>
-                              {formatDecisionLabel(row.negotiation.status)}
-                              {row.negotiation.status !== 'PENDING' && row.negotiation.reviewerName && ` by ${row.negotiation.reviewerName}`}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-500 dark:text-gray-400">{row.unit}</td>
-                      <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-white">{row.qty.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-white">
-                        {allowEdit ? (
-                      <div className="flex justify-end">
-                            {/* Only allow editing if we have general edit permission AND (it's not a negotiation review OR the item is pending) */}
-                            {allowEdit && (quote.status !== 'NEGOTIATION_REVIEW' || row.negotiation?.status === 'PENDING') ? (
-                              <LineRateEditor
-                                quoteId={quote.id}
-                                lineId={row.id}
-                                defaultRate={row.rate}
-                                defaultQuantity={row.qty}
-                                isNegotiationPending={row.negotiation?.status === 'PENDING'}
-                              />
-                            ) : (
-                              <Money value={row.rate} />
-                            )}
-                          </div>
-                        ) : (
-                          <Money value={row.rate} />
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm font-bold text-gray-900 dark:text-white">
-                        <Money value={row.amount} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-gray-50 dark:bg-gray-900/50">
-                  <tr>
-                    <td colSpan={5} className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">Section Subtotal</td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-gray-900 dark:text-white">
-                      <Money value={group.subtotal} />
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        ))}
-      </div>
-      {role === 'ADMIN' && (
-      <section className="rounded border bg-white p-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Versions</h2>
-
-        <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {versions.length === 0 && (
-            <div className="col-span-full text-sm text-gray-500 dark:text-gray-400">No versions recorded yet.</div>
-          )}
-
-          {versions.map((version, index) => {
-            const diff = versionDiffs[index];
-
-            return (
-              <div 
-                key={version.id} 
-                className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-4 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
-              >
-                <div>
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                        v{version.version} - {version.label ?? 'Snapshot'}
-                      </div>
-
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(version.createdAt).toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                         Status: {version.status ?? '-'}
+            {groups.map((group, gIdx) => (
+              <div key={`${group.section}-${group.isLabour ? 'L' : 'M'}`}>
+                {/* Materials total banner - shown right before first labour group */}
+                {gIdx === firstLabourIdx && firstLabourIdx > 0 && (
+                  <div className="mb-6 space-y-3">
+                    <div className="flex justify-end">
+                      <div className="rounded-lg bg-blue-100 px-6 py-3 dark:bg-blue-900/30">
+                        <span className="text-sm font-bold text-blue-900 dark:text-blue-200">
+                          TOTAL MATERIALS:{' '}
+                        </span>
+                        <span className="text-sm font-bold text-blue-900 dark:text-blue-100">
+                          <Money value={materialTotal} />
+                        </span>
                       </div>
                     </div>
-
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      <div className="text-right">
-                        <Money value={version.snapshot.totals.grandTotal} />
-                      </div>
-                      {diff.totalDelta !== null && diff.totalDelta !== 0 && (
-                        <div
-                          className={clsx(
-                            'text-right text-xs',
-                            diff.totalDelta > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
-                          )}
-                        >
-                          {diff.totalDelta > 0 ? '+' : '-'}
-                          <Money value={Math.abs(diff.totalDelta)} />
-                        </div>
-                      )}
+                    <div className="rounded-xl bg-amber-50 p-4 border-2 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700 flex items-center gap-3">
+                      <WrenchScrewdriverIcon className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                      <h2 className="font-bold text-amber-900 dark:text-amber-100 uppercase tracking-wider text-base">
+                        Labour
+                      </h2>
                     </div>
                   </div>
+                )}
 
-                  <div className="mt-3 space-y-2 text-sm border-t border-gray-100 pt-3 dark:border-gray-700">
-                    {diff.lineChanges.length > 0 ? (
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white text-xs uppercase tracking-wide mb-1">Line changes</div>
+                <div className="space-y-4">
+                  <div className="rounded-xl bg-blue-50 p-4 border border-blue-100 dark:bg-blue-900/20 dark:border-blue-800 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {group.isLabour ? (
+                        <WrenchScrewdriverIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      ) : group.section === 'MATERIALS' ? (
+                        <BeakerIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      ) : (
+                        <TagIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      )}
+                      <h3 className="font-bold text-blue-900 dark:text-blue-100 uppercase tracking-wider text-sm">
+                        {group.label}
+                      </h3>
+                    </div>
+                    {isReviewer && status === 'SUBMITTED_REVIEW' && (
+                      <DeleteSectionButton
+                        quoteId={quote.id}
+                        section={group.section}
+                        itemType={group.isLabour ? 'LABOUR' : 'MATERIAL'}
+                        label={group.label}
+                      />
+                    )}
+                  </div>
 
-                        <ul className="space-y-1">
-                          {diff.lineChanges.slice(0, 5).map((change) => (
-                            <li
-                              key={change.lineId}
-                              className="flex items-center justify-between gap-2 text-xs text-gray-600 dark:text-gray-300"
-                            >
-                              <span className="truncate">{change.description}</span>
-
-                              <span className="shrink-0">
-                                {change.previous !== undefined && (
-                                  <span className="mr-2 text-xs text-gray-500 line-through dark:text-gray-500">
-                                    <Money value={change.previous} />
+                  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-900/50">
+                        <tr>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-12"
+                          >
+                            #
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                          >
+                            Description
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-24"
+                          >
+                            Unit
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-24"
+                          >
+                            Qty
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-64"
+                          >
+                            Rate
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-32"
+                          >
+                            Amount
+                          </th>
+                          {isReviewer && status === 'SUBMITTED_REVIEW' && (
+                            <th
+                              scope="col"
+                              className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 w-12"
+                            ></th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                        {group.rows.map((row, idx) => (
+                          <tr
+                            key={row.id}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                          >
+                            <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                              {idx + 1}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                              <div className="line-clamp-2">{row.description}</div>
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {row.source === 'Manual' && (
+                                  <span className="inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                                    MANUAL{row.addedVersion ? ` (v${row.addedVersion})` : ''}
                                   </span>
                                 )}
-
-                                <Money value={change.current} />
-                              </span>
-                            </li>
-                          ))}
-                          {diff.lineChanges.length > 5 && (
-                             <li className="text-xs text-gray-400 italic">+{diff.lineChanges.length - 5} more changes...</li>
-                          )}
-                        </ul>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 italic">
-                        No line changes.
-                      </div>
-                    )}
-
-                    {diff.removed.length > 0 && (
-                      <div className="mt-2">
-                        <div className="font-medium text-gray-900 dark:text-white text-xs uppercase tracking-wide mb-1">Removed</div>
-
-                        <ul className="space-y-1">
-                          {diff.removed.slice(0, 3).map((removed) => (
-                            <li
-                              key={removed.lineId}
-                              className="flex items-center justify-between gap-2 text-xs text-gray-600 dark:text-gray-300"
-                            >
-                              <span className="truncate">{removed.description}</span>
-
-                              <span className="shrink-0 text-gray-500 dark:text-gray-400">
-                                <Money value={removed.amount} />
-                              </span>
-                            </li>
-                          ))}
-                           {diff.removed.length > 3 && (
-                             <li className="text-xs text-gray-400 italic">+{diff.removed.length - 3} more removed...</li>
-                          )}
-                        </ul>
-                      </div>
+                                {!row.isCurrentCycle && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                                    <LockClosedIcon className="h-3 w-3" />
+                                    LOCKED (CYCLE {row.cycle})
+                                  </span>
+                                )}
+                                {row.negotiation && (
+                                  <span
+                                    className={clsx(
+                                      'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold',
+                                      NEGOTIATION_BADGE_CLASSES[row.negotiation.status]
+                                    )}
+                                  >
+                                    {formatDecisionLabel(row.negotiation.status)}
+                                    {row.negotiation.status !== 'PENDING' &&
+                                      row.negotiation.reviewerName &&
+                                      ` by ${row.negotiation.reviewerName}`}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center text-sm text-gray-500 dark:text-gray-400">
+                              {row.unit}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-white">
+                              {row.qty.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-white">
+                              {allowEdit ? (
+                                <div className="flex justify-end">
+                                  {allowEdit &&
+                                  (quote.status !== 'NEGOTIATION_REVIEW' ||
+                                    row.negotiation?.status === 'PENDING') ? (
+                                    <LineRateEditor
+                                      quoteId={quote.id}
+                                      lineId={row.id}
+                                      defaultRate={row.rate}
+                                      defaultQuantity={row.qty}
+                                      isNegotiationPending={row.negotiation?.status === 'PENDING'}
+                                    />
+                                  ) : (
+                                    <Money value={row.rate} />
+                                  )}
+                                </div>
+                              ) : (
+                                <Money value={row.rate} />
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm font-bold text-gray-900 dark:text-white">
+                              <Money value={row.amount} />
+                            </td>
+                            {isReviewer && status === 'SUBMITTED_REVIEW' && (
+                              <td className="px-4 py-3 text-center">
+                                <DeleteLineButton quoteId={quote.id} lineId={row.id} />
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-50 dark:bg-gray-900/50">
+                        <tr>
+                          <td
+                            colSpan={isReviewer && status === 'SUBMITTED_REVIEW' ? 6 : 5}
+                            className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-white"
+                          >
+                            Section Subtotal
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-bold text-gray-900 dark:text-white">
+                            <Money value={group.subtotal} />
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                    {isReviewer && status === 'SUBMITTED_REVIEW' && (
+                      <AddLineForm quoteId={quote.id} section={group.section} />
                     )}
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </section>
-      )}
-      {canViewVersionsAndNegotiations && (
-        <NegotiationsList
-          negotiationSnapshots={negotiationSnapshots}
-          quoteLines={quote.lines}
-          isReviewer={isReviewer}
-          vatRate={vatRate}
-          activeCycle={activeCycle}
-          closeNegotiationAction={closeNegotiationAction}
-        />
-      )}
+            ))}
 
+            {/* Labour Total + Fix & Supply Grand Total */}
+            <div className="space-y-3">
+              {labourTotal > 0 && (
+                <div className="flex justify-end">
+                  <div className="rounded-lg bg-amber-100 px-6 py-3 dark:bg-amber-900/30">
+                    <span className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                      TOTAL LABOUR:{' '}
+                    </span>
+                    <span className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                      <Money value={labourTotal} />
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <div className="rounded-lg bg-green-100 px-6 py-4 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
+                  <span className="text-base font-bold text-green-900 dark:text-green-200">
+                    TOTAL FIX &amp; SUPPLY:{' '}
+                  </span>
+                  <span className="text-base font-bold text-green-900 dark:text-green-100">
+                    <Money value={materialTotal + labourTotal} />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          {role === 'ADMIN' && (
+            <section className="rounded border bg-white p-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Versions</h2>
 
-      {/* Quote Summary (Barmlo Template) */}
-      <QuoteSummary 
-          lines={quote.lines.map(l => ({ 
-            lineTotalMinor: l.lineTotalMinor, 
-            itemType: l.itemType, 
-            section: l.section 
-          }))}
-          pgRate={quote.pgRate}
-          contingencyRate={quote.contingencyRate}
-          currency={quote.currency ?? undefined}
-      />
-      
-      {/* Quote Notes (Barmlo Template) */}
-      <QuoteNotes 
-          assumptions={parseJson<string[]>(quote.assumptions) ?? []} 
-          exclusions={parseJson<string[]>(quote.exclusions) ?? []} 
-          readOnly={!allowEdit}
-          onSave={allowEdit ? async (a, e) => {
-            'use server';
-            await updateQuoteNotes(quote.id, a, e);
-          } : undefined}
-      />
+              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {versions.length === 0 && (
+                  <div className="col-span-full text-sm text-gray-500 dark:text-gray-400">
+                    No versions recorded yet.
+                  </div>
+                )}
 
-      <div className="flex justify-center gap-2 mb-8 mt-8 no-print">
-        <DownloadPdfButton 
-          quoteId={quote.id} 
-          generatePdf={generateQuotePdf}
-          className="bg-green-600 hover:bg-green-700 focus:ring-green-600" 
-        />
-      </div>
+                {versions.map((version, index) => {
+                  const diff = versionDiffs[index];
 
-      <div className="mt-8 pt-6 border-t border-gray-200 no-print">
-        <div className="flex flex-wrap items-center justify-end gap-4">
-          {role && (role === 'QS' || role === 'ADMIN') && <QSEditButton quoteId={quote.id} />}
+                  return (
+                    <div
+                      key={version.id}
+                      className="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-4 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                    >
+                      <div>
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                              v{version.version} - {version.label ?? 'Snapshot'}
+                            </div>
 
-          {visibleTargets.map((target) => (
-            <form key={target} action={transitionAction} className={STATUS_BUTTON_LABELS[target] === 'Send to Sales' || STATUS_BUTTON_LABELS[target] === 'Move to Negotiation' ? 'w-full' : ''}>
-              <input type="hidden" name="target" value={target} />
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {new Date(version.createdAt).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Status: {version.status ?? '-'}
+                            </div>
+                          </div>
 
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                            <div className="text-right">
+                              <Money value={version.snapshot.totals.grandTotal} />
+                            </div>
+                            {diff.totalDelta !== null && diff.totalDelta !== 0 && (
+                              <div
+                                className={clsx(
+                                  'text-right text-xs',
+                                  diff.totalDelta > 0
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-red-600 dark:text-red-400'
+                                )}
+                              >
+                                {diff.totalDelta > 0 ? '+' : '-'}
+                                <Money value={Math.abs(diff.totalDelta)} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 space-y-2 text-sm border-t border-gray-100 pt-3 dark:border-gray-700">
+                          {diff.lineChanges.length > 0 ? (
+                            <div>
+                              <div className="font-medium text-gray-900 dark:text-white text-xs uppercase tracking-wide mb-1">
+                                Line changes
+                              </div>
+
+                              <ul className="space-y-1">
+                                {diff.lineChanges.slice(0, 5).map((change) => (
+                                  <li
+                                    key={change.lineId}
+                                    className="flex items-center justify-between gap-2 text-xs text-gray-600 dark:text-gray-300"
+                                  >
+                                    <span className="truncate">{change.description}</span>
+
+                                    <span className="shrink-0">
+                                      {change.previous !== undefined && (
+                                        <span className="mr-2 text-xs text-gray-500 line-through dark:text-gray-500">
+                                          <Money value={change.previous} />
+                                        </span>
+                                      )}
+
+                                      <Money value={change.current} />
+                                    </span>
+                                  </li>
+                                ))}
+                                {diff.lineChanges.length > 5 && (
+                                  <li className="text-xs text-gray-400 italic">
+                                    +{diff.lineChanges.length - 5} more changes...
+                                  </li>
+                                )}
+                              </ul>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                              No line changes.
+                            </div>
+                          )}
+
+                          {diff.removed.length > 0 && (
+                            <div className="mt-2">
+                              <div className="font-medium text-gray-900 dark:text-white text-xs uppercase tracking-wide mb-1">
+                                Removed
+                              </div>
+
+                              <ul className="space-y-1">
+                                {diff.removed.slice(0, 3).map((removed) => (
+                                  <li
+                                    key={removed.lineId}
+                                    className="flex items-center justify-between gap-2 text-xs text-gray-600 dark:text-gray-300"
+                                  >
+                                    <span className="truncate">{removed.description}</span>
+
+                                    <span className="shrink-0 text-gray-500 dark:text-gray-400">
+                                      <Money value={removed.amount} />
+                                    </span>
+                                  </li>
+                                ))}
+                                {diff.removed.length > 3 && (
+                                  <li className="text-xs text-gray-400 italic">
+                                    +{diff.removed.length - 3} more removed...
+                                  </li>
+                                )}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+          {canViewVersionsAndNegotiations && (
+            <NegotiationsList
+              negotiationSnapshots={negotiationSnapshots}
+              quoteLines={quote.lines}
+              isReviewer={isReviewer}
+              vatRate={vatRate}
+              activeCycle={activeCycle}
+              closeNegotiationAction={closeNegotiationAction}
+            />
+          )}
+
+          {/* Quote Summary (Barmlo Template) */}
+          <QuoteSummary
+            lines={quote.lines.map((l) => ({
+              lineTotalMinor: l.lineTotalMinor,
+              itemType: l.itemType,
+              section: l.section,
+            }))}
+            pgRate={quote.pgRate}
+            contingencyRate={quote.contingencyRate}
+            currency={quote.currency ?? undefined}
+          />
+
+          {/* Quote Notes (Barmlo Template) */}
+          <QuoteNotes
+            assumptions={parseJson<string[]>(quote.assumptions) ?? []}
+            exclusions={parseJson<string[]>(quote.exclusions) ?? []}
+            readOnly={!allowEdit}
+            onSave={
+              allowEdit
+                ? async (a, e) => {
+                    'use server';
+                    await updateQuoteNotes(quote.id, a, e);
+                  }
+                : undefined
+            }
+          />
+
+          <div className="flex justify-center gap-2 mb-8 mt-8 no-print">
+            <DownloadPdfButton
+              quoteId={quote.id}
+              generatePdf={generateQuotePdf}
+              className="bg-green-600 hover:bg-green-700 focus:ring-green-600"
+            />
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-gray-200 no-print">
+            <div className="flex flex-wrap items-center justify-end gap-4">
+              {role && (role === 'QS' || role === 'ADMIN') && <QSEditButton quoteId={quote.id} />}
+
+              {visibleTargets.map((target) => (
+                <form
+                  key={target}
+                  action={transitionAction}
+                  className={
+                    STATUS_BUTTON_LABELS[target] === 'Send to Sales' ||
+                    STATUS_BUTTON_LABELS[target] === 'Move to Negotiation'
+                      ? 'w-full'
+                      : ''
+                  }
+                >
+                  <input type="hidden" name="target" value={target} />
+
+                  <SubmitButton
+                    loadingText=""
+                    className={clsx(
+                      'rounded-xl px-8 py-3 text-sm shadow-md transition-all inline-flex items-center justify-center gap-3 font-bold',
+                      STATUS_BUTTON_LABELS[target] === 'Send to Sales' ||
+                        STATUS_BUTTON_LABELS[target] === 'Move to Negotiation'
+                        ? 'w-full bg-green-600 text-white hover:bg-green-700 hover:shadow-lg hover:-translate-y-0.5 text-lg py-4'
+                        : STATUS_BUTTON_LABELS[target] === 'Submit for Review'
+                          ? 'bg-green-600 text-white hover:bg-green-700 min-w-[200px]'
+                          : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 min-w-[200px]'
+                    )}
+                  >
+                    {STATUS_BUTTON_LABELS[target] === 'Submit for Review' && (
+                      <PaperAirplaneIcon className="h-5 w-5" />
+                    )}
+                    {STATUS_BUTTON_LABELS[target] === 'Mark Reviewed' && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                        className="h-5 w-5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                        />
+                      </svg>
+                    )}
+                    {STATUS_BUTTON_LABELS[target] === 'Archive' && (
+                      <ArchiveBoxIcon className="h-5 w-5" />
+                    )}
+                    <span
+                      className={
+                        STATUS_BUTTON_LABELS[target] === 'Send to Sales' ||
+                        STATUS_BUTTON_LABELS[target] === 'Move to Negotiation'
+                          ? 'text-xl'
+                          : 'text-lg'
+                      }
+                    >
+                      {STATUS_BUTTON_LABELS[target]}
+                    </span>
+                  </SubmitButton>
+                </form>
+              ))}
+            </div>
+          </div>
+
+          {isReviewer && latestNegotiation?.status === 'OPEN' && allItemsResolved && (
+            <form
+              action={closeNegotiationAction.bind(null, latestNegotiation.id)}
+              className="fixed bottom-8 right-8 z-50 no-print"
+            >
               <SubmitButton
-                loadingText=""
-                className={clsx(
-                  'rounded-xl px-8 py-3 text-sm shadow-md transition-all inline-flex items-center justify-center gap-3 font-bold',
-                  (STATUS_BUTTON_LABELS[target] === 'Send to Sales' || STATUS_BUTTON_LABELS[target] === 'Move to Negotiation')
-                    ? 'w-full bg-green-600 text-white hover:bg-green-700 hover:shadow-lg hover:-translate-y-0.5 text-lg py-4'
-                    : STATUS_BUTTON_LABELS[target] === 'Submit for Review'
-                    ? 'bg-green-600 text-white hover:bg-green-700 min-w-[200px]'
-                    : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 min-w-[200px]'
-                )}
+                loadingText="Closing..."
+                className="group flex items-center gap-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-4 text-white shadow-lg shadow-green-900/20 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-green-900/30 active:translate-y-0 active:shadow-md"
               >
-                {STATUS_BUTTON_LABELS[target] === 'Submit for Review' && <PaperAirplaneIcon className="h-5 w-5" />}
-                {STATUS_BUTTON_LABELS[target] === 'Mark Reviewed' && (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                  </svg>
-                )}
-                {STATUS_BUTTON_LABELS[target] === 'Archive' && <ArchiveBoxIcon className="h-5 w-5" />}
-                <span className={STATUS_BUTTON_LABELS[target] === 'Send to Sales' || STATUS_BUTTON_LABELS[target] === 'Move to Negotiation' ? "text-xl" : "text-lg"}>{STATUS_BUTTON_LABELS[target]}</span>
+                <span className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 group-hover:bg-white/30 transition-colors">
+                    <CheckCircleIcon className="h-5 w-5" />
+                  </span>
+                  <span className="text-lg font-bold tracking-wide">Close Proposal</span>
+                </span>
               </SubmitButton>
             </form>
-          ))}
-        </div>
-      </div>
-
-      {isReviewer && latestNegotiation?.status === 'OPEN' && allItemsResolved && (
-        <form
-          action={closeNegotiationAction.bind(null, latestNegotiation.id)}
-          className="fixed bottom-8 right-8 z-50 no-print"
-        >
-          <SubmitButton
-            loadingText="Closing..."
-            className="group flex items-center gap-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-4 text-white shadow-lg shadow-green-900/20 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-green-900/30 active:translate-y-0 active:shadow-md"
-          >
-            <span className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 group-hover:bg-white/30 transition-colors">
-                <CheckCircleIcon className="h-5 w-5" />
-              </span>
-              <span className="text-lg font-bold tracking-wide">Close Proposal</span>
-            </span>
-          </SubmitButton>
-        </form>
-      )}
-      </>
+          )}
+        </>
       )}
     </div>
   );

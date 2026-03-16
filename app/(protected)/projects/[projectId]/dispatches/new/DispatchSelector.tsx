@@ -16,11 +16,13 @@ interface DispatchableItem {
 export default function DispatchSelector({ 
   projectId, 
   availableItems,
-  drivers = []
+  drivers = [],
+  userRole = ''
 }: { 
   projectId: string; 
   availableItems: DispatchableItem[];
   drivers?: Array<{ id: string; name: string | null; email: string | null }>;
+  userRole?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -34,6 +36,8 @@ export default function DispatchSelector({
   const [selectedDriverId, setSelectedDriverId] = useState('');
   const [driverName, setDriverName] = useState('');
   const [vehicleReg, setVehicleReg] = useState('');
+
+  const showDriverAllocation = userRole !== 'PROJECT_OPERATIONS_OFFICER';
 
   const getQty = (id: string) => {
     return selectedItems.find(i => i.id === id)?.qty || 0;
@@ -198,6 +202,7 @@ export default function DispatchSelector({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Driver Allocation */}
+        {showDriverAllocation && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
           <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2">
             Driver Allocation
@@ -251,6 +256,7 @@ export default function DispatchSelector({
             )}
           </div>
         </div>
+        )}
 
         {/* Note Section */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
