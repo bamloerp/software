@@ -133,13 +133,23 @@ export async function POST(
     }),
   );
 
+  // Get all existing item IDs so we can delete their task reports first
+  const existingItemIds = await prisma.scheduleItem
+    .findMany({ where: { scheduleId: schedule.id }, select: { id: true } })
+    .then((items) => items.map((i) => i.id));
+
   await prisma.$transaction([
+    // Delete task reports referencing existing items (FK constraint)
+    ...(existingItemIds.length > 0
+      ? [prisma.scheduleTaskReport.deleteMany({ where: { scheduleItemId: { in: existingItemIds } } })]
+      : []),
     prisma.scheduleItem.deleteMany({ where: { scheduleId: schedule.id } }),
     ...createQueries,
   ]);
 
   revalidatePath(`/projects/${projectId}/schedule`);
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath('/projects/schedules');
 
   return NextResponse.json({ ok: true });
 }

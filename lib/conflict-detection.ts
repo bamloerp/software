@@ -18,6 +18,40 @@ export async function detectAndNotifyConflicts(
             title: i.title
         }));
 
+    // 1b. Clear stale conflict flags on OTHER projects that reference THIS project
+    // When we re-save, conflicts may have been resolved, so wipe old flags first.
+    if (currentProjectNumber) {
+      const staleItems = await prisma.scheduleItem.findMany({
+        where: {
+          schedule: { projectId: { not: currentProjectId } },
+          hasConflict: true,
+          conflictNote: { contains: currentProjectNumber },
+        },
+        select: { id: true, scheduleId: true },
+      });
+
+      if (staleItems.length > 0) {
+        await prisma.scheduleItem.updateMany({
+          where: { id: { in: staleItems.map(s => s.id) } },
+          data: { hasConflict: false, conflictNote: null },
+        });
+
+        // Re-check if affected schedules still have any remaining conflicts
+        const affectedScheduleIds = [...new Set(staleItems.map(s => s.scheduleId))];
+        for (const schedId of affectedScheduleIds) {
+          const remaining = await prisma.scheduleItem.count({
+            where: { scheduleId: schedId, hasConflict: true },
+          });
+          if (remaining === 0) {
+            await prisma.schedule.update({
+              where: { id: schedId },
+              data: { hasConflict: false },
+            });
+          }
+        }
+      }
+    }
+
     if (checks.length === 0) return;
 
     // 2. Batch query for potential conflicts

@@ -760,7 +760,13 @@ export default function ScheduleEditor({
           }}
           employees={employees}
           selectedIds={items[activeRowIndex!]?.employeeIds ?? []}
-          onSave={(ids) => updateField(activeRowIndex!, 'employeeIds', ids)}
+          onSave={(ids) => {
+            updateField(activeRowIndex!, 'employeeIds', ids);
+            // Auto-run conflict check after saving assignment
+            const updated = [...items];
+            (updated[activeRowIndex!] as any).employeeIds = ids;
+            checkAllConflicts(updated);
+          }}
           startDate={items[activeRowIndex!]?.plannedStart ?? null}
           endDate={items[activeRowIndex!]?.plannedEnd ?? null}
           scheduleItemId={items[activeRowIndex!]?.id ?? null}
@@ -788,6 +794,12 @@ export default function ScheduleEditor({
           onSave={(ids) => {
             handleBulkSave(ids);
             setBulkModalOpen(false);
+            // Auto-run conflict check after bulk assignment save
+            const updated = [...items];
+            bulkSelected.forEach((idx) => {
+              updated[idx] = { ...updated[idx], employeeIds: ids };
+            });
+            checkAllConflicts(updated);
           }}
           startDate={items[firstBulkIdx]?.plannedStart ?? null}
           endDate={items[firstBulkIdx]?.plannedEnd ?? null}
