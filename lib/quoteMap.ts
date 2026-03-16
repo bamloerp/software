@@ -134,13 +134,36 @@ export type ElectricalItem = {
 };
 
 export const ELECTRICAL_ITEMS_CATALOG: ElectricalItem[] = [
-  { id: 'elec-1',  description: 'D/Box',                   unit: 'no',  rate: 25.00, qty: 1, section: 'ELECTRICALS', itemType: 'MATERIAL' },
-  { id: 'elec-2',  description: 'Meterboard',              unit: 'no',  rate: 45.00, qty: 1, section: 'ELECTRICALS', itemType: 'MATERIAL' },
-  { id: 'elec-3',  description: '25mm conduit 6m',         unit: 'no',  rate: 3.50,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
-  { id: 'elec-4',  description: '25mm PVC Couplings',      unit: 'no',  rate: 0.30,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
-  { id: 'elec-5',  description: '25mm PVC Nipples',        unit: 'no',  rate: 0.25,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
-  { id: 'elec-6',  description: '19mm Conduits 6m',        unit: 'no',  rate: 2.50,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
-  { id: 'elec-7',  description: '20mm PVC Couplings',      unit: 'no',  rate: 0.25,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
-  { id: 'elec-8',  description: 'Tubing and chopping labour', unit: 'item', rate: 650.00, qty: 1, section: 'ELECTRICALS', itemType: 'LABOUR' },
+  // DISTRIBUTION BOARDS
+  { id: 'elec-1',  description: '8-10Way DB Flush mounting',       unit: 'no',   rate: 25.00,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-2',  description: 'Single phase meterbox',           unit: 'no',   rate: 35.00,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  // SWITCHES AND ACCESSORIES
+  { id: 'elec-3',  description: '25mm Conduits',                   unit: 'no',   rate: 4.00,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-4',  description: '25mm PVC Couplings',              unit: 'no',   rate: 0.20,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-5',  description: '25mm PVC Nipples',                unit: 'no',   rate: 0.10,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-6',  description: '19mm Conduits (6m lengths)',      unit: 'no',   rate: 2.10,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-7',  description: '19mm PVC Couplings',              unit: 'no',   rate: 0.15,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-8',  description: '19mm PVC Nipples',                unit: 'no',   rate: 0.20,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-9',  description: 'Saddles (19mm)',                  unit: 'no',   rate: 0.15,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-10', description: '4.0x35mm wood screws',            unit: 'box',  rate: 5.00,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-11', description: 'Saddles (25mm)',                  unit: 'no',   rate: 0.15,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-12', description: 'B.E conduit',                    unit: 'no',   rate: 15.00,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-13', description: 'B.E coupling',                   unit: 'no',   rate: 1.50,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-14', description: 'B.E saddles',                    unit: 'no',   rate: 0.50,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-15', description: 'Surface boxes, 6x3',             unit: 'no',   rate: 2.00,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-16', description: 'Surface boxes, 3x3',             unit: 'no',   rate: 1.50,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-17', description: 'Round boxes',                    unit: 'no',   rate: 0.90,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-18', description: 'Solvent cement 500ml',           unit: 'no',   rate: 10.00,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-19', description: 'Clout nails',                    unit: 'kgs',  rate: 8.00,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-20', description: '25mm female brass bush',         unit: 'no',   rate: 1.50,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-21', description: '19mm female bushes',             unit: 'no',   rate: 1.50,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-22', description: '25mm PVC to steel adapter',      unit: 'no',   rate: 3.90,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-23', description: '6mm extension bolts',            unit: 'no',   rate: 1.00,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-24', description: 'Angle iron',                     unit: 'no',   rate: 5.00,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-25', description: 'D Iron and schuckle',            unit: 'no',   rate: 6.00,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-26', description: 'Goose Neck pipe',                unit: 'no',   rate: 10.00,  qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  { id: 'elec-27', description: 'Chasing combs',                  unit: 'no',   rate: 0.50,   qty: 0, section: 'ELECTRICALS', itemType: 'MATERIAL' },
+  // LABOUR
+  { id: 'elec-28', description: 'Tubing and chopping labour',     unit: 'item', rate: 650.00, qty: 0, section: 'ELECTRICALS', itemType: 'LABOUR' },
 ];
 
