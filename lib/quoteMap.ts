@@ -5,6 +5,7 @@ export type QuoteLineSource = {
   rate?: number; // default unit price
   section?: string; // optional grouping
   itemType?: 'MATERIAL' | 'LABOUR';
+  labourNote?: string; // detailed description from quotation template (editable by senior QS)
 };
 
 // Define how computed cells map to quotation line items.
@@ -14,7 +15,7 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   { code: 'A15', description: 'Common bricks', unit: 'no', rate: 0.16, section: 'FOUNDATIONS' },
   { code: 'B8', description: 'River sand', unit: 'm3', rate: 20.0, section: 'FOUNDATIONS' },
   { code: 'C8', description: 'Pit sand', unit: 'm3', rate: 20.0, section: 'FOUNDATIONS' },
-  { code: 'D8', description: '19mm Grenite Quarry Stone aggregate', unit: 'm3', rate: 45.0, section: 'FOUNDATIONS' },
+  { code: 'D8', description: '19mm Grenite Quarry Stone aggregate', unit: 'm3', rate: 32.50, section: 'FOUNDATIONS' },
   { code: 'G7', description: 'Imported  inert granular fill/Hrdcore', unit: 'm3', rate: 15.0, section: 'FOUNDATIONS' },
   { code: 'G15', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.50, section: 'FOUNDATIONS' },
   //{ code: 'F15', description: 'Cement (50kg bag)', unit: 'bags', rate: 12.50, section: 'FOUNDATIONS' },
@@ -29,7 +30,7 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   { code: 'B45', description: 'Pit sand', unit: 'm3', rate: 20, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'A45+1', description: 'River Sand', unit: 'm3', rate: 20, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'D22+D33+G22', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.5, section: 'SUPERSTRUCTURE BRICKWORK' },
-   {code: 'C45', description: '19mm Grenite Quarry Stone aggrecates', unit: 'm3', rate: 45, section: 'SUPERSTRUCTURE BRICKWORK' },
+   {code: 'C45', description: '19mm Grenite Quarry Stone aggrecates', unit: 'm3', rate: 32.50, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'A36+A25', description: 'Common bricks', unit: 'no', rate: 0.16, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'B54', description: 'Damp proof course for one brick wall (20 metre rolls) (230mm)', unit: 'rolls', rate: 3.0, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'A54', description: 'Damp proof course for half brick wall (20 metre rolls) (115mm)', unit: 'rolls', rate: 2.0, section: 'SUPERSTRUCTURE BRICKWORK' },
@@ -84,38 +85,38 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   // { code: 'D4*0.263374486', description: 'Valley gutters   2.4m', unit: 'length', rate: 14.0, section: 'ROOF COVERINGS' },
 
   // LABOUR — SUB-STRUCTURE (LABOUR block A61..G61)
-  { code: 'H6', description: 'Site clearance', unit: 'm2', rate: 0.20, section: 'FOUNDATIONS', itemType: 'LABOUR' },
-  { code: 'D4', description: 'Setting out', unit: 'm2', rate: 0.70, section: 'FOUNDATIONS', itemType: 'LABOUR' },
-  { code: 'J6', description: 'Excavation to pickable earth (≤ 2m depth)', unit: 'm', rate: 4.50, section: 'FOUNDATIONS', itemType: 'LABOUR' },
-  { code: 'K6', description: 'Concrete works (footings and surface beds)', unit: 'm3', rate: 20.00, section: 'FOUNDATIONS', itemType: 'LABOUR' },
-  { code: 'L6', description: 'Footing brickwork in foundation', unit: 'm2', rate: 4.50, section: 'FOUNDATIONS', itemType: 'LABOUR' },
-  { code: 'M6', description: 'Ramming and backfilling', unit: 'm3', rate: 4.00, section: 'FOUNDATIONS', itemType: 'LABOUR' },
-  { code: 'N6', description: 'Floor slab (100mm, 1:2:4)', unit: 'm3', rate: 20.00, section: 'FOUNDATIONS', itemType: 'LABOUR' },
+  { code: 'H6', description: 'Site clearance', unit: 'm2', rate: 0.20, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Clear site of all vegetation, including removal and disposal of all debris, bushes, shrubs, undergrowth, hedges and stumps not exceeding 500mm girth and grubbing up roots and filling in holes with approved material.' },
+  { code: 'D4', description: 'Setting out', unit: 'm2', rate: 0.70, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Allow for laying out the practice of transferring the building design onto the land.' },
+  { code: 'J6', description: 'Excavation to pickable earth (≤ 2m depth)', unit: 'm', rate: 4.50, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Excavate in pickable earth below reduced ground level and surplus excavated material to be cartaway to a tip to be found the contractor (cartaway elsewhere measured), depth not exceeding 2 metres.' },
+  { code: 'K6', description: 'Concrete works (footings and surface beds)', unit: 'm3', rate: 20.00, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Concrete Grade 25 (20mm stone) in footing and in surface beds including all steel fixing and placing of concrete.' },
+  { code: 'L6', description: 'Footing brickwork in foundation', unit: 'm2', rate: 4.50, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Brickwork in foundation laid in Stretcher bond 1:4 cement mortar mix and reinforcement with brickforce every third corse up to structural slab level.' },
+  { code: 'M6', description: 'Ramming and backfilling', unit: 'm3', rate: 4.00, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Backfilling to trenches with selected excavated material levelled, well watered and compacted in layers not exceeding 150mm to engineers approval.' },
+  { code: 'N6', description: 'Floor slab (100mm, 1:2:4)', unit: 'm3', rate: 20.00, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: '100mm minimum 1:2:4 mix concrete floor slab cast independently from vertical walls with vertical malthed membrane and on black polythene sheeting lapped at joints and mesh reinforcement.' },
 
   // SUPER STRUCTURE TO RING BEAM
-  { code: 'H12-80', description: 'Brickwork', unit: 'm2', rate: 4.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR' },
-  { code: 'D54+C54', description: 'Door Frame Fittings', unit: 'no', rate: 5.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR' },
+  { code: 'H12-80', description: 'Brickwork', unit: 'm2', rate: 4.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Brickwork in superstructure laid in stretcher bond, 1:4 cement mortar mix and reinforced with brickforce every third corse up to the ring beam level.' },
+  { code: 'D54+C54', description: 'Door Frame Fittings', unit: 'no', rate: 5.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Allow for fitting of a radar approved standard pressed steel doorframe with a linning for a 44mm thick door complete with hinges and lugs of the building in.' },
 
   // ABOVE RING BEAM
-  { code: 'L12-50', description: 'Brickwork', unit: 'm2', rate: 4.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR' },
-  { code: 'K12', description: 'Shuttering', unit: 'm2', rate: 25.00, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR' },
-  { code: 'L12-500', description: 'Steel fixing', unit: 'kgs', rate: 3.00, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR' },
-  { code: 'J12', description: 'Ring beam and column concrete mixing', unit: 'm3', rate: 15, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR' },
-  { code: 'H15', description: 'Beam filing', unit: 'm2', rate: 12.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR' },
+  { code: 'L12-50', description: 'Brickwork', unit: 'm2', rate: 4.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Brickwork in superstructure laid in stretcher bond PC cement, laid in 1:4 cement mortar reinforced with brickforce every third corse up to the ring beam level.' },
+  { code: 'K12', description: 'Shuttering', unit: 'm2', rate: 2.00, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Sawn softwood timber formwork to sides and soffits of the beam.' },
+  { code: 'L12-500', description: 'Steel fixing', unit: 'kgs', rate: 3.00, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Reinforcement as described including cutting to lengths, bending, wiring and fixing in position etc.' },
+  { code: 'J12', description: 'Ring beam and column concrete mixing', unit: 'm3', rate: 15, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'In-situ concrete reinforced concrete (Grade 20Mpa) including all mixing and placing of concrete.' },
+  { code: 'H15', description: 'Beam filing', unit: 'm2', rate: 12.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Brickwork above the wallplate laid in stretcher bond PC cement, laid in 1:4 cement mortar and make good.' },
 
   //BEAM FILLING
   { code: 'H15', description: 'Brickwork above the wallplate laid in stretcher bond PC cement, laid in 1:4 cement mortar and make good.', unit: 'm2', rate: 12.50, section: 'superstructure brickwork'.toUpperCase() },
 
   // SCREED
-  { code: 'D4+40', description: '40mm screed to receive floor finishes', unit: 'm2', rate: 4.50, section: 'SCREEDS', itemType: 'LABOUR' },
+  { code: 'D4+40', description: '40mm screed to receive floor finishes', unit: 'm2', rate: 4.50, section: 'SCREEDS', itemType: 'LABOUR', labourNote: 'Cement and sand (1:4) screeds finished to an even surface so as to receive floor finishes (finishes elsewhere measured).' },
 
   //TUBING AND CHOPPING
   //  { code: 'C29', description: 'Supply, install and commission of conduit fittings required and all necessary accessories and fittings to complete the work as specified.', unit: 'item', rate: 650.0, section: 'ELECTRICALS TUBING' },
 
   // ROOFING
-  { code: 'D4/1.7', description: 'Roof truss', unit: 'no', rate: 12.50, section: 'ROOF COVERINGS', itemType: 'LABOUR' },
-  { code: 'A4/3*3.6', description: 'Facia board', unit: 'm', rate: 1.50, section: 'ROOF COVERINGS', itemType: 'LABOUR' },
-  { code: 'D4*1.5', description: 'Roof Coverings', unit: 'm2', rate: 4.50, section: 'ROOF COVERINGS', itemType: 'LABOUR' },
+  { code: 'D4/1.7', description: 'Roof truss', unit: 'no', rate: 12.50, section: 'ROOF COVERINGS', itemType: 'LABOUR', labourNote: 'Cutting, joining and assembling roof truss in a designed shape. Fixing beam in position complete with all necessary roofing nails, screws or hook as required.' },
+  { code: 'A4/3*3.6', description: 'Facia board', unit: 'm', rate: 1.50, section: 'ROOF COVERINGS', itemType: 'LABOUR', labourNote: 'Fixing A.C Facia board to timber structure.' },
+  { code: 'D4*1.5', description: 'Roof Coverings', unit: 'm2', rate: 4.50, section: 'ROOF COVERINGS', itemType: 'LABOUR', labourNote: 'Double roman concrete tiles to purline spaced at approximately 650mm centres including all necessary straining wires, galvanised hoop iron ties, safe top nails etc.' },
   //{ code: 'D4*1.5', description: 'Extra over roll top ridges', unit: 'no', rate: 1.00, section: 'ROOFING' },
 
 

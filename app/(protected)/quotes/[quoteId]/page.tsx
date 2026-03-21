@@ -24,6 +24,7 @@ import {
 import DeleteLineButton from '@/components/DeleteLineButton';
 import AddLineForm from '@/components/AddLineForm';
 import DeleteSectionButton from '@/components/DeleteSectionButton';
+import LabourNoteEditor from '@/components/LabourNoteEditor';
 
 import {
   DocumentTextIcon,
@@ -196,6 +197,8 @@ type LineRow = {
   isCurrentCycle: boolean;
 
   itemType: string | null;
+
+  labourNote: string | null;
 };
 
 type LineGroup = {
@@ -313,6 +316,8 @@ function buildLineGroups(
 
     const group = targetMap.get(groupKey)!;
 
+    const labourNote = typeof meta?.labourNote === 'string' ? meta.labourNote : null;
+
     group.rows.push({
       id: line.id,
       description: line.description,
@@ -328,6 +333,7 @@ function buildLineGroups(
       negotiation,
       cycle,
       isCurrentCycle,
+      labourNote,
     });
 
     group.subtotal += amount;
@@ -1340,6 +1346,18 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
                             </td>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                               <div className="line-clamp-2">{row.description}</div>
+                              {row.labourNote && !isReviewer && (
+                                <div className="mt-1 text-xs italic text-gray-500 dark:text-gray-400">
+                                  {row.labourNote}
+                                </div>
+                              )}
+                              {row.labourNote !== null && isReviewer && (
+                                <LabourNoteEditor
+                                  quoteId={quote.id}
+                                  lineId={row.id}
+                                  defaultNote={row.labourNote ?? ''}
+                                />
+                              )}
                               <div className="mt-1 flex flex-wrap gap-2">
                                 {row.source === 'Manual' && (
                                   <span className="inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">

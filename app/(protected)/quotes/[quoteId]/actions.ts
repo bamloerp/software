@@ -187,6 +187,37 @@ export async function updateLineItem(
   });
 }
 
+export async function updateLabourNote(
+  quoteId: string,
+  lineId: string,
+  note: string
+): Promise<ActionResult> {
+  return runAction('updateLabourNote', async () => {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    const role = assertRole(user.role);
+    if (role !== 'SENIOR_QS' && role !== 'ADMIN') {
+      throw new Error('Only Senior QS or Admin can edit labour notes');
+    }
+    const userOffice = resolveOfficeForRole(role, user.office ?? null);
+    const include = { lines: { where: { id: lineId } } } satisfies Prisma.QuoteInclude;
+    const { quote } = await fetchQuoteWithOffice(quoteId, include, role, userOffice);
+    const line = quote.lines[0];
+    if (!line) throw new Error('Line not found');
+
+    const meta = parseLineMeta(line.metaJson) ?? {};
+    meta.labourNote = note;
+
+    await prisma.quoteLine.update({
+      where: { id: line.id },
+      data: { metaJson: JSON.stringify(meta) },
+    });
+
+    revalidatePath(`/quotes/${quoteId}`);
+    return undefined;
+  });
+}
+
 function assertRole(role: string | null | undefined): UserRole {
   const normalized = coerceUserRole(role);
   if (!normalized) {

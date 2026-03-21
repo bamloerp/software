@@ -239,6 +239,7 @@ export default function TakeOffSheet() {
         lineTotalMinor: BigInt(Math.round(Math.ceil(Number(qty)) * (m.rate ?? 0) * 100)),
         unit: m.unit,
         code: m.code,
+        labourNote: m.labourNote || '',
       });
     }
 
@@ -400,6 +401,7 @@ export default function TakeOffSheet() {
           label: l.description,
           section: l.section || null,
           from: 'TakeOffSheet',
+          ...(l.labourNote ? { labourNote: l.labourNote } : {}),
         },
       }));
 
