@@ -56,8 +56,8 @@ export const WORKSHEET_SECTIONS: WorksheetSection[] = [
     key: 'metalwork',
     title: 'METALWORK — DOOR FRAMES',
     items: [
-      { id: 'door-frame-815x115', description: 'Door Frame size 815 x 115 mm.', unit: 'no', defaultRate: 35.0 },
-      { id: 'door-frame-815x230', description: 'Door Frame Size 815x230', unit: 'no', defaultRate: 54.0 },
+      { id: 'door-frame-815x115', description: 'Door Frame size 815 x 115 mm.', unit: 'no', defaultRate: 42.0 },
+      { id: 'door-frame-815x230', description: 'Door Frame Size 815x230', unit: 'no', defaultRate: 65.0 },
     ],
   },
   {

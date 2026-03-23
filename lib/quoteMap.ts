@@ -45,12 +45,12 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
 
 
   // METALWORK
-  { code: 'C54', description: 'Door Frames (230mm)', unit: 'no', rate: 5.20, section: 'METALWORK' },
-  { code: 'D54', description: 'Door Frames (115mm)', unit: 'no', rate: 3.90, section: 'METALWORK' },
+  { code: 'C54', description: 'Door Frames (230mm)', unit: 'no', rate: 65, section: 'METALWORK' },
+  { code: 'D54', description: 'Door Frames (115mm)', unit: 'no', rate: 42, section: 'METALWORK' },
 
   //PLASTERING
   { code: 'E22+E33', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.5, section: 'PLASTERING' },
-  { code: 'H22-150', description: 'One coat 1:4 cement sand plaster finished with a wood float on internal walls.', unit: 'm2', rate: 2.50, section: 'PLASTERING', itemType: 'LABOUR' },
+  { code: 'H22', description: 'One coat 1:4 cement sand plaster finished with a wood float on internal walls.', unit: 'm2', rate: 2.50, section: 'PLASTERING', itemType: 'LABOUR' },
   { code: 'I22', description: 'One coat 1:4 cement sand plaster finished with a wood float on extenal wall', unit: 'm3', rate: 2.50, section: 'PLASTERING', itemType: 'LABOUR' },
   {code : 'A51*3/8', description: 'Pit sand internal', unit: 'cm3', rate: 19.5, section: 'PLASTERING' },
   // { code: 'D71', description: 'Transport', unit: 'Km', rate: 0.65, section: 'PLASTERING' },
@@ -94,15 +94,15 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   { code: 'N6', description: 'Floor slab (100mm, 1:2:4)', unit: 'm3', rate: 20.00, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: '100mm minimum 1:2:4 mix concrete floor slab cast independently from vertical walls with vertical malthed membrane and on black polythene sheeting lapped at joints and mesh reinforcement.' },
 
   // SUPER STRUCTURE TO RING BEAM
-  { code: 'H12-80', description: 'Brickwork', unit: 'm2', rate: 4.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Brickwork in superstructure laid in stretcher bond, 1:4 cement mortar mix and reinforced with brickforce every third corse up to the ring beam level.' },
-  { code: 'D54+C54', description: 'Door Frame Fittings', unit: 'no', rate: 5.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Allow for fitting of a radar approved standard pressed steel doorframe with a linning for a 44mm thick door complete with hinges and lugs of the building in.' },
+  { code: 'H12-80', description: 'Brickwork', unit: 'm2', rate: 4.50, section: 'SUPERSTRUCTURE TO RING BEAM', itemType: 'LABOUR', labourNote: 'Brickwork in superstructure laid in stretcher bond, 1:4 cement mortar mix and reinforced with brickforce every third corse up to the ring beam level.' },
+  { code: 'D54+C54', description: 'Door Frame Fittings', unit: 'no', rate: 5.50, section: 'SUPERSTRUCTURE TO RING BEAM', itemType: 'LABOUR', labourNote: 'Allow for fitting of a radar approved standard pressed steel doorframe with a linning for a 44mm thick door complete with hinges and lugs of the building in.' },
 
   // ABOVE RING BEAM
-  { code: 'L12-50', description: 'Brickwork', unit: 'm2', rate: 4.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Brickwork in superstructure laid in stretcher bond PC cement, laid in 1:4 cement mortar reinforced with brickforce every third corse up to the ring beam level.' },
-  { code: 'K12', description: 'Shuttering', unit: 'm2', rate: 2.00, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Sawn softwood timber formwork to sides and soffits of the beam.' },
-  { code: 'L12-500', description: 'Steel fixing', unit: 'kgs', rate: 3.00, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Reinforcement as described including cutting to lengths, bending, wiring and fixing in position etc.' },
-  { code: 'J12', description: 'Ring beam and column concrete mixing', unit: 'm3', rate: 15, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'In-situ concrete reinforced concrete (Grade 20Mpa) including all mixing and placing of concrete.' },
-  { code: 'H15', description: 'Beam filing', unit: 'm2', rate: 12.50, section: 'SUPERSTRUCTURE BRICKWORK', itemType: 'LABOUR', labourNote: 'Brickwork above the wallplate laid in stretcher bond PC cement, laid in 1:4 cement mortar and make good.' },
+  { code: 'L12-50', description: 'Brickwork', unit: 'm2', rate: 4.50, section: 'ABOVE RING BEAM', itemType: 'LABOUR', labourNote: 'Brickwork in superstructure laid in stretcher bond PC cement, laid in 1:4 cement mortar reinforced with brickforce every third corse up to the ring beam level.' },
+  { code: 'K12', description: 'Shuttering', unit: 'm2', rate: 2.00, section: 'ABOVE RING BEAM', itemType: 'LABOUR', labourNote: 'Sawn softwood timber formwork to sides and soffits of the beam.' },
+  { code: 'L12-500', description: 'Steel fixing', unit: 'kgs', rate: 3.00, section: 'ABOVE RING BEAM', itemType: 'LABOUR', labourNote: 'Reinforcement as described including cutting to lengths, bending, wiring and fixing in position etc.' },
+  { code: 'J12', description: 'Ring beam and column concrete mixing', unit: 'm3', rate: 15, section: 'ABOVE RING BEAM', itemType: 'LABOUR', labourNote: 'In-situ concrete reinforced concrete (Grade 20Mpa) including all mixing and placing of concrete.' },
+  { code: 'H15', description: 'Beam filing', unit: 'm2', rate: 12.50, section: 'ABOVE RING BEAM', itemType: 'LABOUR', labourNote: 'Brickwork above the wallplate laid in stretcher bond PC cement, laid in 1:4 cement mortar and make good.' },
 
   //BEAM FILLING
   { code: 'H15', description: 'Brickwork above the wallplate laid in stretcher bond PC cement, laid in 1:4 cement mortar and make good.', unit: 'm2', rate: 12.50, section: 'superstructure brickwork'.toUpperCase() },

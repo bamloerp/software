@@ -355,6 +355,8 @@ function buildLineGroups(
   const SECTION_ORDER: Record<string, number> = {
     FOUNDATIONS: 1,
     'SUPERSTRUCTURE BRICKWORK': 2,
+    'SUPERSTRUCTURE TO RING BEAM': 2.5,
+    'ABOVE RING BEAM': 2.6,
     METALWORK: 3,
     PLASTERING: 4,
     SCREEDS: 5,
