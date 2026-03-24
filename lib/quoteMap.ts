@@ -30,7 +30,7 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   { code: 'B45', description: 'Pit sand', unit: 'm3', rate: 20, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'A45+1', description: 'River Sand', unit: 'm3', rate: 20, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'D22+D33+G22', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.5, section: 'SUPERSTRUCTURE BRICKWORK' },
-   {code: 'C45', description: '19mm Grenite Quarry Stone aggrecates', unit: 'm3', rate: 32.50, section: 'SUPERSTRUCTURE BRICKWORK' },
+   {code: 'C45', description: '19mm Grenite Quarry Stone aggrecates', unit: 'm3', rate: 38, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'A36+A25', description: 'Common bricks', unit: 'no', rate: 0.16, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'B54', description: 'Damp proof course for one brick wall (20 metre rolls) (230mm)', unit: 'rolls', rate: 3.0, section: 'SUPERSTRUCTURE BRICKWORK' },
   { code: 'A54', description: 'Damp proof course for half brick wall (20 metre rolls) (115mm)', unit: 'rolls', rate: 2.0, section: 'SUPERSTRUCTURE BRICKWORK' },
@@ -51,7 +51,7 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   //PLASTERING
   { code: 'E22+E33', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.5, section: 'PLASTERING' },
   { code: 'H22', description: 'One coat 1:4 cement sand plaster finished with a wood float on internal walls.', unit: 'm2', rate: 2.50, section: 'PLASTERING', itemType: 'LABOUR' },
-  { code: 'I22', description: 'One coat 1:4 cement sand plaster finished with a wood float on extenal wall', unit: 'm3', rate: 2.50, section: 'PLASTERING', itemType: 'LABOUR' },
+  { code: 'I22', description: 'One coat 1:4 cement sand plaster finished with a wood float on extenal wall', unit: 'm3', rate: 3.50, section: 'PLASTERING', itemType: 'LABOUR' },
   {code : 'A51*3/8', description: 'Pit sand internal', unit: 'cm3', rate: 19.5, section: 'PLASTERING' },
   // { code: 'D71', description: 'Transport', unit: 'Km', rate: 0.65, section: 'PLASTERING' },
 
@@ -85,8 +85,8 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   // { code: 'D4*0.263374486', description: 'Valley gutters   2.4m', unit: 'length', rate: 14.0, section: 'ROOF COVERINGS' },
 
   // LABOUR — SUB-STRUCTURE (LABOUR block A61..G61)
-  { code: 'H6', description: 'Site clearance', unit: 'm2', rate: 0.20, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Clear site of all vegetation, including removal and disposal of all debris, bushes, shrubs, undergrowth, hedges and stumps not exceeding 500mm girth and grubbing up roots and filling in holes with approved material.' },
-  { code: 'D4', description: 'Setting out', unit: 'm2', rate: 0.70, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Allow for laying out the practice of transferring the building design onto the land.' },
+  { code: 'H6', description: 'Site clearance', unit: 'm2', rate: 0.91, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Clear site of all vegetation, including removal and disposal of all debris, bushes, shrubs, undergrowth, hedges and stumps not exceeding 500mm girth and grubbing up roots and filling in holes with approved material.' },
+  { code: 'D4', description: 'Setting out', unit: 'm2', rate: 1.15, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Allow for laying out the practice of transferring the building design onto the land.' },
   { code: 'J6', description: 'Excavation to pickable earth (≤ 2m depth)', unit: 'm', rate: 4.50, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Excavate in pickable earth below reduced ground level and surplus excavated material to be cartaway to a tip to be found the contractor (cartaway elsewhere measured), depth not exceeding 2 metres.' },
   { code: 'K6', description: 'Concrete works (footings and surface beds)', unit: 'm3', rate: 20.00, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Concrete Grade 25 (20mm stone) in footing and in surface beds including all steel fixing and placing of concrete.' },
   { code: 'L6', description: 'Footing brickwork in foundation', unit: 'm2', rate: 4.50, section: 'FOUNDATIONS', itemType: 'LABOUR', labourNote: 'Brickwork in foundation laid in Stretcher bond 1:4 cement mortar mix and reinforcement with brickforce every third corse up to structural slab level.' },

@@ -1,6 +1,5 @@
 'use client';
 
-import { montserrat } from '@/app/ui/fonts';
 import {
   UserIcon,
   KeyIcon,
@@ -24,7 +23,7 @@ export default function LoginForm() {
   return (
     <form action={formAction} className="space-y-3 w-full max-w-sm mx-auto">
       <div className="flex-1 px-6 pb-4 pt-4">
-        <h1 className={`${montserrat.className} mb-6 text-2xl text-center text-white font-bold drop-shadow-md`}>
+        <h1 className="mb-6 text-2xl text-center text-white font-bold drop-shadow-md">
           Welcome Back!
         </h1>
         <div className="w-full space-y-4">

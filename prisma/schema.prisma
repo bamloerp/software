@@ -19,6 +19,10 @@ model User {
   createdAt                      DateTime                 @default(now())
   passwordHash                   String?
   managerId                      String?
+  disabled                       Boolean                  @default(false)
+  failedLoginAttempts            Int                      @default(0)
+  lockedUntil                    DateTime?
+  lastLoginAt                    DateTime?
   dispatchesAssigned             Dispatch[]               @relation("DispatchAssignedToDriver")
   dispatchesCreated              Dispatch[]               @relation("DispatchCreatedBy")
   dispatchesSecurity             Dispatch[]               @relation("DispatchSecurity")
@@ -60,6 +64,7 @@ model User {
   manager                        User?                    @relation("UserToManager", fields: [managerId], references: [id])
   team                           User[]                   @relation("UserToManager")
   actionLogs                     UserActionLog[]
+  rateOverrides                  RateOverride[]           @relation("RateOverrideUpdatedBy")
 }
 
 model Customer {
@@ -954,4 +959,19 @@ enum PaymentScheduleStatus {
   PAID
   OVERDUE
   CANCELLED
+}
+
+model RateOverride {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  rate        Float
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+  updatedBy   User?    @relation("RateOverrideUpdatedBy", fields: [updatedById], references: [id])
+}
+
+model SystemSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
 }

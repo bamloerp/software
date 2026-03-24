@@ -15,6 +15,7 @@ const BASE: { label:string; href:string; icon:string; roles?: string[] }[] = [
   { label: 'Employees', href: '/employees', icon: 'list', roles: ['ADMIN','MANAGING_DIRECTOR','HUMAN_RESOURCE'] },
   { label: 'Add Employee', href: '/employees/add', icon: 'plus', roles: ['ADMIN','MANAGING_DIRECTOR','HUMAN_RESOURCE'] },
   { label: 'Awaiting Delivery', href: '/dispatches?status=ARRIVED', icon: 'truck', roles: ['PROJECT_OPERATIONS_OFFICER','ADMIN', 'FOREMAN', 'PROJECT_COORDINATOR', 'DRIVER'] },
+  { label: 'Rates', href: '/rates', icon: 'currency', roles: ['SENIOR_QS','ADMIN'] },
   // Driver specific
   { label: 'My Pickups', href: '/dispatches?status=DISPATCHED&driver=me', icon: 'truck', roles: ['DRIVER'] },
   { label: 'Deliveries', href: '/dispatches?status=IN_TRANSIT&driver=me', icon: 'map', roles: ['DRIVER'] },

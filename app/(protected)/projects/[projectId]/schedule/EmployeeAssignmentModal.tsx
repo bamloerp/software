@@ -49,6 +49,7 @@ export default function EmployeeAssignmentModal({
   const [busyDetails, setBusyDetails] = useState<Record<string, any>>({});
   const [checking, setChecking] = useState(!!startDate); // Block selection until first check completes
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [checkDays, setCheckDays] = useState<number>(5);
   const [projectedEnd, setProjectedEnd] = useState<string | null>(endDate);
   const [conflicts, setConflicts] = useState<string[]>([]);
   const [calendarEmpId, setCalendarEmpId] = useState<string | null>(null);
@@ -141,10 +142,10 @@ export default function EmployeeAssignmentModal({
     setChecking(true);
     setInitialCheckDone(false);
 
-    // Use the parent-supplied endDate (or a generous window) for the initial check
+    // Use the parent-supplied endDate (or a 5-day window when duration is unknown)
     const checkEnd =
       endDate ||
-      new Date(new Date(startDate).getTime() + 90 * 24 * 3600_000).toISOString().slice(0, 10);
+      new Date(new Date(startDate).getTime() + 5 * 24 * 3600_000).toISOString().slice(0, 10);
     checkAvailability(startDate, checkEnd);
   }, [isOpen, startDate, endDate, checkAvailability]);
 
@@ -445,6 +446,36 @@ export default function EmployeeAssignmentModal({
               <div className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded px-3 py-1.5">
                 {busyEmployees.length} employee{busyEmployees.length > 1 ? 's' : ''} unavailable due
                 to scheduling conflicts (marked in red below).
+              </div>
+            )}
+            {/* 5-day availability re-check */}
+            {startDate && initialCheckDone && !checking && (
+              <div className="flex items-center gap-2">
+                <select
+                  title="Check window (days)"
+                  value={checkDays}
+                  onChange={(e) => setCheckDays(Number(e.target.value))}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs"
+                >
+                  {[3, 5, 7, 10, 14, 30].map((d) => (
+                    <option key={d} value={d}>{d} days</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const checkEnd = new Date(
+                      new Date(startDate).getTime() + checkDays * 24 * 3600_000
+                    ).toISOString().slice(0, 10);
+                    checkAvailability(startDate, checkEnd);
+                  }}
+                  className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                >
+                  Check Availability
+                </button>
+                <span className="text-[10px] text-gray-400">
+                  Showing conflicts within {checkDays} days of start
+                </span>
               </div>
             )}
           </div>

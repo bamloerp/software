@@ -33,7 +33,16 @@ function varsFromExpr(expr: string): string[] {
   }
 }
 
-export default function TakeOffSheet() {
+type RateOverrides = Record<string, number>; // code -> overridden rate
+type SystemSettings = { vatBps?: string; pgRate?: string; contingencyRate?: string };
+
+export default function TakeOffSheet({
+  rateOverrides = {},
+  systemSettings = {},
+}: {
+  rateOverrides?: RateOverrides;
+  systemSettings?: SystemSettings;
+} = {}) {
   const [vals, setVals] = useState<Record<string, number>>({
     ...TAKEOFF_DEFAULTS,
     A4: 0,
@@ -47,7 +56,10 @@ export default function TakeOffSheet() {
   const [customer, setCustomer] = useState({ name: '', email: '', phone: '', city: '' });
   const [customerAddress, setCustomerAddress] = useState('');
   const [currency, setCurrency] = useState(process.env.NEXT_PUBLIC_CURRENCY || 'USD');
-  const [vatRate, setVatRate] = useState<number>(parseFloat(process.env.VAT_DEFAULT || '0.15'));
+  const defaultVat = systemSettings.vatBps ? Number(systemSettings.vatBps) / 10000 : parseFloat(process.env.VAT_DEFAULT || '0.155');
+  const [vatRate, setVatRate] = useState<number>(defaultVat);
+  const pgPct = systemSettings.pgRate ? Number(systemSettings.pgRate) / 100 : 0.02;
+  const contingencyPct = systemSettings.contingencyRate ? Number(systemSettings.contingencyRate) / 100 : 0.10;
   const [creating, setCreating] = useState(false);
   const router = useRouter();
   type CustomItem = {
@@ -230,13 +242,14 @@ export default function TakeOffSheet() {
       const qty = evalExpr(ctx, m.code); 
       if (!(qty > 0)) continue;
 
+      const rate = rateOverrides[m.code] ?? m.rate ?? 0;
       lines.push({
         description: m.description,
         quantity: Math.ceil(Number(qty)),
-        unitPrice: m.rate ?? 0,
+        unitPrice: rate,
         section: m.section,
         itemType: m.itemType || 'MATERIAL',
-        lineTotalMinor: BigInt(Math.round(Math.ceil(Number(qty)) * (m.rate ?? 0) * 100)),
+        lineTotalMinor: BigInt(Math.round(Math.ceil(Number(qty)) * rate * 100)),
         unit: m.unit,
         code: m.code,
         labourNote: m.labourNote || '',
@@ -247,13 +260,14 @@ export default function TakeOffSheet() {
     if (includeElectricals) {
       for (const ei of electricalItems) {
         if (!ei.description || !(Number.isFinite(ei.qty) && ei.qty > 0)) continue;
+        const rate = rateOverrides[ei.id] ?? Number(ei.rate || 0);
         lines.push({
           description: ei.description,
           quantity: Math.ceil(Number(ei.qty)),
-          unitPrice: Number(ei.rate || 0),
+          unitPrice: rate,
           section: ei.section || 'ELECTRICALS',
           itemType: ei.itemType || 'MATERIAL',
-          lineTotalMinor: BigInt(Math.round(Math.ceil(Number(ei.qty)) * Number(ei.rate || 0) * 100)),
+          lineTotalMinor: BigInt(Math.round(Math.ceil(Number(ei.qty)) * rate * 100)),
           unit: ei.unit,
           code: 'ELECTRICAL',
         });
@@ -281,7 +295,7 @@ export default function TakeOffSheet() {
       });
     }
     return lines;
-  }, [context, customItems, includeTiles, includeElectricals, electricalItems]);
+  }, [context, customItems, includeTiles, includeElectricals, electricalItems, rateOverrides]);
 
   const summary = useMemo(() => {
     let totalLabour = 0n;
@@ -291,13 +305,13 @@ export default function TakeOffSheet() {
       else totalMaterials += l.lineTotalMinor;
     });
     const baseTotal = totalLabour + totalMaterials;
-    const pg = BigInt(Math.round(Number(baseTotal) * 0.02)); // 2% 
+    const pg = BigInt(Math.round(Number(baseTotal) * pgPct));
     const subtotal1 = baseTotal + pg;
-    const contingency = BigInt(Math.round(Number(subtotal1) * 0.10)); // 10%
+    const contingency = BigInt(Math.round(Number(subtotal1) * contingencyPct));
     const grandTotal = subtotal1 + contingency;
 
     return { totalLabour, totalMaterials, baseTotal, pg, contingency, grandTotal };
-  }, [quoteLinesPreview]);
+  }, [quoteLinesPreview, pgPct, contingencyPct]);
 
   useEffect(() => {
     setMissingByCode(missing);
@@ -418,8 +432,8 @@ export default function TakeOffSheet() {
         lines,
         assumptions: JSON.stringify([notesText]),
         exclusions: JSON.stringify([]),
-        pgRate: 2.0,
-        contingencyRate: 10.0,
+        pgRate: pgPct * 100,
+        contingencyRate: contingencyPct * 100,
       });
 
       router.push(`/dashboard`);

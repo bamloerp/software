@@ -25,7 +25,7 @@ export default function CalcBuilder() {
   const [customer, setCustomer] = useState({ name: '', email: '', phone: '', city: '' });
   const [customerAddress, setCustomerAddress] = useState('');
   const [currency, setCurrency] = useState(process.env.NEXT_PUBLIC_CURRENCY || 'USD');
-  const [vatRate, setVatRate] = useState<number>(parseFloat(process.env.VAT_DEFAULT || '0.15'));
+  const [vatRate, setVatRate] = useState<number>(parseFloat(process.env.VAT_DEFAULT || '0.155'));
   const [creating, setCreating] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
 

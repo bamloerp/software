@@ -24,7 +24,6 @@ export const { auth,
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        console.log("-----------------------------")
         const parsedCredentials = z
           .object({ email: z.string().email(), password: z.string().min(6) })
           .safeParse(credentials); 
@@ -32,12 +31,46 @@ export const { auth,
         if (parsedCredentials.success) {
           const { email, password } = parsedCredentials.data;
           const user = await prisma.user.findUnique({ where: { email } });
-          console.log('User found:', user);
           if (!user) return null;
+
+          // Check if account is disabled
+          if (user.disabled) return null;
+
+          // Check if account is locked
+          if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+            return null;
+          }
+
           const passwordsMatch = await bcrypt.compare(password, user.passwordHash ?? '');
  
-           if (!passwordsMatch) return null;
-          if (passwordsMatch) return user;
+          if (!passwordsMatch) {
+            // Increment failed attempts
+            const attempts = (user.failedLoginAttempts ?? 0) + 1;
+            const updateData: { failedLoginAttempts: number; lockedUntil?: Date } = {
+              failedLoginAttempts: attempts,
+            };
+            // Lock after 3 consecutive failures (30 min lockout)
+            if (attempts >= 3) {
+              updateData.lockedUntil = new Date(Date.now() + 30 * 60 * 1000);
+            }
+            await prisma.user.update({
+              where: { id: user.id },
+              data: updateData,
+            });
+            return null;
+          }
+
+          // Successful login — reset failed attempts & record login time
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              failedLoginAttempts: 0,
+              lockedUntil: null,
+              lastLoginAt: new Date(),
+            },
+          });
+
+          return user;
         }
 
         console.log('Invalid credentials');

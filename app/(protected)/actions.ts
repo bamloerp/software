@@ -62,7 +62,7 @@ async function ensureSystemUserId() {
 }
 
 const parseVatEnvToPercent = (raw: string | undefined) => {
-  const value = Number(raw ?? '0.15');
+  const value = Number(raw ?? '0.155');
   return value <= 1 ? value * 100 : value;
 };
 

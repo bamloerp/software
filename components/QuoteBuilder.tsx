@@ -17,7 +17,7 @@ export default function QuoteBuilder() {
   const [customerCity, setCustomerCity] = useState('');
 
   const [currency, setCurrency] = useState(process.env.NEXT_PUBLIC_CURRENCY || 'USD');
-  const [vatRate, setVatRate] = useState<number>(parseFloat(process.env.VAT_DEFAULT || '0.15'));
+  const [vatRate, setVatRate] = useState<number>(parseFloat(process.env.VAT_DEFAULT || '0.155'));
   const [discountPolicy, setDiscountPolicy] = useState<string>('none');
 
   function updateLine(idx: number, v: LineItem) {
@@ -100,7 +100,7 @@ export default function QuoteBuilder() {
           type="number"
           step="0.0001"
           className="px-2 py-1 border rounded"
-          placeholder="VAT Rate (e.g., 0.15)"
+          placeholder="VAT Rate (e.g., 0.155)"
           value={vatRate}
           onChange={(e) => setVatRate(Number(e.target.value))}
         />

@@ -2,6 +2,7 @@ import TakeOffSheet from '@/components/TakeOffSheet';
 import { getCurrentUser } from '@/lib/auth';
 import { assertRoles } from '@/lib/workflow';
 import { redirect } from 'next/navigation';
+import { prisma } from '@/lib/db';
 
 export default async function NewQuotePage() {
   const me = await getCurrentUser();
@@ -14,6 +15,16 @@ export default async function NewQuotePage() {
     if (['QS', 'SENIOR_QS', 'SALES'].includes(r)) redirect('/quotes');
     redirect('/projects');
   }
+
+  const [overrides, settings] = await Promise.all([
+    prisma.rateOverride.findMany(),
+    prisma.systemSetting.findMany(),
+  ]);
+  const rateOverrides: Record<string, number> = {};
+  for (const o of overrides) rateOverrides[o.code] = o.rate;
+  const systemSettings: Record<string, string> = {};
+  for (const s of settings) systemSettings[s.key] = s.value;
+
   return (
     <div className="space-y-6 h-screen overflow-y-auto p-6 scrollbar-y">
       <h1 className="text-2xl font-bold">New Quote :: Take Off</h1>
@@ -21,7 +32,7 @@ export default async function NewQuotePage() {
         Enter base values (red inputs/outputs and formulas mirror your Excel sheet). Totals update
         in real time.
       </p>
-      <TakeOffSheet />
+      <TakeOffSheet rateOverrides={rateOverrides} systemSettings={systemSettings} />
     </div>
   );
 }

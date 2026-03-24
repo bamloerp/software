@@ -71,7 +71,7 @@ const toMinor = (amount: number, scale = 2): bigint =>
   BigInt(Math.round((amount ?? 0) * Math.pow(10, scale)));
 const toBps = (pct: number) => Math.round((pct ?? 0) * 100); // 15.00 -> 1500
 const parseVatEnvToPercent = (raw: string | undefined) => {
-  const n = Number(raw ?? "0.15"); // supports "0.1500" or "15"
+  const n = Number(raw ?? "0.155"); // supports "0.1500" or "15"
   return n <= 1 ? n * 100 : n;
 };
 

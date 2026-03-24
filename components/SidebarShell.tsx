@@ -33,7 +33,8 @@ type NavItem = {
     | 'chart-pie'
     | 'calendar'
     | 'price-check'
-    | 'top-up';
+    | 'top-up'
+    | 'currency';
 };
 type Role = (typeof USER_ROLES)[number];
 type PageDef = NavItem & { roles?: Role[] };
@@ -237,6 +238,12 @@ const PAGE_DEFS: PageDef[] = [
   // Admin / General
   { label: 'Audit Logs', href: '/audit-logs', icon: 'list', roles: ['ADMIN'] },
   {
+    label: 'Users',
+    href: '/users',
+    icon: 'users',
+    roles: ['ADMIN'],
+  },
+  {
     label: 'Assets',
     href: '/assets',
     icon: 'desktop',
@@ -248,6 +255,13 @@ const PAGE_DEFS: PageDef[] = [
     href: '/dispatches?status=ARRIVED',
     icon: 'truck',
     roles: ['PROJECT_OPERATIONS_OFFICER', 'ADMIN', 'FOREMAN', 'PROJECT_COORDINATOR', 'DRIVER'],
+  },
+  // Rates management
+  {
+    label: 'Rates',
+    href: '/rates',
+    icon: 'currency',
+    roles: ['SENIOR_QS', 'ADMIN'],
   },
   // Driver
   {
@@ -556,6 +570,17 @@ function Icon({ name, className }: { name: NavItem['icon']; className?: string }
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25"
+          />
+        </svg>
+      );
+    case 'currency':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+          <path
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
           />
         </svg>
       );

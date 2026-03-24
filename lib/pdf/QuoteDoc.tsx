@@ -113,6 +113,8 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
   const order: Record<string, number> = {
     'FOUNDATIONS': 1,
     'SUPERSTRUCTURE BRICKWORK': 2,
+    'SUPERSTRUCTURE TO RING BEAM': 2.5,
+    'ABOVE RING BEAM': 2.6,
     'METALWORK': 3,
     'PLASTERING': 4,
     'SCREEDS': 5,
@@ -225,7 +227,7 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
                 </View>
               )}
 
-              <View wrap={false}>
+              <View>
                 <Text style={styles.sectionTitle}>{group.label}</Text>
             
                 {/* Table Header */}
@@ -251,7 +253,7 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
                 ))}
             
                 {/* Group Subtotal */}
-                <View style={styles.sectionSubtotal}>
+                <View style={styles.sectionSubtotal} wrap={false}>
                   <Text style={styles.subtotalLabel}>Subtotal {group.label}</Text>
                   <Text style={styles.subtotalValue}>{currencySymbol} {formatMoney(group.subtotal, currency)}</Text>
                 </View>

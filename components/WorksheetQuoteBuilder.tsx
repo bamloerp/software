@@ -17,7 +17,7 @@ export default function WorksheetQuoteBuilder() {
   });
   const [customer, setCustomer] = useState({ name: '', email: '', phone: '', city: '' });
   const [currency, setCurrency] = useState(process.env.NEXT_PUBLIC_CURRENCY || 'USD');
-  const [vatRate, setVatRate] = useState<number>(parseFloat(process.env.VAT_DEFAULT || '0.15'));
+  const [vatRate, setVatRate] = useState<number>(parseFloat(process.env.VAT_DEFAULT || '0.155'));
   const [pending, start] = useTransition();
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [customerAddress, setCustomerAddress] = useState('');
