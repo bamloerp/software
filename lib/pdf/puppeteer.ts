@@ -91,7 +91,8 @@ export class PuppeteerRenderer implements PdfRenderer {
 
       const qty = Number(line.quantity || 0);
       const amt = Number(line.lineTotalMinor || 0);
-      groups[section].rows.push({ ...line, qty, amt, unit: meta.unit || line.unit });
+      const labourNote = typeof meta.labourNote === 'string' ? meta.labourNote : null;
+      groups[section].rows.push({ ...line, qty, amt, unit: meta.unit || line.unit, labourNote });
       groups[section].subtotal += amt;
 
       const itemType = line.itemType || 'MATERIAL';
@@ -369,6 +370,7 @@ export class PuppeteerRenderer implements PdfRenderer {
                   <td class="px-2 py-3 text-sm text-gray-500">${idx + 1}</td>
                   <td class="px-2 py-3 text-sm font-medium text-gray-700">
                     <div>${row.description || ""}</div>
+                    ${row.labourNote ? `<div style="font-style:italic; font-weight:normal; color:#6b7280; font-size:0.75rem; margin-top:2px; line-height:1.3;">${row.labourNote}</div>` : ''}
                   </td>
                   <td class="px-2 py-3 text-center text-sm text-gray-500">${row.unit || ""}</td>
                   <td class="px-2 py-3 text-right text-sm text-gray-900">${row.qty.toFixed(2)}</td>
