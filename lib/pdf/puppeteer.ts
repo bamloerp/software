@@ -382,15 +382,14 @@ export class PuppeteerRenderer implements PdfRenderer {
                 `;
                 }).join("")}
               </tbody>
-              <tfoot class="bg-gray-50">
-                <tr style="border-top: 1px solid #e5e7eb;">
-                  <td colspan="5" class="px-2 py-3 text-right text-sm font-medium text-gray-900">Section Subtotal</td>
-                  <td class="px-2 py-3 text-right text-sm font-bold text-gray-900">
-                    ${money(group.subtotal, currency)}
-                  </td>
-                </tr>
-              </tfoot>
             </table>
+            <!-- Section subtotal outside tfoot so it only appears once at the end of the section, not on every page break -->
+            <div style="display:flex; justify-content:flex-end; background:#f9fafb; border-top:1px solid #e5e7eb; padding:0.75rem 0.5rem; break-inside:avoid; page-break-inside:avoid;">
+              <span class="text-sm font-medium text-gray-900" style="margin-right:1rem;">Section Subtotal</span>
+              <span class="text-sm font-bold text-gray-900" style="width:7rem; text-align:right;">
+                ${money(group.subtotal, currency)}
+              </span>
+            </div>
           </div>
         </div>
         `;

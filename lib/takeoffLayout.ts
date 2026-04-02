@@ -51,9 +51,9 @@ export const TAKEOFF_LAYOUT: SheetRow[] = [
       { code: 'E7', label: '230mm Brickforce', kind: 'calc', expr: 'A4 / 15 * 3' },
       { code: 'F7', label: '115mm Brickforce', kind: 'calc', expr: 'B4 / 15 * 3' },
       { code: 'G7', label: 'Gravel', kind: 'calc', expr: 'C4 * 0.5' },
-      { code: 'B8', label: '', kind: 'calc', expr: 'B7 * 2 / 11' },
+      { code: 'B8', label: '', kind: 'calc', expr: 'B7 * 2 / 8' },
       { code: 'C8', label: '', kind: 'calc', expr: 'C7 / 8' },
-      { code: 'D8', label: '', kind: 'calc', expr: 'D7 * 2 / 11' },
+      { code: 'D8', label: '', kind: 'calc', expr: 'D7 * 2 / 8' },
     ],
   },
   // BRICKS block
@@ -179,9 +179,9 @@ export const TAKEOFF_LAYOUT: SheetRow[] = [
   {
     type: 'cells',
     cells: [
-      { code: 'A45', label: 'River Sand', kind: 'calc', expr: 'G22 * 2 / 11' },
-      { code: 'B45', label: 'Pit Sand', kind: 'calc', expr: 'B36 * 3 / 11' },
-      { code: 'C45', label: 'Concrete', kind: 'calc', expr: 'G22 * 2 / 11' },
+      { code: 'A45', label: 'River Sand', kind: 'calc', expr: 'G22 * 2 / 8' },
+      { code: 'B45', label: 'Pit Sand', kind: 'calc', expr: 'B36 * 3 / 8' },
+      { code: 'C45', label: 'Concrete', kind: 'calc', expr: 'G22 * 2 / 8' },
       { code: 'D45', label: '12mm D/Bars', kind: 'calc', expr: 'A4 / 5 * 4' },
       { code: 'E45', label: '10mm D/Bars', kind: 'calc', expr: '(A4 / 0.2) * 0.85 / 5' },
       { code: 'F45', label: '230mm Brick Force', kind: 'calc', expr: 'A4 / 15 * 8' },
@@ -195,7 +195,7 @@ export const TAKEOFF_LAYOUT: SheetRow[] = [
     cells: [
       { code: 'A51', label: 'Pit Sand Internal', kind: 'calc', expr: 'E22 + E33' },
       { code: 'B51', label: 'Rhinoset', kind: 'calc', expr: 'F25 / 15' },
-      { code: 'C51', label: 'Floors River Sand', kind: 'calc', expr: 'D25 * 3 / 11' },
+      { code: 'C51', label: 'Floors River Sand', kind: 'calc', expr: 'D25 * 3 / 8' },
       { code: 'D51', label: 'Pit Sand External', kind: 'calc', expr: 'F22 + F33' },
       { code: 'A52', label: '', kind: 'calc', expr: 'A51 * 3 / 8' },
       { code: 'D52', label: '', kind: 'calc', expr: 'D51 * 3 / 8' },
