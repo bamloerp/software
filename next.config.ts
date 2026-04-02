@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
       allowedOrigins: ["*"]
     }
   },
+  serverExternalPackages: ["@react-pdf/renderer", "@sparticuz/chromium", "puppeteer-core"],
   images: {
     remotePatterns: [
       {
