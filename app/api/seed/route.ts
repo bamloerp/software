@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const toMinor = (amount: number, scale = 2) => BigInt(Math.round(Number(amount ?? 0) * Math.pow(10, scale)));
 
