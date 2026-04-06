@@ -1,30 +1,45 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import NextAuth from 'next-auth';
 import { authConfig } from './auth.config';
 
-const { auth } = NextAuth(authConfig);
+const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
 
-export default auth(async (req) => {
-  // Logging enabled for all authenticated users to populate Audit Logs
-  if (req.auth?.user?.id) {
-    const { pathname, search } = req.nextUrl;
-    const method = req.method;
-    const ip = req.headers.get('x-forwarded-for') || 'unknown';
-    const userAgent = req.headers.get('user-agent') || 'unknown';
+// Only initialise NextAuth middleware when a secret is available;
+// otherwise every request would crash with MIDDLEWARE_INVOCATION_FAILED.
+const authMiddleware = secret
+  ? NextAuth({ ...authConfig, secret }).auth
+  : null;
 
-    fetch(`${req.nextUrl.origin}/api/log-action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: req.auth.user.id,
-        action: `${method} ${pathname}`,
-        method,
-        path: pathname + search,
-        ip,
-        userAgent,
-      }),
-    }).catch(() => { });
-  }
-});
+async function handler(req: NextRequest) {
+  // No auth secret → just pass through (login page will render, auth won't work)
+  if (!authMiddleware) return NextResponse.next();
+
+  // Run the NextAuth middleware
+  return (authMiddleware as any)(async (authReq: any) => {
+    if (authReq.auth?.user?.id) {
+      const { pathname, search } = authReq.nextUrl;
+      const method = authReq.method;
+      const ip = authReq.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = authReq.headers.get('user-agent') || 'unknown';
+
+      fetch(`${authReq.nextUrl.origin}/api/log-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: authReq.auth.user.id,
+          action: `${method} ${pathname}`,
+          method,
+          path: pathname + search,
+          ip,
+          userAgent,
+        }),
+      }).catch(() => { });
+    }
+  })(req);
+}
+
+export default handler;
 
 export const config = {
   // https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
