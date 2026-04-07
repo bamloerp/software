@@ -1,6 +1,6 @@
 // prisma/seed.ts
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -15,12 +15,12 @@ async function upsertUser(email: string, role: string, name?: string) {
 
 async function main() {
   const roles = [
-    'ADMIN','QS','SENIOR_QS','SALES',
+    'ADMIN','QS','SENIOR_QS','SALES',"SALESACCOUNT",
     'PROJECT_OPERATIONS_OFFICER','PROCUREMENT','ACCOUNTS','SECURITY','DRIVER',
     'ACCOUNTING_CLERK','ACCOUNTING_OFFICER','ACCOUNTING_AUDITOR'
   ];
   for (const r of roles) {
-    await upsertUser(`${r.toLowerCase()}@local.test`, r, r.replaceAll('_',' '));
+    await upsertUser(`${r.toLowerCase()}@barmlo.com`, r, r.replaceAll('_',' '));
   }
   console.log('Seeded base roles (password: Password@123).');
 }
