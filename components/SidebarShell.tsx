@@ -182,13 +182,19 @@ const PAGE_DEFS: PageDef[] = [
     label: 'Receive Due Payments',
     href: '/projects?tab=due_today',
     icon: 'banknotes',
-    roles: ['SALES_ACCOUNTS'],
+    roles: ['SALES_ACCOUNTS', 'ADMIN'],
   },
   {
     label: 'Other Payments',
     href: '/projects?tab=all_payments',
     icon: 'credit-card',
-    roles: ['SALES_ACCOUNTS'],
+    roles: ['SALES_ACCOUNTS', 'ADMIN'],
+  },
+  {
+    label: 'Payments',
+    href: '/accounts/payments',
+    icon: 'currency',
+    roles: ['SALES_ACCOUNTS', 'ACCOUNTS', 'ADMIN'],
   },
   // Procurement & Logistics
   {

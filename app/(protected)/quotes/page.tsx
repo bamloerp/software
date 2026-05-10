@@ -70,9 +70,8 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
   } else if (role === 'SENIOR_QS') {
     if (view === 'my') {
       where = { ...where, createdById: me.id };
-    } else {
-      where = { ...where, status: { in: ['SUBMITTED_REVIEW', 'NEGOTIATION_REVIEW'] } };
     }
+    // Otherwise SENIOR_QS sees ALL quotations across ALL stages (no status filter)
   } else if (role === 'SALES') {
     where = { ...where, status: { in: ['REVIEWED', 'SENT_TO_SALES', 'NEGOTIATION'] } };
   } // ADMIN sees all

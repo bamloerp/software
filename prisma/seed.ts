@@ -15,7 +15,7 @@ async function upsertUser(email: string, role: string, name?: string) {
 
 async function main() {
   const roles = [
-    'ADMIN','QS','SENIOR_QS','SALES',"SALESACCOUNT",
+    'ADMIN','QS','SENIOR_QS','SALES','SALES_ACCOUNTS',
     'PROJECT_OPERATIONS_OFFICER','PROCUREMENT','ACCOUNTS','SECURITY','DRIVER',
     'ACCOUNTING_CLERK','ACCOUNTING_OFFICER','ACCOUNTING_AUDITOR'
   ];
