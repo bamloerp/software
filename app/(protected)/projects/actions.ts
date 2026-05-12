@@ -3412,7 +3412,7 @@ export async function ensureProjectAccess(projectId: string, user?: Awaited<Retu
 
 export async function assignProjectToManager(projectId: string, userId: string) {
   const me = await getCurrentUser();
-  assertRoles(me?.role, ['ADMIN', 'PROJECT_COORDINATOR', 'GENERAL_MANAGER', 'MANAGING_DIRECTOR']);
+  assertRoles(me?.role, ['ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'GENERAL_MANAGER', 'MANAGING_DIRECTOR']);
 
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!targetUser) throw new Error('User not found');

@@ -53,8 +53,8 @@ export default async function ProjectsPage({
   }
 
   const role = me.role as string;
-  const isSeniorPM = ['PROJECT_COORDINATOR', 'ADMIN', 'GENERAL_MANAGER', 'MANAGING_DIRECTOR'].includes(role);
-  const isProjectManager = role === 'PROJECT_OPERATIONS_OFFICER';
+  const isSeniorPM = ['PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'ADMIN', 'GENERAL_MANAGER', 'MANAGING_DIRECTOR'].includes(role);
+  const isProjectManager = false;
   const isSalesAccounts = role === 'SALES_ACCOUNTS';
 
   const { q: query, page: pageParam, tab, status, start_date, pageSize: pageSizeParam } = await searchParams;
