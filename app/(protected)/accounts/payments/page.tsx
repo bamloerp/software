@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { SearchInput } from '@/components/ui/search-input';
 import TablePagination from '@/components/ui/table-pagination';
-import { PageSizeSelector } from '@/components/ui/page-size-selector';
+import PageSizeSelector from '@/components/ui/page-size-selector';
 
 const formatMoney = (minor: bigint | number) => {
   return new Intl.NumberFormat('en-US', {
