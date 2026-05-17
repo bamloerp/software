@@ -31,7 +31,7 @@ export default async function AssetsPage(props: {
     redirect('/login');
   }
   try {
-    assertRoles(me.role as any, ['PROJECT_OPERATIONS_OFFICER', 'PROCUREMENT', 'SENIOR_PROCUREMENT', 'SECURITY', 'ADMIN'] as any);
+    assertRoles(me.role as any, ['ADMIN', 'MANAGING_DIRECTOR', 'PROJECT_COORDINATOR'] as any);
   } catch {
     redirect('/projects');
   }
@@ -240,7 +240,7 @@ async function addMultipurposeAsset(formData: FormData) {
 
   const me = await getCurrentUser();
   if (!me) redirect('/login');
-  assertRoles((me as any).role, ['PROJECT_OPERATIONS_OFFICER', 'PROCUREMENT', 'SENIOR_PROCUREMENT', 'SECURITY', 'ADMIN'] as any);
+  assertRoles((me as any).role, ['ADMIN', 'MANAGING_DIRECTOR', 'PROJECT_COORDINATOR'] as any);
 
   const name = String(formData.get('name') || '').trim();
   const unit = String(formData.get('unit') || '').trim() || null;

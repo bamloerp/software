@@ -253,7 +253,7 @@ const PAGE_DEFS: PageDef[] = [
     label: 'Assets',
     href: '/assets',
     icon: 'desktop',
-    roles: ['SENIOR_PROCUREMENT', 'SECURITY', 'PROJECT_OPERATIONS_OFFICER', 'ADMIN'],
+    roles: ['ADMIN', 'MANAGING_DIRECTOR', 'PROJECT_COORDINATOR'],
   },
   { label: 'Employees', href: '/employees', icon: 'users', roles: ['ADMIN', 'MANAGING_DIRECTOR'] },
   {
