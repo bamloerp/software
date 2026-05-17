@@ -1,0 +1,3 @@
+BEFORE: [{"email":"salesaccount@barmlo.com","role":"SALESACCOUNT","name":"SALESACCOUNT"}]
+UPDATED: [{"email":"salesaccount@barmlo.com","role":"SALES_ACCOUNTS","name":"Sales Accounts"}]
+AFTER: [{"email":"salesaccount@barmlo.com","role":"SALES_ACCOUNTS","name":"Sales Accounts"}]

@@ -1,0 +1,3 @@
+NO neon: Cannot find module '@neondatabase/serverless'
+Require stack:
+- C:\Users\ze9167867\Desktop\erp_bamlo-frica\[eval]

@@ -1,0 +1,186 @@
+2026-04-07T10:21:45.812Z === Starting schema push ===
+2026-04-07T10:21:45.864Z Total statements: 200
+2026-04-07T10:21:45.925Z [22/200] SKIP (exists): CREATE TABLE "public"."FundDisbursement" (     "id" TEXT NOT NULL,     "fundingRequestId" TEXT NOT NULL,     "amountMino
+2026-04-07T10:21:46.371Z [23/200] SKIP (exists): CREATE TABLE "public"."Purchase" (     "id" TEXT NOT NULL,     "requisitionId" TEXT NOT NULL,     "purchasedAt" TIMESTAM
+2026-04-07T10:21:46.709Z [24/200] SKIP (exists): CREATE TABLE "public"."Dispatch" (     "id" TEXT NOT NULL,     "projectId" TEXT NOT NULL,     "status" TEXT NOT NULL DEF
+2026-04-07T10:21:47.142Z [25/200] SKIP (exists): CREATE TABLE "public"."DispatchItem" (     "id" TEXT NOT NULL,     "dispatchId" TEXT NOT NULL,     "description" TEXT NO
+2026-04-07T10:21:47.503Z [26/200] SKIP (exists): CREATE TABLE "public"."InventoryMove" (     "id" TEXT NOT NULL,     "inventoryItemId" TEXT NOT NULL,     "changeById" TE
+2026-04-07T10:21:47.836Z [27/200] SKIP (exists): CREATE TABLE "public"."InventoryAllocation" (     "id" TEXT NOT NULL,     "inventoryItemId" TEXT NOT NULL,     "projectI
+2026-04-07T10:21:48.184Z [28/200] SKIP (exists): CREATE TABLE "public"."Payment" (     "id" TEXT NOT NULL,     "projectId" TEXT NOT NULL,     "type" TEXT NOT NULL,     "
+2026-04-07T10:21:48.516Z [29/200] SKIP (exists): CREATE TABLE "public"."Reminder" (     "id" TEXT NOT NULL,     "relatedType" TEXT NOT NULL,     "relatedId" TEXT NOT NUL
+2026-04-07T10:21:48.880Z [30/200] SKIP (exists): CREATE TABLE "public"."Escalation" (     "id" TEXT NOT NULL,     "relatedType" TEXT NOT NULL,     "relatedId" TEXT NOT N
+2026-04-07T10:21:49.242Z [31/200] SKIP (exists): CREATE TABLE "public"."ClientPayment" (     "id" TEXT NOT NULL,     "projectId" TEXT NOT NULL,     "type" TEXT NOT NULL,
+2026-04-07T10:21:49.575Z [32/200] SKIP (exists): CREATE TABLE "public"."File" (     "id" TEXT NOT NULL,     "filename" TEXT NOT NULL,     "mimeType" TEXT NOT NULL,     "
+2026-04-07T10:21:49.912Z [33/200] SKIP (exists): CREATE TABLE "public"."PaymentSchedule" (     "id" TEXT NOT NULL,     "projectId" TEXT NOT NULL,     "label" TEXT NOT NU
+2026-04-07T10:21:50.244Z [34/200] SKIP (exists): CREATE TABLE "public"."PaymentReminder" (     "id" TEXT NOT NULL,     "scheduleId" TEXT NOT NULL,     "kind" TEXT NOT NU
+2026-04-07T10:21:50.585Z [35/200] SKIP (exists): CREATE TABLE "public"."Schedule" (     "id" TEXT NOT NULL,     "projectId" TEXT NOT NULL,     "createdById" TEXT,     "c
+2026-04-07T10:21:50.922Z [36/200] SKIP (exists): CREATE TABLE "public"."ProjectProductivitySetting" (     "id" TEXT NOT NULL,     "projectId" TEXT NOT NULL,     "builder
+2026-04-07T10:21:51.265Z [37/200] SKIP (exists): CREATE TABLE "public"."ScheduleTaskReport" (     "id" TEXT NOT NULL,     "scheduleItemId" TEXT NOT NULL,     "reporterId
+2026-04-07T10:21:51.591Z [38/200] SKIP (exists): CREATE TABLE "public"."ScheduleItem" (     "id" TEXT NOT NULL,     "scheduleId" TEXT NOT NULL,     "quoteLineId" TEXT,  
+2026-04-07T10:21:51.951Z [39/200] SKIP (exists): CREATE TABLE "public"."Employee" (     "id" TEXT NOT NULL,     "userId" TEXT,     "givenName" TEXT NOT NULL,     "surnam
+2026-04-07T10:21:52.297Z [40/200] SKIP (exists): CREATE TABLE "public"."TaskTemplate" (     "key" TEXT NOT NULL,     "name" TEXT NOT NULL,     "hoursPerUnit" DOUBLE PREC
+2026-04-07T10:21:52.624Z [41/200] SKIP (exists): CREATE TABLE "public"."Task" (     "id" TEXT NOT NULL,     "projectId" TEXT NOT NULL,     "templateKey" TEXT,     "title
+2026-04-07T10:21:52.966Z [42/200] SKIP (exists): CREATE TABLE "public"."TaskAssignment" (     "id" TEXT NOT NULL,     "taskId" TEXT NOT NULL,     "userId" TEXT NOT NULL,
+2026-04-07T10:21:53.289Z [43/200] SKIP (exists): CREATE TABLE "public"."TaskProgress" (     "id" TEXT NOT NULL,     "taskId" TEXT NOT NULL,     "userId" TEXT NOT NULL,  
+2026-04-07T10:21:53.614Z [44/200] SKIP (exists): CREATE TABLE "public"."Notification" (     "id" TEXT NOT NULL,     "userId" TEXT NOT NULL,     "kind" TEXT NOT NULL,    
+2026-04-07T10:21:53.960Z [45/200] SKIP (exists): CREATE TABLE "public"."ProjectMember" (     "id" TEXT NOT NULL,     "projectId" TEXT NOT NULL,     "userId" TEXT NOT NUL
+2026-04-07T10:21:54.279Z [46/200] SKIP (exists): CREATE TABLE "public"."PurchaseOrder" (     "id" TEXT NOT NULL,     "projectId" TEXT NOT NULL,     "requisitionId" TEXT,
+2026-04-07T10:21:54.605Z [47/200] SKIP (exists): CREATE TABLE "public"."PurchaseOrderItem" (     "id" TEXT NOT NULL,     "purchaseOrderId" TEXT NOT NULL,     "requisitio
+2026-04-07T10:21:54.971Z [48/200] SKIP (exists): CREATE TABLE "public"."GoodsReceivedNote" (     "id" TEXT NOT NULL,     "purchaseOrderId" TEXT NOT NULL,     "receivedBy
+2026-04-07T10:21:55.335Z [49/200] SKIP (exists): CREATE TABLE "public"."GoodsReceivedNoteItem" (     "id" TEXT NOT NULL,     "grnId" TEXT NOT NULL,     "poItemId" TEXT, 
+2026-04-07T10:21:55.678Z [50/200] SKIP (exists): CREATE TABLE "public"."InventoryItem" (     "id" TEXT NOT NULL,     "key" TEXT NOT NULL,     "description" TEXT NOT NULL
+2026-04-07T10:21:56.025Z [51/200] SKIP (exists): CREATE TABLE "public"."InventoryReturn" (     "id" TEXT NOT NULL,     "dispatchId" TEXT,     "projectId" TEXT,     "crea
+2026-04-07T10:21:56.373Z [52/200] SKIP (exists): CREATE TABLE "public"."InventoryReturnItem" (     "id" TEXT NOT NULL,     "returnId" TEXT NOT NULL,     "dispatchItemId"
+2026-04-07T10:21:56.699Z [53/200] SKIP (exists): CREATE TABLE "public"."StockMove" (     "id" TEXT NOT NULL,     "inventoryItemId" TEXT NOT NULL,     "projectId" TEXT,  
+2026-04-07T10:21:57.031Z [54/200] OK: CREATE TABLE "public"."UserActionLog" (     "id" TEXT NOT NULL,     "userId" TEXT NOT NULL,     "action" TEXT NOT NULL, 
+2026-04-07T10:21:57.375Z [55/200] OK: CREATE TABLE "public"."RateOverride" (     "id" TEXT NOT NULL,     "code" TEXT NOT NULL,     "rate" DOUBLE PRECISION NOT
+2026-04-07T10:21:57.711Z [56/200] OK: CREATE TABLE "public"."SystemSetting" (     "id" TEXT NOT NULL,     "key" TEXT NOT NULL,     "value" TEXT NOT NULL,     
+2026-04-07T10:21:58.049Z [57/200] OK: CREATE TABLE "public"."_ScheduleItemAssignees" (     "A" TEXT NOT NULL,     "B" TEXT NOT NULL,      CONSTRAINT "_Schedul
+2026-04-07T10:21:58.381Z [58/200] SKIP (exists): CREATE UNIQUE INDEX "User_email_key" ON "public"."User"("email");
+2026-04-07T10:21:58.804Z [59/200] OK: CREATE UNIQUE INDEX "Customer_displayName_city_key" ON "public"."Customer"("displayName", "city");
+2026-04-07T10:21:59.151Z [60/200] OK: CREATE UNIQUE INDEX "Product_sku_key" ON "public"."Product"("sku");
+2026-04-07T10:21:59.479Z [61/200] OK: CREATE UNIQUE INDEX "FormulaRule_code_key" ON "public"."FormulaRule"("code");
+2026-04-07T10:21:59.850Z [62/200] OK: CREATE UNIQUE INDEX "Quote_number_key" ON "public"."Quote"("number");
+2026-04-07T10:22:00.205Z [63/200] OK: CREATE UNIQUE INDEX "Project_quoteId_key" ON "public"."Project"("quoteId");
+2026-04-07T10:22:00.646Z [64/200] OK: CREATE UNIQUE INDEX "Project_projectNumber_key" ON "public"."Project"("projectNumber");
+2026-04-07T10:22:00.982Z [65/200] OK: CREATE INDEX "Project_projectNumber_idx" ON "public"."Project"("projectNumber");
+2026-04-07T10:22:01.335Z [66/200] OK: CREATE INDEX "QuoteLineExtraRequest_projectId_idx" ON "public"."QuoteLineExtraRequest"("projectId");
+2026-04-07T10:22:01.680Z [67/200] OK: CREATE INDEX "QuoteLineExtraRequest_quoteLineId_idx" ON "public"."QuoteLineExtraRequest"("quoteLineId");
+2026-04-07T10:22:02.195Z [68/200] OK: CREATE INDEX "QuoteLineExtraRequest_status_idx" ON "public"."QuoteLineExtraRequest"("status");
+2026-04-07T10:22:02.573Z [69/200] OK: CREATE INDEX "FundingRequest_requisitionId_idx" ON "public"."FundingRequest"("requisitionId");
+2026-04-07T10:22:02.931Z [70/200] OK: CREATE INDEX "FundingRequest_status_idx" ON "public"."FundingRequest"("status");
+2026-04-07T10:22:03.271Z [71/200] OK: CREATE INDEX "FundingRequest_type_idx" ON "public"."FundingRequest"("type");
+2026-04-07T10:22:03.670Z [72/200] OK: CREATE INDEX "FundDisbursement_fundingRequestId_idx" ON "public"."FundDisbursement"("fundingRequestId");
+2026-04-07T10:22:04.028Z [73/200] OK: CREATE UNIQUE INDEX "PaymentSchedule_projectId_seq_key" ON "public"."PaymentSchedule"("projectId", "seq");
+2026-04-07T10:22:04.372Z [74/200] OK: CREATE UNIQUE INDEX "Schedule_projectId_key" ON "public"."Schedule"("projectId");
+2026-04-07T10:22:04.731Z [75/200] OK: CREATE INDEX "Schedule_projectId_idx" ON "public"."Schedule"("projectId");
+2026-04-07T10:22:05.079Z [76/200] OK: CREATE UNIQUE INDEX "ProjectProductivitySetting_projectId_key" ON "public"."ProjectProductivitySetting"("projectId");
+2026-04-07T10:22:05.411Z [77/200] OK: CREATE INDEX "ScheduleTaskReport_scheduleItemId_idx" ON "public"."ScheduleTaskReport"("scheduleItemId");
+2026-04-07T10:22:05.752Z [78/200] OK: CREATE INDEX "ScheduleTaskReport_reporterId_idx" ON "public"."ScheduleTaskReport"("reporterId");
+2026-04-07T10:22:06.110Z [79/200] OK: CREATE INDEX "ScheduleTaskReport_reportedForDate_idx" ON "public"."ScheduleTaskReport"("reportedForDate");
+2026-04-07T10:22:06.482Z [80/200] OK: CREATE INDEX "ScheduleItem_scheduleId_idx" ON "public"."ScheduleItem"("scheduleId");
+2026-04-07T10:22:06.817Z [81/200] OK: CREATE INDEX "ScheduleItem_quoteLineId_idx" ON "public"."ScheduleItem"("quoteLineId");
+2026-04-07T10:22:07.157Z [82/200] OK: CREATE INDEX "ScheduleItem_plannedStart_idx" ON "public"."ScheduleItem"("plannedStart");
+2026-04-07T10:22:07.574Z [83/200] OK: CREATE INDEX "ScheduleItem_plannedEnd_idx" ON "public"."ScheduleItem"("plannedEnd");
+2026-04-07T10:22:07.904Z [84/200] OK: CREATE UNIQUE INDEX "Employee_userId_key" ON "public"."Employee"("userId");
+2026-04-07T10:22:08.243Z [85/200] OK: CREATE UNIQUE INDEX "Employee_ecNumber_key" ON "public"."Employee"("ecNumber");
+2026-04-07T10:22:08.572Z [86/200] OK: CREATE UNIQUE INDEX "Employee_email_key" ON "public"."Employee"("email");
+2026-04-07T10:22:08.910Z [87/200] OK: CREATE UNIQUE INDEX "TaskAssignment_taskId_userId_key" ON "public"."TaskAssignment"("taskId", "userId");
+2026-04-07T10:22:09.260Z [88/200] OK: CREATE UNIQUE INDEX "ProjectMember_projectId_userId_key" ON "public"."ProjectMember"("projectId", "userId");
+2026-04-07T10:22:09.590Z [89/200] OK: CREATE UNIQUE INDEX "InventoryItem_key_key" ON "public"."InventoryItem"("key");
+2026-04-07T10:22:09.923Z [90/200] OK: CREATE UNIQUE INDEX "InventoryItem_name_unit_key" ON "public"."InventoryItem"("name", "unit");
+2026-04-07T10:22:10.268Z [91/200] OK: CREATE UNIQUE INDEX "RateOverride_code_key" ON "public"."RateOverride"("code");
+2026-04-07T10:22:10.596Z [92/200] OK: CREATE UNIQUE INDEX "SystemSetting_key_key" ON "public"."SystemSetting"("key");
+2026-04-07T10:22:10.928Z [93/200] OK: CREATE INDEX "_ScheduleItemAssignees_B_index" ON "public"."_ScheduleItemAssignees"("B");
+2026-04-07T10:22:11.367Z [94/200] OK: ALTER TABLE "public"."User" ADD CONSTRAINT "User_managerId_fkey" FOREIGN KEY ("managerId") REFERENCES "public"."User"("i
+2026-04-07T10:22:11.703Z [95/200] OK: ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."Us
+2026-04-07T10:22:12.031Z [96/200] OK: ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "public"."Cust
+2026-04-07T10:22:12.373Z [97/200] OK: ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_projectManagerId_fkey" FOREIGN KEY ("projectManagerId") REFERENCES "p
+2026-04-07T10:22:12.707Z [98/200] OK: ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_reviewerId_fkey" FOREIGN KEY ("reviewerId") REFERENCES "public"."User
+2026-04-07T10:22:13.040Z [99/200] OK: ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_salesId_fkey" FOREIGN KEY ("salesId") REFERENCES "public"."User"("id"
+2026-04-07T10:22:13.380Z [100/200] OK: ALTER TABLE "public"."QuoteLine" ADD CONSTRAINT "QuoteLine_addedInVersionId_fkey" FOREIGN KEY ("addedInVersionId") REFER
+2026-04-07T10:22:13.719Z [101/200] OK: ALTER TABLE "public"."QuoteLine" ADD CONSTRAINT "QuoteLine_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"
+2026-04-07T10:22:14.118Z [102/200] OK: ALTER TABLE "public"."QuoteLine" ADD CONSTRAINT "QuoteLine_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "public"."Qu
+2026-04-07T10:22:14.442Z [103/200] OK: ALTER TABLE "public"."QuoteVersion" ADD CONSTRAINT "QuoteVersion_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "publi
+2026-04-07T10:22:14.775Z [104/200] OK: ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_assigneeId_fkey" FOREIGN KEY ("assigneeId") REFERENCES "p
+2026-04-07T10:22:15.129Z [105/200] OK: ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES 
+2026-04-07T10:22:15.480Z [106/200] OK: ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "pub
+2026-04-07T10:22:15.820Z [107/200] OK: ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "public"
+2026-04-07T10:22:16.168Z [108/200] OK: ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."
+2026-04-07T10:22:16.493Z [109/200] OK: ALTER TABLE "public"."QuoteNegotiation" ADD CONSTRAINT "QuoteNegotiation_createdById_fkey" FOREIGN KEY ("createdById") R
+2026-04-07T10:22:16.828Z [110/200] OK: ALTER TABLE "public"."QuoteNegotiation" ADD CONSTRAINT "QuoteNegotiation_originalVersionId_fkey" FOREIGN KEY ("originalV
+2026-04-07T10:22:17.159Z [111/200] OK: ALTER TABLE "public"."QuoteNegotiation" ADD CONSTRAINT "QuoteNegotiation_proposedVersionId_fkey" FOREIGN KEY ("proposedV
+2026-04-07T10:22:17.483Z [112/200] OK: ALTER TABLE "public"."QuoteNegotiation" ADD CONSTRAINT "QuoteNegotiation_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCE
+2026-04-07T10:22:17.817Z [113/200] OK: ALTER TABLE "public"."QuoteNegotiationItem" ADD CONSTRAINT "QuoteNegotiationItem_negotiationId_fkey" FOREIGN KEY ("negot
+2026-04-07T10:22:18.207Z [114/200] OK: ALTER TABLE "public"."QuoteNegotiationItem" ADD CONSTRAINT "QuoteNegotiationItem_quoteLineId_fkey" FOREIGN KEY ("quoteLi
+2026-04-07T10:22:18.584Z [115/200] OK: ALTER TABLE "public"."QuoteNegotiationItem" ADD CONSTRAINT "QuoteNegotiationItem_reviewedById_fkey" FOREIGN KEY ("review
+2026-04-07T10:22:18.993Z [116/200] OK: ALTER TABLE "public"."Project" ADD CONSTRAINT "Project_assignedToId_fkey" FOREIGN KEY ("assignedToId") REFERENCES "publi
+2026-04-07T10:22:19.330Z [117/200] OK: ALTER TABLE "public"."Project" ADD CONSTRAINT "Project_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"
+2026-04-07T10:22:19.681Z [118/200] OK: ALTER TABLE "public"."Project" ADD CONSTRAINT "Project_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "public"."Quote"
+2026-04-07T10:22:20.024Z [119/200] OK: ALTER TABLE "public"."ProcurementRequisition" ADD CONSTRAINT "ProcurementRequisition_projectId_fkey" FOREIGN KEY ("proje
+2026-04-07T10:22:20.351Z [120/200] OK: ALTER TABLE "public"."ProcurementRequisition" ADD CONSTRAINT "ProcurementRequisition_reviewSubmittedById_fkey" FOREIGN K
+2026-04-07T10:22:20.683Z [121/200] OK: ALTER TABLE "public"."ProcurementRequisition" ADD CONSTRAINT "ProcurementRequisition_submittedById_fkey" FOREIGN KEY ("s
+2026-04-07T10:22:21.012Z [122/200] OK: ALTER TABLE "public"."ProcurementRequisitionItem" ADD CONSTRAINT "ProcurementRequisitionItem_quoteLineId_fkey" FOREIGN K
+2026-04-07T10:22:21.351Z [123/200] OK: ALTER TABLE "public"."ProcurementRequisitionItem" ADD CONSTRAINT "ProcurementRequisitionItem_requisitionId_fkey" FOREIGN
+2026-04-07T10:22:21.694Z [124/200] OK: ALTER TABLE "public"."RequisitionItemTopup" ADD CONSTRAINT "RequisitionItemTopup_decidedById_fkey" FOREIGN KEY ("decided
+2026-04-07T10:22:22.045Z [125/200] OK: ALTER TABLE "public"."RequisitionItemTopup" ADD CONSTRAINT "RequisitionItemTopup_requestedById_fkey" FOREIGN KEY ("reque
+2026-04-07T10:22:22.382Z [126/200] OK: ALTER TABLE "public"."RequisitionItemTopup" ADD CONSTRAINT "RequisitionItemTopup_requisitionItemId_fkey" FOREIGN KEY ("r
+2026-04-07T10:22:22.718Z [127/200] OK: ALTER TABLE "public"."QuoteLineExtraRequest" ADD CONSTRAINT "QuoteLineExtraRequest_decidedById_fkey" FOREIGN KEY ("decid
+2026-04-07T10:22:23.100Z [128/200] OK: ALTER TABLE "public"."QuoteLineExtraRequest" ADD CONSTRAINT "QuoteLineExtraRequest_projectId_fkey" FOREIGN KEY ("project
+2026-04-07T10:22:23.440Z [129/200] OK: ALTER TABLE "public"."QuoteLineExtraRequest" ADD CONSTRAINT "QuoteLineExtraRequest_quoteLineId_fkey" FOREIGN KEY ("quote
+2026-04-07T10:22:23.788Z [130/200] OK: ALTER TABLE "public"."QuoteLineExtraRequest" ADD CONSTRAINT "QuoteLineExtraRequest_requestedById_fkey" FOREIGN KEY ("req
+2026-04-07T10:22:24.116Z [131/200] OK: ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_approvedById_fkey" FOREIGN KEY ("approvedById") REF
+2026-04-07T10:22:24.445Z [132/200] OK: ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_decidedById_fkey" FOREIGN KEY ("decidedById") REFER
+2026-04-07T10:22:24.775Z [133/200] OK: ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_requestedById_fkey" FOREIGN KEY ("requestedById") R
+2026-04-07T10:22:25.100Z [134/200] OK: ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_requisitionId_fkey" FOREIGN KEY ("requisitionId") R
+2026-04-07T10:22:25.433Z [135/200] OK: ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_submittedById_fkey" FOREIGN KEY ("submittedById") R
+2026-04-07T10:22:25.770Z [136/200] OK: ALTER TABLE "public"."FundDisbursement" ADD CONSTRAINT "FundDisbursement_fundingRequestId_fkey" FOREIGN KEY ("fundingReq
+2026-04-07T10:22:26.096Z [137/200] OK: ALTER TABLE "public"."Purchase" ADD CONSTRAINT "Purchase_purchaseOrderId_fkey" FOREIGN KEY ("purchaseOrderId") REFERENCE
+2026-04-07T10:22:26.427Z [138/200] OK: ALTER TABLE "public"."Purchase" ADD CONSTRAINT "Purchase_requisitionId_fkey" FOREIGN KEY ("requisitionId") REFERENCES "p
+2026-04-07T10:22:26.773Z [139/200] OK: ALTER TABLE "public"."Purchase" ADD CONSTRAINT "Purchase_requisitionItemId_fkey" FOREIGN KEY ("requisitionItemId") REFER
+2026-04-07T10:22:27.135Z [140/200] OK: ALTER TABLE "public"."Dispatch" ADD CONSTRAINT "Dispatch_assignedToDriverId_fkey" FOREIGN KEY ("assignedToDriverId") REF
+2026-04-07T10:22:27.468Z [141/200] OK: ALTER TABLE "public"."Dispatch" ADD CONSTRAINT "Dispatch_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "publi
+2026-04-07T10:22:27.797Z [142/200] OK: ALTER TABLE "public"."Dispatch" ADD CONSTRAINT "Dispatch_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."
+2026-04-07T10:22:28.127Z [143/200] OK: ALTER TABLE "public"."Dispatch" ADD CONSTRAINT "Dispatch_securityById_fkey" FOREIGN KEY ("securityById") REFERENCES "pub
+2026-04-07T10:22:28.460Z [144/200] OK: ALTER TABLE "public"."DispatchItem" ADD CONSTRAINT "DispatchItem_dispatchId_fkey" FOREIGN KEY ("dispatchId") REFERENCES 
+2026-04-07T10:22:28.872Z [145/200] OK: ALTER TABLE "public"."DispatchItem" ADD CONSTRAINT "DispatchItem_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId") R
+2026-04-07T10:22:29.219Z [146/200] OK: ALTER TABLE "public"."DispatchItem" ADD CONSTRAINT "DispatchItem_purchaseId_fkey" FOREIGN KEY ("purchaseId") REFERENCES 
+2026-04-07T10:22:29.553Z [147/200] OK: ALTER TABLE "public"."DispatchItem" ADD CONSTRAINT "DispatchItem_requisitionItemId_fkey" FOREIGN KEY ("requisitionItemId
+2026-04-07T10:22:29.892Z [148/200] OK: ALTER TABLE "public"."InventoryMove" ADD CONSTRAINT "InventoryMove_changeById_fkey" FOREIGN KEY ("changeById") REFERENCE
+2026-04-07T10:22:30.249Z [149/200] OK: ALTER TABLE "public"."InventoryMove" ADD CONSTRAINT "InventoryMove_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId")
+2026-04-07T10:22:30.578Z [150/200] OK: ALTER TABLE "public"."InventoryAllocation" ADD CONSTRAINT "InventoryAllocation_inventoryItemId_fkey" FOREIGN KEY ("inven
+2026-04-07T10:22:30.903Z [151/200] OK: ALTER TABLE "public"."InventoryAllocation" ADD CONSTRAINT "InventoryAllocation_projectId_fkey" FOREIGN KEY ("projectId")
+2026-04-07T10:22:31.246Z [152/200] OK: ALTER TABLE "public"."Payment" ADD CONSTRAINT "Payment_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Pr
+2026-04-07T10:22:31.583Z [153/200] OK: ALTER TABLE "public"."Payment" ADD CONSTRAINT "Payment_receivedById_fkey" FOREIGN KEY ("receivedById") REFERENCES "publi
+2026-04-07T10:22:31.914Z [154/200] OK: ALTER TABLE "public"."ClientPayment" ADD CONSTRAINT "ClientPayment_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES 
+2026-04-07T10:22:32.289Z [155/200] OK: ALTER TABLE "public"."PaymentSchedule" ADD CONSTRAINT "PaymentSchedule_projectId_fkey" FOREIGN KEY ("projectId") REFEREN
+2026-04-07T10:22:32.612Z [156/200] OK: ALTER TABLE "public"."PaymentReminder" ADD CONSTRAINT "PaymentReminder_scheduleId_fkey" FOREIGN KEY ("scheduleId") REFER
+2026-04-07T10:22:32.973Z [157/200] OK: ALTER TABLE "public"."Schedule" ADD CONSTRAINT "Schedule_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "publi
+2026-04-07T10:22:33.317Z [158/200] OK: ALTER TABLE "public"."Schedule" ADD CONSTRAINT "Schedule_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."
+2026-04-07T10:22:33.649Z [159/200] OK: ALTER TABLE "public"."ProjectProductivitySetting" ADD CONSTRAINT "ProjectProductivitySetting_projectId_fkey" FOREIGN KEY
+2026-04-07T10:22:33.984Z [160/200] OK: ALTER TABLE "public"."ScheduleTaskReport" ADD CONSTRAINT "ScheduleTaskReport_reporterId_fkey" FOREIGN KEY ("reporterId")
+2026-04-07T10:22:34.382Z [161/200] OK: ALTER TABLE "public"."ScheduleTaskReport" ADD CONSTRAINT "ScheduleTaskReport_scheduleItemId_fkey" FOREIGN KEY ("schedule
+2026-04-07T10:22:34.713Z [162/200] OK: ALTER TABLE "public"."ScheduleItem" ADD CONSTRAINT "ScheduleItem_quoteLineId_fkey" FOREIGN KEY ("quoteLineId") REFERENCE
+2026-04-07T10:22:35.052Z [163/200] OK: ALTER TABLE "public"."ScheduleItem" ADD CONSTRAINT "ScheduleItem_scheduleId_fkey" FOREIGN KEY ("scheduleId") REFERENCES 
+2026-04-07T10:22:35.403Z [164/200] OK: ALTER TABLE "public"."Employee" ADD CONSTRAINT "Employee_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"(
+2026-04-07T10:22:35.766Z [165/200] OK: ALTER TABLE "public"."Task" ADD CONSTRAINT "Task_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"
+2026-04-07T10:22:36.090Z [166/200] OK: ALTER TABLE "public"."Task" ADD CONSTRAINT "Task_templateKey_fkey" FOREIGN KEY ("templateKey") REFERENCES "public"."Task
+2026-04-07T10:22:36.413Z [167/200] OK: ALTER TABLE "public"."TaskAssignment" ADD CONSTRAINT "TaskAssignment_projectTaskId_fkey" FOREIGN KEY ("projectTaskId") R
+2026-04-07T10:22:36.757Z [168/200] OK: ALTER TABLE "public"."TaskAssignment" ADD CONSTRAINT "TaskAssignment_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "pub
+2026-04-07T10:22:37.090Z [169/200] OK: ALTER TABLE "public"."TaskAssignment" ADD CONSTRAINT "TaskAssignment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "pub
+2026-04-07T10:22:37.422Z [170/200] OK: ALTER TABLE "public"."TaskProgress" ADD CONSTRAINT "TaskProgress_projectTaskId_fkey" FOREIGN KEY ("projectTaskId") REFER
+2026-04-07T10:22:37.773Z [171/200] OK: ALTER TABLE "public"."TaskProgress" ADD CONSTRAINT "TaskProgress_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "public"
+2026-04-07T10:22:38.101Z [172/200] OK: ALTER TABLE "public"."TaskProgress" ADD CONSTRAINT "TaskProgress_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"
+2026-04-07T10:22:38.438Z [173/200] OK: ALTER TABLE "public"."Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"
+2026-04-07T10:22:38.769Z [174/200] OK: ALTER TABLE "public"."ProjectMember" ADD CONSTRAINT "ProjectMember_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES 
+2026-04-07T10:22:39.098Z [175/200] OK: ALTER TABLE "public"."ProjectMember" ADD CONSTRAINT "ProjectMember_userId_fkey" FOREIGN KEY ("userId") REFERENCES "publi
+2026-04-07T10:22:39.451Z [176/200] OK: ALTER TABLE "public"."PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_createdById_fkey" FOREIGN KEY ("createdById") REFEREN
+2026-04-07T10:22:39.770Z [177/200] OK: ALTER TABLE "public"."PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_decidedById_fkey" FOREIGN KEY ("decidedById") REFEREN
+2026-04-07T10:22:40.089Z [178/200] OK: ALTER TABLE "public"."PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES 
+2026-04-07T10:22:40.423Z [179/200] OK: ALTER TABLE "public"."PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_requisitionId_fkey" FOREIGN KEY ("requisitionId") REF
+2026-04-07T10:22:40.756Z [180/200] OK: ALTER TABLE "public"."PurchaseOrderItem" ADD CONSTRAINT "PurchaseOrderItem_purchaseOrderId_fkey" FOREIGN KEY ("purchaseO
+2026-04-07T10:22:41.087Z [181/200] OK: ALTER TABLE "public"."PurchaseOrderItem" ADD CONSTRAINT "PurchaseOrderItem_quoteLineId_fkey" FOREIGN KEY ("quoteLineId")
+2026-04-07T10:22:41.409Z [182/200] OK: ALTER TABLE "public"."PurchaseOrderItem" ADD CONSTRAINT "PurchaseOrderItem_requisitionItemId_fkey" FOREIGN KEY ("requisi
+2026-04-07T10:22:41.749Z [183/200] OK: ALTER TABLE "public"."GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_purchaseOrderId_fkey" FOREIGN KEY ("purchaseO
+2026-04-07T10:22:42.070Z [184/200] OK: ALTER TABLE "public"."GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_receivedById_fkey" FOREIGN KEY ("receivedById
+2026-04-07T10:22:42.398Z [185/200] OK: ALTER TABLE "public"."GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_verifiedById_fkey" FOREIGN KEY ("verifiedById
+2026-04-07T10:22:42.729Z [186/200] OK: ALTER TABLE "public"."GoodsReceivedNoteItem" ADD CONSTRAINT "GoodsReceivedNoteItem_grnId_fkey" FOREIGN KEY ("grnId") REF
+2026-04-07T10:22:43.078Z [187/200] OK: ALTER TABLE "public"."GoodsReceivedNoteItem" ADD CONSTRAINT "GoodsReceivedNoteItem_poItemId_fkey" FOREIGN KEY ("poItemId
+2026-04-07T10:22:43.408Z [188/200] OK: ALTER TABLE "public"."InventoryReturn" ADD CONSTRAINT "InventoryReturn_createdById_fkey" FOREIGN KEY ("createdById") REF
+2026-04-07T10:22:43.734Z [189/200] OK: ALTER TABLE "public"."InventoryReturn" ADD CONSTRAINT "InventoryReturn_dispatchId_fkey" FOREIGN KEY ("dispatchId") REFER
+2026-04-07T10:22:44.073Z [190/200] OK: ALTER TABLE "public"."InventoryReturnItem" ADD CONSTRAINT "InventoryReturnItem_dispatchItemId_fkey" FOREIGN KEY ("dispat
+2026-04-07T10:22:44.406Z [191/200] OK: ALTER TABLE "public"."InventoryReturnItem" ADD CONSTRAINT "InventoryReturnItem_inventoryItemId_fkey" FOREIGN KEY ("inven
+2026-04-07T10:22:44.729Z [192/200] OK: ALTER TABLE "public"."InventoryReturnItem" ADD CONSTRAINT "InventoryReturnItem_returnId_fkey" FOREIGN KEY ("returnId") R
+2026-04-07T10:22:45.075Z [193/200] OK: ALTER TABLE "public"."StockMove" ADD CONSTRAINT "StockMove_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId") REFEREN
+2026-04-07T10:22:45.433Z [194/200] OK: ALTER TABLE "public"."StockMove" ADD CONSTRAINT "StockMove_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"
+2026-04-07T10:22:45.772Z [195/200] OK: ALTER TABLE "public"."UserActionLog" ADD CONSTRAINT "UserActionLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "publi
+2026-04-07T10:22:46.094Z [196/200] OK: ALTER TABLE "public"."RateOverride" ADD CONSTRAINT "RateOverride_updatedById_fkey" FOREIGN KEY ("updatedById") REFERENCE
+2026-04-07T10:22:46.433Z [197/200] OK: ALTER TABLE "public"."_ScheduleItemAssignees" ADD CONSTRAINT "_ScheduleItemAssignees_A_fkey" FOREIGN KEY ("A") REFERENCE
+2026-04-07T10:22:46.756Z [198/200] OK: ALTER TABLE "public"."_ScheduleItemAssignees" ADD CONSTRAINT "_ScheduleItemAssignees_B_fkey" FOREIGN KEY ("B") REFERENCE
+2026-04-07T10:22:47.080Z [199/200] FAIL: N UPDATE CASCADE;
+2026-04-07T10:22:47.084Z   Error: HTTP 400: {"message":"syntax error at or near \"N\"","code":"42601","detail":null,"hint":null,"position":"1","internalPosition":null,"internalQuery":null,"severity":"ERROR","where":null,"table":null,"column":null,"schema":null,"dataType":null,"constraint":null,"file":"scan.l","line":"1244","routine"
+2026-04-07T10:22:47.414Z [200/200] SKIP (exists): ALTER TABLE "public"."_ScheduleItemAssignees" ADD CONSTRAINT "_ScheduleItemAssignees_B_fkey" FOREIGN KEY ("B") REFERENCE
+2026-04-07T10:22:47.418Z 
+2026-04-07T10:22:47.421Z === DONE ===
+2026-04-07T10:22:47.425Z OK: 145, Skipped: 54, Failed: 1
+2026-04-07T10:22:47.429Z Total: 200 / 200

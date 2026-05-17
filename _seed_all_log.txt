@@ -1,0 +1,32 @@
+Tue, Apr  7, 2026  9:30:01 AM Starting full seed...
+Tue, Apr  7, 2026  9:30:10 AM Default hash: $2b$10$hr4YEQ6BvRGeA37wNXEx0eGt7BP60Em3F8h3rj9Up0kRBZKHj6BZG
+Tue, Apr  7, 2026  9:30:14 AM Brian hash: $2b$10$fvlb2bSILv4lb139r8B3SOzRfb1PLdbVX8tTNNsNeWa7CxVh6rv.G
+Tue, Apr  7, 2026  9:30:29 AM [admin@barmlo.com]
+Tue, Apr  7, 2026  9:30:39 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:30:48 AM [qs@barmlo.com]
+Tue, Apr  7, 2026  9:31:02 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:31:10 AM [senior_qs@barmlo.com]
+Tue, Apr  7, 2026  9:31:13 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:31:24 AM [sales@barmlo.com]
+Tue, Apr  7, 2026  9:31:38 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:31:43 AM [salesaccount@barmlo.com]
+Tue, Apr  7, 2026  9:32:00 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:32:06 AM [project_operations_officer@barmlo.com]
+Tue, Apr  7, 2026  9:32:11 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:32:15 AM [procurement@barmlo.com]
+Tue, Apr  7, 2026  9:32:21 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:32:49 AM [accounts@barmlo.com]
+Tue, Apr  7, 2026  9:33:03 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:33:11 AM [security@barmlo.com]
+Tue, Apr  7, 2026  9:33:17 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:33:25 AM [driver@barmlo.com]
+Tue, Apr  7, 2026  9:33:36 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:33:41 AM [accounting_clerk@barmlo.com]
+Tue, Apr  7, 2026  9:33:46 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:33:55 AM [accounting_officer@barmlo.com]
+Tue, Apr  7, 2026  9:34:03 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:34:08 AM [accounting_auditor@barmlo.com]
+Tue, Apr  7, 2026  9:34:13 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:34:15 AM [bmarambire@gmail.com]
+Tue, Apr  7, 2026  9:34:18 AM -> {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:34:18 AM ALL DONE

@@ -1,0 +1,10 @@
+2026-04-07T09:21:02.913Z === Starting seed ===
+2026-04-07T09:21:03.013Z Creating User table...
+2026-04-07T09:21:03.019Z QUERY: 
+    CREATE TABLE IF NOT EXISTS "User" (
+      "id" TEXT NOT NULL,
+      "name" TEXT,
+      "email" TEXT NOT NULL,
+      "role" TEXT NOT NULL DEFAULT 'QS',
+      "office" TEXT,
+      "createdAt" TIMES

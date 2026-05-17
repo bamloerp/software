@@ -1,0 +1,150 @@
+ALL USERS:
+{
+  "fields": [
+    {
+      "name": "email",
+      "dataTypeID": 25,
+      "tableID": 24576,
+      "columnID": 3,
+      "dataTypeSize": -1,
+      "dataTypeModifier": -1,
+      "format": "text"
+    },
+    {
+      "name": "role",
+      "dataTypeID": 25,
+      "tableID": 24576,
+      "columnID": 4,
+      "dataTypeSize": -1,
+      "dataTypeModifier": -1,
+      "format": "text"
+    },
+    {
+      "name": "name",
+      "dataTypeID": 25,
+      "tableID": 24576,
+      "columnID": 2,
+      "dataTypeSize": -1,
+      "dataTypeModifier": -1,
+      "format": "text"
+    }
+  ],
+  "rows": [
+    {
+      "email": "accounting_auditor@barmlo.com",
+      "role": "ACCOUNTING_AUDITOR",
+      "name": "ACCOUNTING AUDITOR"
+    },
+    {
+      "email": "accounting_clerk@barmlo.com",
+      "role": "ACCOUNTING_CLERK",
+      "name": "ACCOUNTING CLERK"
+    },
+    {
+      "email": "accounting_officer@barmlo.com",
+      "role": "ACCOUNTING_OFFICER",
+      "name": "ACCOUNTING OFFICER"
+    },
+    {
+      "email": "accounts@barmlo.com",
+      "role": "ACCOUNTS",
+      "name": "ACCOUNTS"
+    },
+    {
+      "email": "admin@barmlo.com",
+      "role": "ADMIN",
+      "name": "ADMIN"
+    },
+    {
+      "email": "bmarambire@gmail.com",
+      "role": "ADMIN",
+      "name": "Brian Marambire"
+    },
+    {
+      "email": "driver@barmlo.com",
+      "role": "DRIVER",
+      "name": "DRIVER"
+    },
+    {
+      "email": "procurement@barmlo.com",
+      "role": "PROCUREMENT",
+      "name": "PROCUREMENT"
+    },
+    {
+      "email": "project_coordinator@barmlo.com",
+      "role": "PROJECT_COORDINATOR",
+      "name": "Project Coordinator"
+    },
+    {
+      "email": "ops@barmlo.com",
+      "role": "PROJECT_OPERATIONS_OFFICER",
+      "name": "ops"
+    },
+    {
+      "email": "project_operations_officer@barmlo.com",
+      "role": "PROJECT_OPERATIONS_OFFICER",
+      "name": "PROJECT OPERATIONS OFFICER"
+    },
+    {
+      "email": "qs@barmlo.com",
+      "role": "QS",
+      "name": "QS"
+    },
+    {
+      "email": "sales@barmlo.com",
+      "role": "SALES",
+      "name": "SALES"
+    },
+    {
+      "email": "salesaccount@barmlo.com",
+      "role": "SALES_ACCOUNTS",
+      "name": "Sales Accounts"
+    },
+    {
+      "email": "security@barmlo.com",
+      "role": "SECURITY",
+      "name": "SECURITY"
+    },
+    {
+      "email": "senior_qs@barmlo.com",
+      "role": "SENIOR_QS",
+      "name": "SENIOR QS"
+    }
+  ],
+  "command": "SELECT",
+  "rowCount": 16,
+  "rowAsArray": false
+}
+
+SALES-ACCOUNT-LIKE:
+{
+  "fields": [
+    {
+      "name": "email",
+      "dataTypeID": 25,
+      "tableID": 24576,
+      "columnID": 3,
+      "dataTypeSize": -1,
+      "dataTypeModifier": -1,
+      "format": "text"
+    },
+    {
+      "name": "role",
+      "dataTypeID": 25,
+      "tableID": 24576,
+      "columnID": 4,
+      "dataTypeSize": -1,
+      "dataTypeModifier": -1,
+      "format": "text"
+    }
+  ],
+  "rows": [
+    {
+      "email": "salesaccount@barmlo.com",
+      "role": "SALES_ACCOUNTS"
+    }
+  ],
+  "command": "SELECT",
+  "rowCount": 1,
+  "rowAsArray": false
+}

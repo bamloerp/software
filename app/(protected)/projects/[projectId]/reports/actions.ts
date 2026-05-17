@@ -118,7 +118,14 @@ export async function getProjectReportData(projectId: string): Promise<ReportDat
             items: {
                 include: {
                     purchase: true,
-                    requisitionItem: { select: { quoteLineId: true } }
+                    requisitionItem: {
+                        select: {
+                            quoteLineId: true,
+                            qtyRequested: true,
+                            estPriceMinor: true,
+                            amountMinor: true,
+                        },
+                    },
                 }
             }
         }
@@ -135,8 +142,35 @@ export async function getProjectReportData(projectId: string): Promise<ReportDat
             const qty = Number(item.qty);
             const handedOut = Math.max(0, qty - Number(item.returnedQty ?? 0));
             const used = Number(item.usedOutQty ?? 0);
-            const price = item.estPriceMinor ? fromMinor(item.estPriceMinor) : 0;
             const quoteLineId = item.requisitionItem?.quoteLineId;
+
+            // Derive per-unit price. `estPriceMinor` on DispatchItem/RequisitionItem
+            // actually holds the line TOTAL (qty × unit price) copied from the quote
+            // line — NOT a per-unit rate. We therefore prefer the matched quote line's
+            // unitPriceMinor; if none is available, fall back to dividing the
+            // requisition item's total by its requested qty.
+            let unitPrice = 0;
+            if (quoteLineId) {
+                const ql = quoteLineMap.get(quoteLineId);
+                if (ql) unitPrice = ql.unitPrice;
+            }
+            if (!unitPrice && item.requisitionItem) {
+                const reqQty = Number(item.requisitionItem.qtyRequested ?? 0);
+                const reqTotalMinor =
+                    item.requisitionItem.amountMinor ??
+                    item.requisitionItem.estPriceMinor ??
+                    0n;
+                if (reqQty > 0 && reqTotalMinor) {
+                    unitPrice = fromMinor(reqTotalMinor) / reqQty;
+                }
+            }
+            if (!unitPrice && item.estPriceMinor) {
+                // Last-ditch fallback: assume estPriceMinor is the line total for THIS
+                // dispatch qty (best guess for items without a requisition link).
+                const dispatchQty = qty || 1;
+                unitPrice = fromMinor(item.estPriceMinor) / dispatchQty;
+            }
+            const price = unitPrice;
 
             // Attempt to derive section from linked quote line
             let section = 'General';

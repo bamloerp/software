@@ -1,0 +1,1 @@
+{"fields":[{"name":"test","dataTypeID":23,"tableID":0,"columnID":0,"dataTypeSize":4,"dataTypeModifier":-1,"format":"text"}],"rows":[{"test":1}],"command":"SELECT","rowCount":1,"rowAsArray":false}

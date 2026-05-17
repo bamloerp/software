@@ -1,0 +1,11 @@
+Tue, Apr  7, 2026  9:24:17 AM Starting...
+Tue, Apr  7, 2026  9:24:19 AM Running: SELECT 1
+Tue, Apr  7, 2026  9:24:32 AM Result: {"fields":[{"name":"ok","dataTypeID":23,"tableID":0,"columnID":0,"dataTypeSize":4,"dataTypeModifier":-1,"format":"text"}],"rows":[{"ok":1}],"command":"SELECT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:24:34 AM Running: CREATE TABLE
+Tue, Apr  7, 2026  9:24:54 AM Result: {"fields":[],"rows":[],"command":"CREATE","rowCount":null,"rowAsArray":false}
+Tue, Apr  7, 2026  9:24:54 AM Running: CREATE INDEX
+Tue, Apr  7, 2026  9:25:04 AM Result: {"fields":[],"rows":[],"command":"CREATE","rowCount":null,"rowAsArray":false}
+Tue, Apr  7, 2026  9:25:07 AM Hash: $2b$10$99zLm.hxLO7c4xrWmiUcluZBCMaU605.14R.cgx4pmYJuFtfHVsdy
+Tue, Apr  7, 2026  9:25:11 AM Running: INSERT USER
+Tue, Apr  7, 2026  9:25:19 AM Result: {"fields":[],"rows":[],"command":"INSERT","rowCount":1,"rowAsArray":false}
+Tue, Apr  7, 2026  9:25:20 AM DONE

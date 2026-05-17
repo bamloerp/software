@@ -1,0 +1,1283 @@
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
+-- CreateEnum
+CREATE TYPE "public"."FundingRequestType" AS ENUM ('BASE', 'TOP_UP');
+
+-- CreateEnum
+CREATE TYPE "public"."LineDecision" AS ENUM ('PENDING', 'OK', 'ACCEPTED', 'REJECTED', 'REVIEWED');
+
+-- CreateEnum
+CREATE TYPE "public"."ProjectStatus" AS ENUM ('PLANNED', 'PREPARING', 'READY', 'ONGOING', 'ON_HOLD', 'COMPLETED', 'CLOSED', 'DEPOSIT_PENDING', 'SCHEDULING_PENDING', 'CREATED');
+
+-- CreateEnum
+CREATE TYPE "public"."PaymentScheduleStatus" AS ENUM ('DUE', 'PARTIAL', 'PAID', 'OVERDUE', 'CANCELLED');
+
+-- CreateTable
+CREATE TABLE "public"."User" (
+    "id" TEXT NOT NULL,
+    "name" TEXT,
+    "email" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'QS',
+    "office" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "passwordHash" TEXT,
+    "managerId" TEXT,
+    "disabled" BOOLEAN NOT NULL DEFAULT false,
+    "failedLoginAttempts" INTEGER NOT NULL DEFAULT 0,
+    "lockedUntil" TIMESTAMP(3),
+    "lastLoginAt" TIMESTAMP(3),
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Customer" (
+    "id" TEXT NOT NULL,
+    "displayName" TEXT NOT NULL,
+    "email" TEXT,
+    "phone" TEXT,
+    "addressJson" JSONB,
+    "city" TEXT,
+
+    CONSTRAINT "Customer_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Product" (
+    "id" TEXT NOT NULL,
+    "sku" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "unit" TEXT,
+    "basePriceMinor" BIGINT NOT NULL,
+    "extraJson" TEXT,
+
+    CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."FormulaRule" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "description" TEXT,
+    "expression" TEXT NOT NULL,
+    "dependsOn" TEXT,
+
+    CONSTRAINT "FormulaRule_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Quote" (
+    "id" TEXT NOT NULL,
+    "number" TEXT,
+    "customerId" TEXT NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'USD',
+    "vatBps" INTEGER NOT NULL,
+    "discountPolicy" TEXT,
+    "metaJson" TEXT,
+    "pgRate" DOUBLE PRECISION NOT NULL DEFAULT 2.0,
+    "contingencyRate" DOUBLE PRECISION NOT NULL DEFAULT 10.0,
+    "assumptions" TEXT,
+    "exclusions" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "office" TEXT,
+    "createdById" TEXT NOT NULL,
+    "reviewerId" TEXT,
+    "salesId" TEXT,
+    "projectManagerId" TEXT,
+    "projectManagerAssignedAt" TIMESTAMP(3),
+    "negotiationCycle" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "Quote_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."QuoteLine" (
+    "id" TEXT NOT NULL,
+    "quoteId" TEXT NOT NULL,
+    "productId" TEXT,
+    "description" TEXT NOT NULL,
+    "quantity" DOUBLE PRECISION NOT NULL,
+    "unit" TEXT,
+    "unitPriceMinor" BIGINT NOT NULL,
+    "lineSubtotalMinor" BIGINT NOT NULL,
+    "lineDiscountMinor" BIGINT NOT NULL,
+    "lineTaxMinor" BIGINT NOT NULL,
+    "lineTotalMinor" BIGINT NOT NULL,
+    "metaJson" TEXT,
+    "source" TEXT DEFAULT 'System',
+    "cycle" INTEGER NOT NULL DEFAULT 0,
+    "addedInVersionId" TEXT,
+    "section" TEXT,
+    "itemType" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "QuoteLine_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."QuoteVersion" (
+    "id" TEXT NOT NULL,
+    "quoteId" TEXT NOT NULL,
+    "version" INTEGER NOT NULL,
+    "snapshotJson" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "label" TEXT,
+    "status" TEXT,
+    "byRole" TEXT,
+
+    CONSTRAINT "QuoteVersion_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."ProjectTask" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "plannedStart" TIMESTAMP(3),
+    "plannedEnd" TIMESTAMP(3),
+    "estimatedHours" DOUBLE PRECISION NOT NULL DEFAULT 8,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "assigneeId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "userId" TEXT,
+    "createdById" TEXT,
+    "quoteId" TEXT,
+
+    CONSTRAINT "ProjectTask_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."QuoteNegotiation" (
+    "id" TEXT NOT NULL,
+    "quoteId" TEXT NOT NULL,
+    "originalVersionId" TEXT NOT NULL,
+    "proposedVersionId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'OPEN',
+    "createdById" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "QuoteNegotiation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."QuoteNegotiationItem" (
+    "id" TEXT NOT NULL,
+    "negotiationId" TEXT NOT NULL,
+    "quoteLineId" TEXT NOT NULL,
+    "proposedTotalMinor" BIGINT NOT NULL,
+    "status" "public"."LineDecision" NOT NULL DEFAULT 'PENDING',
+    "reviewedById" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "QuoteNegotiationItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Project" (
+    "id" TEXT NOT NULL,
+    "quoteId" TEXT NOT NULL,
+    "commenceOn" TIMESTAMP(3) NOT NULL,
+    "installmentDueOn" TIMESTAMP(3) NOT NULL,
+    "depositMinor" BIGINT NOT NULL DEFAULT 0,
+    "installmentMinor" BIGINT NOT NULL DEFAULT 0,
+    "installmentDueDay" INTEGER NOT NULL DEFAULT 1,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdById" TEXT,
+    "office" TEXT,
+    "status" "public"."ProjectStatus" NOT NULL DEFAULT 'CREATED',
+    "name" TEXT NOT NULL DEFAULT '',
+    "assignedToId" TEXT,
+    "projectNumber" TEXT,
+
+    CONSTRAINT "Project_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."ProcurementRequisition" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "submittedById" TEXT,
+    "note" TEXT,
+    "reviewSubmittedAt" TIMESTAMP(3),
+    "reviewSubmittedById" TEXT,
+
+    CONSTRAINT "ProcurementRequisition_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."ProcurementRequisitionItem" (
+    "id" TEXT NOT NULL,
+    "requisitionId" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "qty" DOUBLE PRECISION,
+    "unit" TEXT,
+    "estPriceMinor" BIGINT NOT NULL DEFAULT 0,
+    "quoteLineId" TEXT,
+    "qtyRequested" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "amountMinor" BIGINT NOT NULL DEFAULT 0,
+    "extraRequestedQty" DOUBLE PRECISION DEFAULT 0,
+    "reviewRequested" BOOLEAN NOT NULL DEFAULT false,
+    "reviewApproved" BOOLEAN NOT NULL DEFAULT false,
+    "requestedUnitPriceMinor" BIGINT,
+    "stagedUnitPriceMinor" BIGINT DEFAULT 0,
+    "reviewRejectionReason" TEXT,
+
+    CONSTRAINT "ProcurementRequisitionItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."RequisitionItemTopup" (
+    "id" TEXT NOT NULL,
+    "requisitionItemId" TEXT NOT NULL,
+    "requestedById" TEXT,
+    "decidedById" TEXT,
+    "qtyRequested" DOUBLE PRECISION NOT NULL,
+    "reason" TEXT,
+    "approved" BOOLEAN NOT NULL DEFAULT false,
+    "decidedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "RequisitionItemTopup_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."QuoteLineExtraRequest" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "quoteLineId" TEXT NOT NULL,
+    "qty" DOUBLE PRECISION NOT NULL,
+    "reason" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "requiresAdmin" BOOLEAN NOT NULL DEFAULT false,
+    "requestedById" TEXT NOT NULL,
+    "decidedById" TEXT,
+    "decidedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "QuoteLineExtraRequest_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."FundingRequest" (
+    "id" TEXT NOT NULL,
+    "requisitionId" TEXT NOT NULL,
+    "amountMinor" BIGINT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "approvedAt" TIMESTAMP(3),
+    "lastReminderAt" TIMESTAMP(3),
+    "rejectedAt" TIMESTAMP(3),
+    "reminderCount" INTEGER NOT NULL DEFAULT 0,
+    "requestedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "requestedById" TEXT,
+    "decidedById" TEXT,
+    "decidedAt" TIMESTAMP(3),
+    "reason" TEXT,
+    "isTopUp" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3),
+    "approvedById" TEXT,
+    "submittedById" TEXT,
+    "type" "public"."FundingRequestType" NOT NULL DEFAULT 'BASE',
+    "note" TEXT,
+    "postponedUntil" TIMESTAMP(3),
+
+    CONSTRAINT "FundingRequest_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."FundDisbursement" (
+    "id" TEXT NOT NULL,
+    "fundingRequestId" TEXT NOT NULL,
+    "amountMinor" BIGINT NOT NULL,
+    "paidAt" TIMESTAMP(3) NOT NULL,
+    "ref" TEXT,
+    "attachmentUrl" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "FundDisbursement_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Purchase" (
+    "id" TEXT NOT NULL,
+    "requisitionId" TEXT NOT NULL,
+    "purchasedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "attachmentsJson" TEXT,
+    "filedAt" TIMESTAMP(3),
+    "requisitionItemId" TEXT,
+    "vendor" TEXT NOT NULL,
+    "taxInvoiceNo" TEXT NOT NULL,
+    "priceMinor" BIGINT NOT NULL DEFAULT 0,
+    "qty" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "purchasedOn" TIMESTAMP(3),
+    "invoiceUrl" TEXT,
+    "createdById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "vendorPhone" TEXT,
+    "purchaseOrderId" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+
+    CONSTRAINT "Purchase_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Dispatch" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "attachmentsJson" TEXT,
+    "createdById" TEXT,
+    "note" TEXT,
+    "securityById" TEXT,
+    "driverById" TEXT,
+    "driverName" TEXT,
+    "signedBy" TEXT,
+    "vehicleReg" TEXT,
+    "driverSignedAt" TIMESTAMP(3),
+    "securitySignedAt" TIMESTAMP(3),
+    "siteStockistSignedAt" TIMESTAMP(3),
+    "departAt" TIMESTAMP(3),
+    "receiveAt" TIMESTAMP(3),
+    "securityAck" TEXT,
+    "driverAck" TEXT,
+    "siteAck" TEXT,
+    "assignedToDriverId" TEXT,
+
+    CONSTRAINT "Dispatch_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."DispatchItem" (
+    "id" TEXT NOT NULL,
+    "dispatchId" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "qty" DOUBLE PRECISION NOT NULL,
+    "unit" TEXT,
+    "purchaseId" TEXT,
+    "requisitionItemId" TEXT,
+    "estPriceMinor" BIGINT,
+    "handedOutAt" TIMESTAMP(3),
+    "handedOutById" TEXT,
+    "receivedAt" TIMESTAMP(3),
+    "receivedByName" TEXT,
+    "receivedById" TEXT,
+    "inventoryItemId" TEXT,
+    "selected" BOOLEAN NOT NULL DEFAULT true,
+    "returnedQty" DOUBLE PRECISION DEFAULT 0,
+    "usedOut" BOOLEAN NOT NULL DEFAULT false,
+    "usedOutAt" TIMESTAMP(3),
+    "usedOutById" TEXT,
+    "handedOutQty" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "usedOutQty" DOUBLE PRECISION NOT NULL DEFAULT 0,
+
+    CONSTRAINT "DispatchItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."InventoryMove" (
+    "id" TEXT NOT NULL,
+    "inventoryItemId" TEXT NOT NULL,
+    "changeById" TEXT,
+    "delta" DOUBLE PRECISION NOT NULL,
+    "reason" TEXT NOT NULL,
+    "metaJson" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "InventoryMove_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."InventoryAllocation" (
+    "id" TEXT NOT NULL,
+    "inventoryItemId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "qty" DOUBLE PRECISION NOT NULL,
+    "dispatchedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "returnedAt" TIMESTAMP(3),
+
+    CONSTRAINT "InventoryAllocation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Payment" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "amountMinor" BIGINT NOT NULL,
+    "receivedAt" TIMESTAMP(3) NOT NULL,
+    "receivedById" TEXT,
+    "receiptNo" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "paidOn" TIMESTAMP(3) NOT NULL,
+    "ref" TEXT,
+    "createdById" TEXT,
+
+    CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Reminder" (
+    "id" TEXT NOT NULL,
+    "relatedType" TEXT NOT NULL,
+    "relatedId" TEXT NOT NULL,
+    "attempt" INTEGER NOT NULL,
+    "sentAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "status" TEXT NOT NULL,
+
+    CONSTRAINT "Reminder_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Escalation" (
+    "id" TEXT NOT NULL,
+    "relatedType" TEXT NOT NULL,
+    "relatedId" TEXT NOT NULL,
+    "triggeredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "message" TEXT NOT NULL,
+
+    CONSTRAINT "Escalation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."ClientPayment" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "amountMinor" BIGINT NOT NULL,
+    "receivedAt" TIMESTAMP(3) NOT NULL,
+    "receiptNo" TEXT,
+    "method" TEXT,
+    "attachmentUrl" TEXT,
+    "recordedById" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "description" TEXT,
+
+    CONSTRAINT "ClientPayment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."File" (
+    "id" TEXT NOT NULL,
+    "filename" TEXT NOT NULL,
+    "mimeType" TEXT NOT NULL,
+    "data" BYTEA NOT NULL,
+    "size" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "File_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."PaymentSchedule" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "seq" INTEGER NOT NULL,
+    "dueOn" TIMESTAMP(3) NOT NULL,
+    "amountMinor" BIGINT NOT NULL,
+    "paidMinor" BIGINT NOT NULL DEFAULT 0,
+    "status" "public"."PaymentScheduleStatus" NOT NULL DEFAULT 'DUE',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PaymentSchedule_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."PaymentReminder" (
+    "id" TEXT NOT NULL,
+    "scheduleId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "sentAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PaymentReminder_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Schedule" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "createdById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "note" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "hasConflict" BOOLEAN NOT NULL DEFAULT false,
+
+    CONSTRAINT "Schedule_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."ProjectProductivitySetting" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "builderShare" DOUBLE PRECISION NOT NULL DEFAULT 0.3333,
+    "excavationBuilder" DOUBLE PRECISION NOT NULL DEFAULT 5,
+    "excavationAssistant" DOUBLE PRECISION NOT NULL DEFAULT 5,
+    "brickBuilder" DOUBLE PRECISION NOT NULL DEFAULT 500,
+    "brickAssistant" DOUBLE PRECISION NOT NULL DEFAULT 500,
+    "plasterBuilder" DOUBLE PRECISION NOT NULL DEFAULT 16,
+    "plasterAssistant" DOUBLE PRECISION NOT NULL DEFAULT 16,
+    "cubicBuilder" DOUBLE PRECISION NOT NULL DEFAULT 5,
+    "cubicAssistant" DOUBLE PRECISION NOT NULL DEFAULT 5,
+    "tilerBuilder" DOUBLE PRECISION NOT NULL DEFAULT 20,
+    "tilerAssistant" DOUBLE PRECISION NOT NULL DEFAULT 20,
+
+    CONSTRAINT "ProjectProductivitySetting_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."ScheduleTaskReport" (
+    "id" TEXT NOT NULL,
+    "scheduleItemId" TEXT NOT NULL,
+    "reporterId" TEXT,
+    "reportedForDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "activity" TEXT,
+    "usedQty" DOUBLE PRECISION,
+    "usedUnit" TEXT,
+    "remainingQty" DOUBLE PRECISION,
+    "remainingUnit" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ScheduleTaskReport_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."ScheduleItem" (
+    "id" TEXT NOT NULL,
+    "scheduleId" TEXT NOT NULL,
+    "quoteLineId" TEXT,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "unit" TEXT,
+    "quantity" DOUBLE PRECISION,
+    "plannedStart" TIMESTAMP(3),
+    "plannedEnd" TIMESTAMP(3),
+    "employees" INTEGER,
+    "estHours" DOUBLE PRECISION,
+    "note" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "hasConflict" BOOLEAN NOT NULL DEFAULT false,
+    "conflictNote" TEXT,
+
+    CONSTRAINT "ScheduleItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Employee" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT,
+    "givenName" TEXT NOT NULL,
+    "surname" TEXT,
+    "ecNumber" TEXT,
+    "role" TEXT NOT NULL,
+    "phone" TEXT,
+    "email" TEXT,
+    "createdBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "office" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+
+    CONSTRAINT "Employee_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."TaskTemplate" (
+    "key" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "hoursPerUnit" DOUBLE PRECISION NOT NULL,
+    "unitLabel" TEXT NOT NULL,
+    "complexityFactor" DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TaskTemplate_pkey" PRIMARY KEY ("key")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Task" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "templateKey" TEXT,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "quantity" DOUBLE PRECISION,
+    "estimatedHours" DOUBLE PRECISION NOT NULL DEFAULT 8,
+    "plannedStart" TIMESTAMP(3),
+    "plannedEnd" TIMESTAMP(3),
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "percentComplete" INTEGER NOT NULL DEFAULT 0,
+    "createdById" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Task_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."TaskAssignment" (
+    "id" TEXT NOT NULL,
+    "taskId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "hoursPerDay" DOUBLE PRECISION NOT NULL DEFAULT 8,
+    "roleLabel" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "projectTaskId" TEXT,
+
+    CONSTRAINT "TaskAssignment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."TaskProgress" (
+    "id" TEXT NOT NULL,
+    "taskId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "percent" INTEGER NOT NULL,
+    "note" TEXT,
+    "loggedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "projectTaskId" TEXT,
+
+    CONSTRAINT "TaskProgress_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."Notification" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "link" TEXT,
+    "readAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."ProjectMember" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "role" TEXT NOT NULL,
+
+    CONSTRAINT "ProjectMember_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."PurchaseOrder" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "requisitionId" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "vendor" TEXT,
+    "supplierId" TEXT,
+    "note" TEXT,
+    "requestedMinor" BIGINT NOT NULL DEFAULT 0,
+    "totalMinor" BIGINT NOT NULL DEFAULT 0,
+    "approvedMinor" BIGINT NOT NULL DEFAULT 0,
+    "createdById" TEXT,
+    "decidedById" TEXT,
+    "decidedAt" TIMESTAMP(3),
+    "reason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PurchaseOrder_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."PurchaseOrderItem" (
+    "id" TEXT NOT NULL,
+    "purchaseOrderId" TEXT NOT NULL,
+    "requisitionItemId" TEXT,
+    "quoteLineId" TEXT,
+    "description" TEXT NOT NULL,
+    "unit" TEXT,
+    "qty" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "unitPriceMinor" BIGINT NOT NULL DEFAULT 0,
+    "totalMinor" BIGINT NOT NULL DEFAULT 0,
+
+    CONSTRAINT "PurchaseOrderItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."GoodsReceivedNote" (
+    "id" TEXT NOT NULL,
+    "purchaseOrderId" TEXT NOT NULL,
+    "receivedById" TEXT,
+    "verifiedById" TEXT,
+    "receivedAt" TIMESTAMP(3),
+    "verifiedAt" TIMESTAMP(3),
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "note" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "receiptNumber" TEXT,
+    "vendorName" TEXT,
+    "vendorPhone" TEXT,
+
+    CONSTRAINT "GoodsReceivedNote_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."GoodsReceivedNoteItem" (
+    "id" TEXT NOT NULL,
+    "grnId" TEXT NOT NULL,
+    "poItemId" TEXT,
+    "description" TEXT NOT NULL,
+    "unit" TEXT,
+    "qtyDelivered" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "qtyAccepted" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "qtyRejected" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "priceMinor" BIGINT,
+    "varianceMinor" BIGINT DEFAULT 0,
+
+    CONSTRAINT "GoodsReceivedNoteItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."InventoryItem" (
+    "id" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "unit" TEXT,
+    "quantity" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "name" TEXT,
+    "qty" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "category" TEXT,
+    "purchaseId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "InventoryItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."InventoryReturn" (
+    "id" TEXT NOT NULL,
+    "dispatchId" TEXT,
+    "projectId" TEXT,
+    "createdById" TEXT,
+    "note" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "InventoryReturn_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."InventoryReturnItem" (
+    "id" TEXT NOT NULL,
+    "returnId" TEXT NOT NULL,
+    "dispatchItemId" TEXT,
+    "inventoryItemId" TEXT,
+    "description" TEXT NOT NULL,
+    "qty" DOUBLE PRECISION NOT NULL,
+    "unit" TEXT,
+    "note" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "InventoryReturnItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."StockMove" (
+    "id" TEXT NOT NULL,
+    "inventoryItemId" TEXT NOT NULL,
+    "projectId" TEXT,
+    "kind" TEXT NOT NULL,
+    "qty" DOUBLE PRECISION NOT NULL,
+    "refType" TEXT NOT NULL,
+    "refId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "StockMove_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."UserActionLog" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "method" TEXT NOT NULL,
+    "path" TEXT NOT NULL,
+    "ip" TEXT,
+    "userAgent" TEXT,
+    "details" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "UserActionLog_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."RateOverride" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "rate" DOUBLE PRECISION NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedById" TEXT,
+
+    CONSTRAINT "RateOverride_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."SystemSetting" (
+    "id" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+
+    CONSTRAINT "SystemSetting_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."_ScheduleItemAssignees" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_ScheduleItemAssignees_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_email_key" ON "public"."User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Customer_displayName_city_key" ON "public"."Customer"("displayName", "city");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Product_sku_key" ON "public"."Product"("sku");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "FormulaRule_code_key" ON "public"."FormulaRule"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Quote_number_key" ON "public"."Quote"("number");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Project_quoteId_key" ON "public"."Project"("quoteId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Project_projectNumber_key" ON "public"."Project"("projectNumber");
+
+-- CreateIndex
+CREATE INDEX "Project_projectNumber_idx" ON "public"."Project"("projectNumber");
+
+-- CreateIndex
+CREATE INDEX "QuoteLineExtraRequest_projectId_idx" ON "public"."QuoteLineExtraRequest"("projectId");
+
+-- CreateIndex
+CREATE INDEX "QuoteLineExtraRequest_quoteLineId_idx" ON "public"."QuoteLineExtraRequest"("quoteLineId");
+
+-- CreateIndex
+CREATE INDEX "QuoteLineExtraRequest_status_idx" ON "public"."QuoteLineExtraRequest"("status");
+
+-- CreateIndex
+CREATE INDEX "FundingRequest_requisitionId_idx" ON "public"."FundingRequest"("requisitionId");
+
+-- CreateIndex
+CREATE INDEX "FundingRequest_status_idx" ON "public"."FundingRequest"("status");
+
+-- CreateIndex
+CREATE INDEX "FundingRequest_type_idx" ON "public"."FundingRequest"("type");
+
+-- CreateIndex
+CREATE INDEX "FundDisbursement_fundingRequestId_idx" ON "public"."FundDisbursement"("fundingRequestId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PaymentSchedule_projectId_seq_key" ON "public"."PaymentSchedule"("projectId", "seq");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Schedule_projectId_key" ON "public"."Schedule"("projectId");
+
+-- CreateIndex
+CREATE INDEX "Schedule_projectId_idx" ON "public"."Schedule"("projectId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ProjectProductivitySetting_projectId_key" ON "public"."ProjectProductivitySetting"("projectId");
+
+-- CreateIndex
+CREATE INDEX "ScheduleTaskReport_scheduleItemId_idx" ON "public"."ScheduleTaskReport"("scheduleItemId");
+
+-- CreateIndex
+CREATE INDEX "ScheduleTaskReport_reporterId_idx" ON "public"."ScheduleTaskReport"("reporterId");
+
+-- CreateIndex
+CREATE INDEX "ScheduleTaskReport_reportedForDate_idx" ON "public"."ScheduleTaskReport"("reportedForDate");
+
+-- CreateIndex
+CREATE INDEX "ScheduleItem_scheduleId_idx" ON "public"."ScheduleItem"("scheduleId");
+
+-- CreateIndex
+CREATE INDEX "ScheduleItem_quoteLineId_idx" ON "public"."ScheduleItem"("quoteLineId");
+
+-- CreateIndex
+CREATE INDEX "ScheduleItem_plannedStart_idx" ON "public"."ScheduleItem"("plannedStart");
+
+-- CreateIndex
+CREATE INDEX "ScheduleItem_plannedEnd_idx" ON "public"."ScheduleItem"("plannedEnd");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Employee_userId_key" ON "public"."Employee"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Employee_ecNumber_key" ON "public"."Employee"("ecNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Employee_email_key" ON "public"."Employee"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TaskAssignment_taskId_userId_key" ON "public"."TaskAssignment"("taskId", "userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ProjectMember_projectId_userId_key" ON "public"."ProjectMember"("projectId", "userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "InventoryItem_key_key" ON "public"."InventoryItem"("key");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "InventoryItem_name_unit_key" ON "public"."InventoryItem"("name", "unit");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RateOverride_code_key" ON "public"."RateOverride"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SystemSetting_key_key" ON "public"."SystemSetting"("key");
+
+-- CreateIndex
+CREATE INDEX "_ScheduleItemAssignees_B_index" ON "public"."_ScheduleItemAssignees"("B");
+
+-- AddForeignKey
+ALTER TABLE "public"."User" ADD CONSTRAINT "User_managerId_fkey" FOREIGN KEY ("managerId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "public"."Customer"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_projectManagerId_fkey" FOREIGN KEY ("projectManagerId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_reviewerId_fkey" FOREIGN KEY ("reviewerId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Quote" ADD CONSTRAINT "Quote_salesId_fkey" FOREIGN KEY ("salesId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteLine" ADD CONSTRAINT "QuoteLine_addedInVersionId_fkey" FOREIGN KEY ("addedInVersionId") REFERENCES "public"."QuoteVersion"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteLine" ADD CONSTRAINT "QuoteLine_productId_fkey" FOREIGN KEY ("productId") REFERENCES "public"."Product"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteLine" ADD CONSTRAINT "QuoteLine_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "public"."Quote"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteVersion" ADD CONSTRAINT "QuoteVersion_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "public"."Quote"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_assigneeId_fkey" FOREIGN KEY ("assigneeId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "public"."Quote"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProjectTask" ADD CONSTRAINT "ProjectTask_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteNegotiation" ADD CONSTRAINT "QuoteNegotiation_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteNegotiation" ADD CONSTRAINT "QuoteNegotiation_originalVersionId_fkey" FOREIGN KEY ("originalVersionId") REFERENCES "public"."QuoteVersion"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteNegotiation" ADD CONSTRAINT "QuoteNegotiation_proposedVersionId_fkey" FOREIGN KEY ("proposedVersionId") REFERENCES "public"."QuoteVersion"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteNegotiation" ADD CONSTRAINT "QuoteNegotiation_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "public"."Quote"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteNegotiationItem" ADD CONSTRAINT "QuoteNegotiationItem_negotiationId_fkey" FOREIGN KEY ("negotiationId") REFERENCES "public"."QuoteNegotiation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteNegotiationItem" ADD CONSTRAINT "QuoteNegotiationItem_quoteLineId_fkey" FOREIGN KEY ("quoteLineId") REFERENCES "public"."QuoteLine"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteNegotiationItem" ADD CONSTRAINT "QuoteNegotiationItem_reviewedById_fkey" FOREIGN KEY ("reviewedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Project" ADD CONSTRAINT "Project_assignedToId_fkey" FOREIGN KEY ("assignedToId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Project" ADD CONSTRAINT "Project_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Project" ADD CONSTRAINT "Project_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "public"."Quote"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProcurementRequisition" ADD CONSTRAINT "ProcurementRequisition_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProcurementRequisition" ADD CONSTRAINT "ProcurementRequisition_reviewSubmittedById_fkey" FOREIGN KEY ("reviewSubmittedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProcurementRequisition" ADD CONSTRAINT "ProcurementRequisition_submittedById_fkey" FOREIGN KEY ("submittedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProcurementRequisitionItem" ADD CONSTRAINT "ProcurementRequisitionItem_quoteLineId_fkey" FOREIGN KEY ("quoteLineId") REFERENCES "public"."QuoteLine"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProcurementRequisitionItem" ADD CONSTRAINT "ProcurementRequisitionItem_requisitionId_fkey" FOREIGN KEY ("requisitionId") REFERENCES "public"."ProcurementRequisition"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."RequisitionItemTopup" ADD CONSTRAINT "RequisitionItemTopup_decidedById_fkey" FOREIGN KEY ("decidedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."RequisitionItemTopup" ADD CONSTRAINT "RequisitionItemTopup_requestedById_fkey" FOREIGN KEY ("requestedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."RequisitionItemTopup" ADD CONSTRAINT "RequisitionItemTopup_requisitionItemId_fkey" FOREIGN KEY ("requisitionItemId") REFERENCES "public"."ProcurementRequisitionItem"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteLineExtraRequest" ADD CONSTRAINT "QuoteLineExtraRequest_decidedById_fkey" FOREIGN KEY ("decidedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteLineExtraRequest" ADD CONSTRAINT "QuoteLineExtraRequest_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteLineExtraRequest" ADD CONSTRAINT "QuoteLineExtraRequest_quoteLineId_fkey" FOREIGN KEY ("quoteLineId") REFERENCES "public"."QuoteLine"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."QuoteLineExtraRequest" ADD CONSTRAINT "QuoteLineExtraRequest_requestedById_fkey" FOREIGN KEY ("requestedById") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_approvedById_fkey" FOREIGN KEY ("approvedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_decidedById_fkey" FOREIGN KEY ("decidedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_requestedById_fkey" FOREIGN KEY ("requestedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_requisitionId_fkey" FOREIGN KEY ("requisitionId") REFERENCES "public"."ProcurementRequisition"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."FundingRequest" ADD CONSTRAINT "FundingRequest_submittedById_fkey" FOREIGN KEY ("submittedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."FundDisbursement" ADD CONSTRAINT "FundDisbursement_fundingRequestId_fkey" FOREIGN KEY ("fundingRequestId") REFERENCES "public"."FundingRequest"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Purchase" ADD CONSTRAINT "Purchase_purchaseOrderId_fkey" FOREIGN KEY ("purchaseOrderId") REFERENCES "public"."PurchaseOrder"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Purchase" ADD CONSTRAINT "Purchase_requisitionId_fkey" FOREIGN KEY ("requisitionId") REFERENCES "public"."ProcurementRequisition"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Purchase" ADD CONSTRAINT "Purchase_requisitionItemId_fkey" FOREIGN KEY ("requisitionItemId") REFERENCES "public"."ProcurementRequisitionItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Dispatch" ADD CONSTRAINT "Dispatch_assignedToDriverId_fkey" FOREIGN KEY ("assignedToDriverId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Dispatch" ADD CONSTRAINT "Dispatch_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Dispatch" ADD CONSTRAINT "Dispatch_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Dispatch" ADD CONSTRAINT "Dispatch_securityById_fkey" FOREIGN KEY ("securityById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."DispatchItem" ADD CONSTRAINT "DispatchItem_dispatchId_fkey" FOREIGN KEY ("dispatchId") REFERENCES "public"."Dispatch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."DispatchItem" ADD CONSTRAINT "DispatchItem_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId") REFERENCES "public"."InventoryItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."DispatchItem" ADD CONSTRAINT "DispatchItem_purchaseId_fkey" FOREIGN KEY ("purchaseId") REFERENCES "public"."Purchase"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."DispatchItem" ADD CONSTRAINT "DispatchItem_requisitionItemId_fkey" FOREIGN KEY ("requisitionItemId") REFERENCES "public"."ProcurementRequisitionItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."InventoryMove" ADD CONSTRAINT "InventoryMove_changeById_fkey" FOREIGN KEY ("changeById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."InventoryMove" ADD CONSTRAINT "InventoryMove_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId") REFERENCES "public"."InventoryItem"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."InventoryAllocation" ADD CONSTRAINT "InventoryAllocation_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId") REFERENCES "public"."InventoryItem"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."InventoryAllocation" ADD CONSTRAINT "InventoryAllocation_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Payment" ADD CONSTRAINT "Payment_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Payment" ADD CONSTRAINT "Payment_receivedById_fkey" FOREIGN KEY ("receivedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ClientPayment" ADD CONSTRAINT "ClientPayment_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."PaymentSchedule" ADD CONSTRAINT "PaymentSchedule_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."PaymentReminder" ADD CONSTRAINT "PaymentReminder_scheduleId_fkey" FOREIGN KEY ("scheduleId") REFERENCES "public"."PaymentSchedule"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Schedule" ADD CONSTRAINT "Schedule_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Schedule" ADD CONSTRAINT "Schedule_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProjectProductivitySetting" ADD CONSTRAINT "ProjectProductivitySetting_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ScheduleTaskReport" ADD CONSTRAINT "ScheduleTaskReport_reporterId_fkey" FOREIGN KEY ("reporterId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ScheduleTaskReport" ADD CONSTRAINT "ScheduleTaskReport_scheduleItemId_fkey" FOREIGN KEY ("scheduleItemId") REFERENCES "public"."ScheduleItem"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ScheduleItem" ADD CONSTRAINT "ScheduleItem_quoteLineId_fkey" FOREIGN KEY ("quoteLineId") REFERENCES "public"."QuoteLine"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ScheduleItem" ADD CONSTRAINT "ScheduleItem_scheduleId_fkey" FOREIGN KEY ("scheduleId") REFERENCES "public"."Schedule"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Employee" ADD CONSTRAINT "Employee_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Task" ADD CONSTRAINT "Task_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Task" ADD CONSTRAINT "Task_templateKey_fkey" FOREIGN KEY ("templateKey") REFERENCES "public"."TaskTemplate"("key") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."TaskAssignment" ADD CONSTRAINT "TaskAssignment_projectTaskId_fkey" FOREIGN KEY ("projectTaskId") REFERENCES "public"."ProjectTask"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."TaskAssignment" ADD CONSTRAINT "TaskAssignment_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "public"."Task"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."TaskAssignment" ADD CONSTRAINT "TaskAssignment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."TaskProgress" ADD CONSTRAINT "TaskProgress_projectTaskId_fkey" FOREIGN KEY ("projectTaskId") REFERENCES "public"."ProjectTask"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."TaskProgress" ADD CONSTRAINT "TaskProgress_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "public"."Task"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."TaskProgress" ADD CONSTRAINT "TaskProgress_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProjectMember" ADD CONSTRAINT "ProjectMember_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."ProjectMember" ADD CONSTRAINT "ProjectMember_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_decidedById_fkey" FOREIGN KEY ("decidedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_requisitionId_fkey" FOREIGN KEY ("requisitionId") REFERENCES "public"."ProcurementRequisition"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."PurchaseOrderItem" ADD CONSTRAINT "PurchaseOrderItem_purchaseOrderId_fkey" FOREIGN KEY ("purchaseOrderId") REFERENCES "public"."PurchaseOrder"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."PurchaseOrderItem" ADD CONSTRAINT "PurchaseOrderItem_quoteLineId_fkey" FOREIGN KEY ("quoteLineId") REFERENCES "public"."QuoteLine"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."PurchaseOrderItem" ADD CONSTRAINT "PurchaseOrderItem_requisitionItemId_fkey" FOREIGN KEY ("requisitionItemId") REFERENCES "public"."ProcurementRequisitionItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_purchaseOrderId_fkey" FOREIGN KEY ("purchaseOrderId") REFERENCES "public"."PurchaseOrder"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_receivedById_fkey" FOREIGN KEY ("receivedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_verifiedById_fkey" FOREIGN KEY ("verifiedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."GoodsReceivedNoteItem" ADD CONSTRAINT "GoodsReceivedNoteItem_grnId_fkey" FOREIGN KEY ("grnId") REFERENCES "public"."GoodsReceivedNote"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."GoodsReceivedNoteItem" ADD CONSTRAINT "GoodsReceivedNoteItem_poItemId_fkey" FOREIGN KEY ("poItemId") REFERENCES "public"."PurchaseOrderItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."InventoryReturn" ADD CONSTRAINT "InventoryReturn_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."InventoryReturn" ADD CONSTRAINT "InventoryReturn_dispatchId_fkey" FOREIGN KEY ("dispatchId") REFERENCES "public"."Dispatch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."InventoryReturnItem" ADD CONSTRAINT "InventoryReturnItem_dispatchItemId_fkey" FOREIGN KEY ("dispatchItemId") REFERENCES "public"."DispatchItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."InventoryReturnItem" ADD CONSTRAINT "InventoryReturnItem_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId") REFERENCES "public"."InventoryItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."InventoryReturnItem" ADD CONSTRAINT "InventoryReturnItem_returnId_fkey" FOREIGN KEY ("returnId") REFERENCES "public"."InventoryReturn"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."StockMove" ADD CONSTRAINT "StockMove_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId") REFERENCES "public"."InventoryItem"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."StockMove" ADD CONSTRAINT "StockMove_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "public"."Project"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."UserActionLog" ADD CONSTRAINT "UserActionLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."RateOverride" ADD CONSTRAINT "RateOverride_updatedById_fkey" FOREIGN KEY ("updatedById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."_ScheduleItemAssignees" ADD CONSTRAINT "_ScheduleItemAssignees_A_fkey" FOREIGN KEY ("A") REFERENCES "public"."Employee"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."_ScheduleItemAssignees" ADD CONSTRAINT "_ScheduleItemAssignees_B_fkey" FOREIGN KEY ("B") REFERENCES "public"."ScheduleItem"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

@@ -1,0 +1,3 @@
+NO pg: Cannot find module 'pg'
+Require stack:
+- C:\Users\ze9167867\Desktop\erp_bamlo-frica\[eval]
