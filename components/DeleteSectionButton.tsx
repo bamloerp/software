@@ -73,7 +73,7 @@ export default function DeleteSectionButton({ quoteId, section, itemType, label 
               disabled={isPending}
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
-              Cancel
+              No
             </button>
             <button
               type="button"
@@ -81,7 +81,7 @@ export default function DeleteSectionButton({ quoteId, section, itemType, label 
               disabled={isPending}
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
             >
-              {isPending ? 'Deleting…' : 'Delete Section'}
+              {isPending ? 'Deleting…' : 'Yes'}
             </button>
           </div>
         </div>

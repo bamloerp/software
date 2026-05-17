@@ -6,6 +6,7 @@ import { Dispatch, DispatchItem } from '@prisma/client';
 // Add import
 import { acknowledgeDispatch, markDispatchArrived, confirmDispatchPickup } from '../../../actions';
 import { CheckCircleIcon, TruckIcon, KeyIcon } from '@heroicons/react/24/outline'; // KeyIcon for pickup?
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 type Props = {
   dispatch: Dispatch & { items: DispatchItem[] };
@@ -19,6 +20,9 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [showAckForm, setShowAckForm] = useState(false);
+  const [confirmPickupOpen, setConfirmPickupOpen] = useState(false);
+  const [confirmArrivedOpen, setConfirmArrivedOpen] = useState(false);
+  const [confirmAckOpen, setConfirmAckOpen] = useState(false);
 
   // Initialize quantities with sent amounts
   useState(() => {
@@ -29,12 +33,13 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
     setQuantities(initial);
   });
 
-  const handleConfirmPickup = async () => {
-    if (!confirm('Confirm you have picked up all items and are leaving?')) return;
+  const handleConfirmPickup = () => setConfirmPickupOpen(true);
+  const doConfirmPickup = async () => {
     setLoading(true);
     try {
         await confirmDispatchPickup(dispatch.id);
         router.refresh();
+        setConfirmPickupOpen(false);
     } catch (e: any) {
         alert(e.message);
     } finally {
@@ -42,8 +47,8 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
     }
   };
 
-  const handleMarkArrived = async () => {
-    if (!confirm('Confirm you have arrived at the site?')) return;
+  const handleMarkArrived = () => setConfirmArrivedOpen(true);
+  const doMarkArrived = async () => {
     setLoading(true);
     try {
       await markDispatchArrived(dispatch.id);
@@ -53,11 +58,12 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
       alert(e.message);
     } finally {
       setLoading(false);
+      setConfirmArrivedOpen(false);
     }
   };
 
-  const handleAcknowledge = async () => {
-    if (!confirm('Confirm receipt of these items? Any missing items will be flagged.')) return;
+  const handleAcknowledge = () => setConfirmAckOpen(true);
+  const doAcknowledge = async () => {
     setLoading(true);
     try {
       const items = dispatch.items.map(it => ({
@@ -69,6 +75,7 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
       await acknowledgeDispatch(dispatch.id, items);
       router.refresh();
       setShowAckForm(false);
+      setConfirmAckOpen(false);
     } catch (e: any) {
         alert(e.message);
     } finally {
@@ -195,6 +202,33 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
             </div>
          </div>
        )}
+      <ConfirmDialog
+        open={confirmPickupOpen}
+        title="Confirm Pickup"
+        message="Are you sure you have picked up all items and are leaving?"
+        onCancel={() => setConfirmPickupOpen(false)}
+        onConfirm={doConfirmPickup}
+        busy={loading}
+        variant="info"
+      />
+      <ConfirmDialog
+        open={confirmArrivedOpen}
+        title="Confirm Arrival"
+        message="Are you sure you have arrived at the site?"
+        onCancel={() => setConfirmArrivedOpen(false)}
+        onConfirm={doMarkArrived}
+        busy={loading}
+        variant="info"
+      />
+      <ConfirmDialog
+        open={confirmAckOpen}
+        title="Confirm Receipt"
+        message="Confirm receipt of these items? Any missing items will be flagged."
+        onCancel={() => setConfirmAckOpen(false)}
+        onConfirm={doAcknowledge}
+        busy={loading}
+        variant="info"
+      />
     </div>
   );
 }

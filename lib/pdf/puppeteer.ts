@@ -142,6 +142,17 @@ export class PuppeteerRenderer implements PdfRenderer {
     }
 
     const sortByOrder = (a: PdfGroup, b: PdfGroup) => (orderMap[a.section] || 99) - (orderMap[b.section] || 99);
+    // Enforce intra-section ordering: SUPERSTRUCTURE TO RING BEAM must have Brickwork above Door Frame Fittings.
+    const rowPriority = (section: string, description: string): number => {
+      const d = (description || '').toLowerCase();
+      if (section === 'SUPERSTRUCTURE TO RING BEAM') {
+        if (d.startsWith('brickwork')) return 0;
+        if (d.includes('door frame')) return 1;
+      }
+      return 100;
+    };
+    for (const g of matGroups.values()) g.rows.sort((a: any, b: any) => rowPriority(g.section, a.description) - rowPriority(g.section, b.description));
+    for (const g of labGroups.values()) g.rows.sort((a: any, b: any) => rowPriority(g.section, a.description) - rowPriority(g.section, b.description));
     const sortedMat = [...matGroups.values()].sort(sortByOrder);
     const sortedLab = [...labGroups.values()].sort(sortByOrder);
     const allGroups: PdfGroup[] = [...sortedMat, ...sortedLab];

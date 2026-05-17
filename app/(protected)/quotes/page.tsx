@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import QuoteTableToolbar from './components/QuoteTableToolbar';
 import QuotePagination from './components/QuotePagination';
+import DeleteQuoteButton from '@/components/DeleteQuoteButton';
 
 const STATUS_BADGE: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
@@ -274,6 +275,12 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
                                 </>
                             )}
                         </Link>
+                        {role === 'ADMIN' && (
+                          <DeleteQuoteButton
+                            quoteId={q.id}
+                            quoteNumber={q.quoteNumber}
+                          />
+                        )}
                       </div>
                     </td>
                   </tr>

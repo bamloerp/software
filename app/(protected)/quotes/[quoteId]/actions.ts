@@ -2102,3 +2102,157 @@ export async function updateQuoteNotes(
     return { ok: false, error: getErrorMessage(error) };
   }
 }
+
+/**
+ * ADMIN ONLY: Delete a quotation and ALL related records (cascade).
+ * Removes lines, versions, negotiations, tasks, and any linked project together with
+ * all its dependents (dispatches, requisitions, purchase orders, schedules, payments, etc.).
+ */
+export async function deleteQuote(quoteId: string): Promise<ActionResult> {
+  return runAction('deleteQuote', async () => {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    const role = assertRole(user.role);
+    if (role !== 'ADMIN') {
+      throw new Error('Only an admin can delete a quotation');
+    }
+
+    const quote = await prisma.quote.findUnique({
+      where: { id: quoteId },
+      select: {
+        id: true,
+        lines: { select: { id: true } },
+        project: { select: { id: true } },
+      },
+    });
+    if (!quote) throw new Error('Quote not found');
+
+    const lineIds = quote.lines.map((l) => l.id);
+    const projectId = quote.project?.id ?? null;
+
+    await prisma.$transaction(async (tx) => {
+      // ---- Project cascade (if any) ----
+      if (projectId) {
+        // Schedules
+        const schedule = await tx.schedule.findUnique({
+          where: { projectId },
+          select: { id: true },
+        }).catch(() => null);
+        if (schedule) {
+          await tx.scheduleItem.deleteMany({ where: { scheduleId: schedule.id } });
+          await tx.schedule.delete({ where: { id: schedule.id } });
+        }
+
+        // Dispatches + items
+        const dispatches = await tx.dispatch.findMany({
+          where: { projectId },
+          select: { id: true },
+        });
+        const dispatchIds = dispatches.map((d) => d.id);
+        if (dispatchIds.length) {
+          await tx.dispatchItem.deleteMany({ where: { dispatchId: { in: dispatchIds } } });
+          await tx.dispatch.deleteMany({ where: { id: { in: dispatchIds } } });
+        }
+
+        // Purchase orders + items
+        const purchaseOrders = await tx.purchaseOrder.findMany({
+          where: { projectId },
+          select: { id: true },
+        });
+        const poIds = purchaseOrders.map((p) => p.id);
+        if (poIds.length) {
+          await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: { in: poIds } } });
+          await tx.purchaseOrder.deleteMany({ where: { id: { in: poIds } } });
+        }
+
+        // Procurement requisitions + items (+ topups)
+        const requisitions = await tx.procurementRequisition.findMany({
+          where: { projectId },
+          select: { id: true },
+        });
+        const reqIds = requisitions.map((r) => r.id);
+        if (reqIds.length) {
+          const reqItems = await tx.procurementRequisitionItem.findMany({
+            where: { requisitionId: { in: reqIds } },
+            select: { id: true },
+          });
+          const reqItemIds = reqItems.map((i) => i.id);
+          if (reqItemIds.length) {
+            await tx.requisitionItemTopup.deleteMany({ where: { requisitionItemId: { in: reqItemIds } } }).catch(() => undefined);
+          }
+          await tx.procurementRequisitionItem.deleteMany({ where: { requisitionId: { in: reqIds } } });
+          await tx.procurementRequisition.deleteMany({ where: { id: { in: reqIds } } });
+        }
+
+        // Tasks (project tasks via projectId, plus their assignments/progress)
+        const tasks = await tx.task.findMany({ where: { projectId }, select: { id: true } }).catch(() => []);
+        const taskIds = tasks.map((t) => t.id);
+        if (taskIds.length) {
+          await tx.taskAssignment.deleteMany({ where: { taskId: { in: taskIds } } }).catch(() => undefined);
+          await tx.taskProgress.deleteMany({ where: { taskId: { in: taskIds } } }).catch(() => undefined);
+          await tx.task.deleteMany({ where: { id: { in: taskIds } } });
+        }
+
+        // ProjectTask (linked through projectId or quoteId)
+        const projTasks = await tx.projectTask.findMany({
+          where: { OR: [{ projectId }, { quoteId }] },
+          select: { id: true },
+        });
+        const projTaskIds = projTasks.map((t) => t.id);
+        if (projTaskIds.length) {
+          await tx.taskAssignment.deleteMany({ where: { taskId: { in: projTaskIds } } }).catch(() => undefined);
+          await tx.taskProgress.deleteMany({ where: { taskId: { in: projTaskIds } } }).catch(() => undefined);
+          await tx.projectTask.deleteMany({ where: { id: { in: projTaskIds } } });
+        }
+
+        // Payments & schedules
+        await tx.paymentSchedule.deleteMany({ where: { projectId } }).catch(() => undefined);
+        await tx.payment.deleteMany({ where: { projectId } }).catch(() => undefined);
+        await tx.clientPayment.deleteMany({ where: { projectId } }).catch(() => undefined);
+
+        // Inventory / stock
+        await tx.inventoryAllocation.deleteMany({ where: { projectId } }).catch(() => undefined);
+        await tx.stockMove.deleteMany({ where: { projectId } }).catch(() => undefined);
+
+        // Members & misc
+        await tx.projectMember.deleteMany({ where: { projectId } }).catch(() => undefined);
+        await tx.projectProductivitySetting.deleteMany({ where: { projectId } }).catch(() => undefined);
+
+        // Extra line requests linked to this project
+        await tx.quoteLineExtraRequest.deleteMany({ where: { projectId } }).catch(() => undefined);
+
+        // Finally remove the project
+        await tx.project.delete({ where: { id: projectId } });
+      } else {
+        // No project: still scrub ProjectTasks that point only to this quote
+        await tx.projectTask.deleteMany({ where: { quoteId } }).catch(() => undefined);
+      }
+
+      // ---- Quote-line descendants ----
+      if (lineIds.length) {
+        await tx.quoteNegotiationItem.deleteMany({ where: { quoteLineId: { in: lineIds } } }).catch(() => undefined);
+        await tx.quoteLineExtraRequest.deleteMany({ where: { quoteLineId: { in: lineIds } } }).catch(() => undefined);
+        await tx.scheduleItem.deleteMany({ where: { quoteLineId: { in: lineIds } } }).catch(() => undefined);
+        await tx.procurementRequisitionItem.deleteMany({ where: { quoteLineId: { in: lineIds } } }).catch(() => undefined);
+        await tx.purchaseOrderItem.deleteMany({ where: { quoteLineId: { in: lineIds } } }).catch(() => undefined);
+      }
+
+      // ---- Negotiations ----
+      await tx.quoteNegotiationItem.deleteMany({ where: { negotiation: { quoteId } } }).catch(() => undefined);
+      await tx.quoteNegotiation.deleteMany({ where: { quoteId } }).catch(() => undefined);
+
+      // ---- Quote lines ----
+      await tx.quoteLine.deleteMany({ where: { quoteId } });
+
+      // ---- Quote versions ----
+      await tx.quoteVersion.deleteMany({ where: { quoteId } });
+
+      // ---- Quote ----
+      await tx.quote.delete({ where: { id: quoteId } });
+    }, TX_OPTS);
+
+    revalidatePath('/quotes');
+    revalidatePath('/projects');
+    return undefined;
+  });
+}

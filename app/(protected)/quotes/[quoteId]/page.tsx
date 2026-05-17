@@ -339,13 +339,27 @@ function buildLineGroups(
     group.subtotal += amount;
   });
 
-  // Sort rows within groups: PENDING items first
+  // Section-specific row ordering (lower = appears first).
+  // SUPERSTRUCTURE TO RING BEAM must always have Brickwork above Door Frame Fittings.
+  const sectionRowPriority = (section: string, description: string): number => {
+    const desc = (description || '').toLowerCase();
+    if (section === 'SUPERSTRUCTURE TO RING BEAM') {
+      if (desc.startsWith('brickwork')) return 0;
+      if (desc.includes('door frame')) return 1;
+    }
+    return 100;
+  };
+
+  // Sort rows within groups: PENDING items first, then section-specific priority
   const sortRows = (group: LineGroup) => {
     group.rows.sort((a, b) => {
       const aPending = a.negotiation?.status === 'PENDING';
       const bPending = b.negotiation?.status === 'PENDING';
       if (aPending && !bPending) return -1;
       if (!aPending && bPending) return 1;
+      const aPri = sectionRowPriority(group.section, a.description);
+      const bPri = sectionRowPriority(group.section, b.description);
+      if (aPri !== bPri) return aPri - bPri;
       return 0;
     });
   };

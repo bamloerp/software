@@ -236,7 +236,7 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
                             disabled={loading}
                             className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                         >
-                            Cancel
+                            No
                         </button>
                         <button
                             onClick={confirmPickupAction}
@@ -246,7 +246,7 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
                             {loading && (
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                             )}
-                            {loading ? 'Confirming...' : 'Yes, Confirm'}
+                            {loading ? 'Confirming...' : 'Yes'}
                         </button>
                     </div>
                 </div>
@@ -285,7 +285,7 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
                              disabled={loading}
                              className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                          >
-                             Cancel
+                             No
                          </button>
                          <button
                             onClick={markArrivedAction}
@@ -295,7 +295,7 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
                              {loading && (
                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                              )}
-                             {loading ? 'Updating...' : 'Yes, I Arrived'}
+                             {loading ? 'Updating...' : 'Yes'}
                          </button>
                      </div>
                  </div>
@@ -334,7 +334,7 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
                              disabled={loading}
                              className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                          >
-                             Cancel
+                             No
                          </button>
                          <button
                             onClick={acknowledgeAction}
@@ -344,7 +344,7 @@ export default function DispatchAcknowledgment({ dispatch, userId, userRole }: P
                              {loading && (
                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                              )}
-                             {loading ? 'Processing...' : 'Confirm Receipt'}
+                             {loading ? 'Processing...' : 'Yes'}
                          </button>
                      </div>
                  </div>
