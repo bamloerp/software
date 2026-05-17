@@ -7,7 +7,7 @@ datasource db {
   provider          = "postgresql"
   url               = env("POSTGRES_PRISMA_URL")
   directUrl         = env("MIGRATIONS_OVER_POOLER_URL")
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  // shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model User {
@@ -165,6 +165,24 @@ model QuoteLine {
   extraRequests     QuoteLineExtraRequest[]
   negotiationItems  QuoteNegotiationItem[]
   scheduleItems     ScheduleItem[]
+}
+
+model ManualQuoteLineTemplate {
+  id             String   @id @default(cuid())
+  createdById    String
+  descriptionKey String   // lowercased+trimmed description used for dedupe
+  description    String   // original-cased display description
+  unit           String   @default("")
+  section        String   @default("")
+  itemType       String?
+  unitPriceMinor BigInt   @default(0)
+  usageCount     Int      @default(1)
+  lastUsedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([createdById, descriptionKey, unit, section])
+  @@index([createdById, lastUsedAt])
 }
 
 model QuoteVersion {

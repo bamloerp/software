@@ -8,13 +8,15 @@ import { useLoading } from '@/components/LoadingProvider';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 import { addManualLines, type ManualRowInput } from './actions';
+import type { ManualTemplateSuggestion } from '@/lib/manualLineTemplates';
 
 type ManualItemsFormProps = {
   quoteId: string;
   vatPercent: number;
+  suggestions?: ManualTemplateSuggestion[];
 };
 
-type EditableRow = ManualRowInput & { id: string };
+type EditableRow = ManualRowInput & { id: string; templateId?: string };
 
 function emptyRow(): EditableRow {
   return {
@@ -27,11 +29,59 @@ function emptyRow(): EditableRow {
   };
 }
 
-export default function ManualItemsForm({ quoteId, vatPercent }: ManualItemsFormProps) {
+function rowFromTemplate(t: ManualTemplateSuggestion): EditableRow {
+  return {
+    id: crypto.randomUUID(),
+    templateId: t.id,
+    description: t.description,
+    unit: t.unit ?? '',
+    quantity: 1,
+    rate: t.rate,
+    section: t.section ?? '',
+  };
+}
+
+export default function ManualItemsForm({ quoteId, vatPercent, suggestions = [] }: ManualItemsFormProps) {
   const [rows, setRows] = useState<EditableRow[]>([emptyRow()]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [search, setSearch] = useState('');
   const loading = useLoading();
+
+  const filteredSuggestions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return suggestions;
+    return suggestions.filter((s) =>
+      s.description.toLowerCase().includes(q) ||
+      (s.section ?? '').toLowerCase().includes(q) ||
+      (s.unit ?? '').toLowerCase().includes(q),
+    );
+  }, [search, suggestions]);
+
+  const checkedTemplateIds = useMemo(
+    () => new Set(rows.map((r) => r.templateId).filter(Boolean) as string[]),
+    [rows],
+  );
+
+  const toggleSuggestion = (t: ManualTemplateSuggestion) => {
+    setRows((current) => {
+      if (current.some((r) => r.templateId === t.id)) {
+        const filtered = current.filter((r) => r.templateId !== t.id);
+        return filtered.length > 0 ? filtered : [emptyRow()];
+      }
+      const next = [...current, rowFromTemplate(t)];
+      // Drop a leading completely-empty row if the user hasn't typed anything yet.
+      if (
+        next.length > 1 &&
+        !next[0].templateId &&
+        !next[0].description.trim() &&
+        Number(next[0].rate) === 0
+      ) {
+        next.shift();
+      }
+      return next;
+    });
+  };
 
   const totalsPreview = useMemo(() => {
     const subtotal = rows.reduce((sum, row) => sum + row.quantity * row.rate, 0);
@@ -104,6 +154,74 @@ export default function ManualItemsForm({ quoteId, vatPercent }: ManualItemsForm
             Add Row
           </button>
         </div>
+
+        {suggestions.length > 0 && (
+          <details
+            className="rounded-xl border border-dashed border-blue-200 bg-blue-50/40 p-4 dark:border-blue-900/40 dark:bg-blue-900/10"
+            open
+          >
+            <summary className="cursor-pointer select-none text-sm font-semibold text-blue-700 dark:text-blue-300">
+              Add from previous manual items ({suggestions.length})
+            </summary>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Tick any item you&apos;ve used before to add it to this quote. Quantity defaults to 1 — adjust as needed.
+            </p>
+            <div className="mt-3">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by description, section, or unit…"
+                className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+            </div>
+            <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto pr-1">
+              {filteredSuggestions.length === 0 && (
+                <li className="rounded px-2 py-2 text-xs text-gray-500 dark:text-gray-400">
+                  No matches.
+                </li>
+              )}
+              {filteredSuggestions.map((s) => {
+                const checked = checkedTemplateIds.has(s.id);
+                return (
+                  <li key={s.id}>
+                    <label
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 text-sm transition-all ${
+                        checked
+                          ? 'border-blue-300 bg-white shadow-sm dark:border-blue-700 dark:bg-gray-800'
+                          : 'border-transparent hover:border-blue-200 hover:bg-white dark:hover:border-blue-800 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        checked={checked}
+                        onChange={() => toggleSuggestion(s)}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-gray-900 dark:text-white">
+                          {s.description}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+                          {s.section && (
+                            <span className="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-700">
+                              {s.section}
+                            </span>
+                          )}
+                          {s.unit && <span>Unit: {s.unit}</span>}
+                          <span>
+                            Rate: <Money value={s.rate} />
+                          </span>
+                          <span>Used {s.usageCount}×</span>
+                        </div>
+                      </div>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        )}
 
         <div className="space-y-4">
           {rows.map((row, index) => (

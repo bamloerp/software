@@ -131,6 +131,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { fromMinor } from '@/helpers/money';
 import { USER_ROLES, type UserRole } from '@/lib/workflow';
+import { listManualLineSuggestions } from '@/lib/manualLineTemplates';
 
 import ManualItemsForm from './ManualItemsForm';
 
@@ -201,6 +202,10 @@ export default async function QuoteManualEditPage({ params }: PageParams) {
 
   const vatPercent = quote.vatBps / 100;
 
+  const suggestions = !isLocked && currentUser?.id
+    ? await listManualLineSuggestions(currentUser.id)
+    : [];
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -260,7 +265,7 @@ export default async function QuoteManualEditPage({ params }: PageParams) {
       </section>
 
       {/* 🛠️ Only render the form when editing is allowed */}
-      {!isLocked && <ManualItemsForm quoteId={quote.id} vatPercent={vatPercent} />}
+      {!isLocked && <ManualItemsForm quoteId={quote.id} vatPercent={vatPercent} suggestions={suggestions} />}
     </div>
   );
 }

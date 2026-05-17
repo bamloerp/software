@@ -12,6 +12,7 @@ import { money } from '@/lib/money';
 import { fromBps, fromMinor, toMinor, toBigIntMinor } from '@/helpers/money';
 import { buildQuoteSnapshot, computeTotalsFromLines, createQuoteVersionTx, type SnapshotLine } from '@/lib/quoteSnapshot';
 import { TX_OPTS } from '@/lib/db-tx';
+import { rememberManualLine } from '@/lib/manualLineTemplates';
 import { QUOTE_STATUSES, USER_ROLES, type QuoteStatus, type UserRole } from '@/lib/workflow';
 import { getErrorMessage } from '@/lib/errors';
 import { generatePaymentSchedule } from '../../projects/actions';
@@ -2007,6 +2008,8 @@ export async function addQuoteLineItem(
     if (role !== 'SENIOR_QS' && role !== 'ADMIN') {
       throw new Error('Only Senior QS or Admin can add line items');
     }
+    const userId = user.id;
+    if (!userId) throw new Error('Authentication required');
     const userOffice = resolveOfficeForRole(role, user.office ?? null);
 
     const { description, quantity, unitRate, unit, section, itemType } = input;
@@ -2040,6 +2043,15 @@ export async function addQuoteLineItem(
           itemType,
           source: 'Manual',
         },
+      });
+
+      // Remember this manual line as a per-user template for future suggestions.
+      await rememberManualLine(tx, userId, {
+        description,
+        unit,
+        section,
+        itemType,
+        rate: unitRate,
       });
 
       const refreshed = await tx.quote.findUniqueOrThrow({

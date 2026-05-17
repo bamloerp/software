@@ -12,6 +12,7 @@ import { money } from '@/lib/money';
 import { fromBps, toMinor } from '@/helpers/money';
 import { buildQuoteSnapshot, createQuoteVersionTx } from '@/lib/quoteSnapshot';
 import { TX_OPTS } from '@/lib/db-tx';
+import { rememberManualLine } from '@/lib/manualLineTemplates';
 import {
   QUOTE_STATUSES,
   USER_ROLES,
@@ -350,6 +351,14 @@ export async function addManualLines(quoteId: string, rows: ManualRowInput[]) {
         select: { id: true },
       });
       createdIds.push(created.id);
+
+      // Remember this manual line as a per-user template for future suggestions.
+      await rememberManualLine(tx, user.id, {
+        description: row.description,
+        unit: row.unit,
+        section: row.section,
+        rate: row.rate,
+      });
     }
 
     // Refresh quote with new lines for snapshot/totals
