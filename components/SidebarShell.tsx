@@ -773,7 +773,7 @@ export default function SidebarShell({
           </div>
           <nav className="px-3 space-y-1 mt-4">
             {navItems
-              .filter((p) => !p.roles || p.roles.includes((currentUser?.role as Role) || 'VIEWER'))
+              .filter((p) => (currentUser?.role === 'ADMIN') || !p.roles || p.roles.includes((currentUser?.role as Role) || 'VIEWER'))
               .map((item) => {
                 const [base, queryString] = item.href.split('?');
                 let active = pathname === base;
@@ -980,6 +980,16 @@ export default function SidebarShell({
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-sm font-bold ring-2 ring-white dark:ring-gray-800 shadow-sm">
                     {userInitial}
                   </div>
+                  <Link
+                    href="/settings"
+                    className="p-2 text-gray-500 hover:bg-gray-100 hover:text-blue-600 rounded-full transition-colors dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-blue-400"
+                    title="Account settings"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                  </Link>
                   <button
                     type="button"
                     onClick={() => {

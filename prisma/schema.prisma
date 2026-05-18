@@ -18,6 +18,7 @@ model User {
   office                         String?
   createdAt                      DateTime                 @default(now())
   passwordHash                   String?
+  mustChangePassword             Boolean                  @default(false)
   managerId                      String?
   disabled                       Boolean                  @default(false)
   failedLoginAttempts            Int                      @default(0)

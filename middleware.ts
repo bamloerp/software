@@ -19,6 +19,19 @@ async function handler(req: NextRequest) {
   return (authMiddleware as any)(async (authReq: any) => {
     if (authReq.auth?.user?.id) {
       const { pathname, search } = authReq.nextUrl;
+
+      // Force change-password redirect when admin reset the password
+      const mustChange = (authReq.auth.user as any).mustChangePassword;
+      const isSettingsSecurity = pathname.startsWith('/settings/security');
+      const isAuthApi = pathname.startsWith('/api/auth');
+      const isLogout = pathname.startsWith('/api/logout') || pathname.startsWith('/logout');
+      if (mustChange && !isSettingsSecurity && !isAuthApi && !isLogout) {
+        const url = authReq.nextUrl.clone();
+        url.pathname = '/settings/security';
+        url.search = '?force=1';
+        return NextResponse.redirect(url);
+      }
+
       const method = authReq.method;
       const ip = authReq.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = authReq.headers.get('user-agent') || 'unknown';

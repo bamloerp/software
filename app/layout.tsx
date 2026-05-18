@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   },
   description: 'The official Website for Barmlo Enterprise',
   metadataBase: new URL('https://barmlo.co.zw/index.php/services/agricultural-processing'),
+  manifest: '/manifest.webmanifest',
+  themeColor: '#1d4ed8',
   icons: {
     icon: '/barmlo_logo111.png',
   },

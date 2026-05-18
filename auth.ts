@@ -15,7 +15,7 @@ export const { auth,
    } = NextAuth({
   ...authConfig,
   secret: process.env.NEXTAUTH_SECRET!,
-  session: { strategy: 'jwt', maxAge: 600 },
+  session: { strategy: 'jwt', maxAge: 300, updateAge: 60 },
   providers: [
     Credentials({
       name: 'Credentials',

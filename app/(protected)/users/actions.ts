@@ -102,7 +102,7 @@ export async function resetUserPassword(userId: string, newPassword: string): Pr
 
   await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null },
+    data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null, mustChangePassword: true },
   });
 
   revalidatePath('/users');

@@ -9,6 +9,8 @@ import { readFlashMessage } from '@/lib/flash.server';
 
 import { getCurrentUser } from '@/lib/auth';
 import ToastProvider from '@/components/ToastProvider';
+import IdleLogout from '@/components/IdleLogout';
+import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 
 export default async function ProtectedLayout({ children }: { children: ReactNode }) {
   const [currentUser, flash] = await Promise.all([getCurrentUser(), readFlashMessage()]);
@@ -27,6 +29,8 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
             <FlashToast flash={flash} />
             {children}
           </SidebarShell>
+          <IdleLogout />
+          <PwaInstallPrompt />
         </div>
       </LoadingProvider>
     </>
