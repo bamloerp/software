@@ -22,12 +22,12 @@ async function handler(req: NextRequest) {
 
       // Force change-password redirect when admin reset the password
       const mustChange = (authReq.auth.user as any).mustChangePassword;
-      const isSettingsSecurity = pathname.startsWith('/settings/security');
+      const isSettings = pathname === '/settings' || pathname.startsWith('/settings/');
       const isAuthApi = pathname.startsWith('/api/auth');
       const isLogout = pathname.startsWith('/api/logout') || pathname.startsWith('/logout');
-      if (mustChange && !isSettingsSecurity && !isAuthApi && !isLogout) {
+      if (mustChange && !isSettings && !isAuthApi && !isLogout) {
         const url = authReq.nextUrl.clone();
-        url.pathname = '/settings/security';
+        url.pathname = '/settings';
         url.search = '?force=1';
         return NextResponse.redirect(url);
       }

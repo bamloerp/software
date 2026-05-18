@@ -67,7 +67,7 @@ export async function createUser(data: {
   const passwordHash = await bcrypt.hash(password, 10);
 
   await prisma.user.create({
-    data: { name, email, role, office: office || null, passwordHash },
+    data: { name, email, role, office: office || null, passwordHash, mustChangePassword: true },
   });
 
   revalidatePath('/users');
