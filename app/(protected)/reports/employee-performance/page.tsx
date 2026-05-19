@@ -9,7 +9,8 @@ import {
 import PrintHeader from '@/components/PrintHeader';
 import PrintButton from '@/components/PrintButton';
 // Import the shared view component. Note: Ideally this should be in /components, but reusing for speed.
-import EmployeePerformanceView, { EmployeeStat } from '../../projects/[projectId]/reports/employee-performance/EmployeePerformanceView';
+import EmployeePerformanceView from '../../projects/[projectId]/reports/employee-performance/EmployeePerformanceView';
+import { buildEmployeePerformanceData } from '../../projects/[projectId]/reports/employee-performance/performanceData';
 
 export default async function GlobalEmployeePerformancePage() {
   const user = await getCurrentUser();
@@ -37,6 +38,7 @@ export default async function GlobalEmployeePerformancePage() {
           assignees: {
             select: {
               id: true,
+              userId: true,
               givenName: true,
               surname: true,
               role: true,
@@ -46,13 +48,25 @@ export default async function GlobalEmployeePerformancePage() {
              select: {
                 id: true,
                 reporterId: true,
-                reportedForDate: true
+                reportedForDate: true,
+                activity: true,
+                usedQty: true,
+                usedUnit: true,
+                remainingQty: true,
+                remainingUnit: true,
+                reporter: {
+                  select: {
+                    name: true,
+                    email: true,
+                  }
+                }
              }
           }
         },
       },
       project: {
           select: {
+              id: true,
               name: true,
               quote: {
                   select: {
@@ -68,48 +82,7 @@ export default async function GlobalEmployeePerformancePage() {
     },
   });
 
-  // Aggregate Stats Globally
-  let employees: EmployeeStat[] = [];
-  const employeeStats = new Map<string, EmployeeStat>();
-
-  schedules.forEach(schedule => {
-      schedule.items.forEach(item => {
-           // Track Assignees
-           item.assignees.forEach(assignee => {
-               const name = [assignee.givenName, assignee.surname].filter(Boolean).join(' ') || 'Unknown';
-               if (!employeeStats.has(assignee.id)) {
-                   employeeStats.set(assignee.id, {
-                       id: assignee.id,
-                       name,
-                       role: assignee.role,
-                       tasksAssigned: 0,
-                       tasksCompleted: 0,
-                       reportsSubmitted: 0,
-                       lastActive: null
-                   });
-               }
-               const stats = employeeStats.get(assignee.id)!;
-               stats.tasksAssigned++;
-               if (item.status === 'DONE') {
-                   stats.tasksCompleted++;
-               }
-           });
-
-           // Track Reporters
-           item.reports.forEach(report => {
-                if (employeeStats.has(report.reporterId)) {
-                    const stats = employeeStats.get(report.reporterId)!;
-                    stats.reportsSubmitted++;
-                    const reportDate = new Date(report.reportedForDate);
-                    if (!stats.lastActive || reportDate.toISOString() > stats.lastActive!) {
-                        stats.lastActive = reportDate.toISOString();
-                    }
-                }
-           });
-      });
-  });
-
-  employees = Array.from(employeeStats.values()).sort((a, b) => b.tasksAssigned - a.tasksAssigned);
+    const { employees, ganttItems, timesheets } = buildEmployeePerformanceData(schedules);
 
   return (
     <div className="p-6 space-y-8 max-w-[1400px] mx-auto bg-gray-50 min-h-screen">
@@ -151,7 +124,7 @@ export default async function GlobalEmployeePerformancePage() {
               <p className="mt-1 text-sm text-gray-500">No active schedules or employees found in the selecting projects.</p>
           </div>
       ) : (
-        <EmployeePerformanceView employees={employees} />
+        <EmployeePerformanceView employees={employees} ganttItems={ganttItems} timesheets={timesheets} />
       )}
     </div>
   );

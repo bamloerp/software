@@ -8,7 +8,8 @@ import {
 } from '@heroicons/react/24/outline';
 import PrintHeader from '@/components/PrintHeader';
 import PrintButton from '@/components/PrintButton';
-import EmployeePerformanceView, { EmployeeStat } from './EmployeePerformanceView'; // Import the client component
+import EmployeePerformanceView from './EmployeePerformanceView';
+import { buildEmployeePerformanceData } from './performanceData';
 
 export default async function ProjectEmployeePerformancePage({
   params,
@@ -22,6 +23,7 @@ export default async function ProjectEmployeePerformancePage({
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: {
+      id: true,
       name: true,
       quote: {
         select: {
@@ -43,6 +45,7 @@ export default async function ProjectEmployeePerformancePage({
           assignees: {
             select: {
               id: true,
+              userId: true,
               givenName: true,
               surname: true,
               role: true,
@@ -52,7 +55,18 @@ export default async function ProjectEmployeePerformancePage({
              select: {
                 id: true,
                 reporterId: true,
-                reportedForDate: true
+                reportedForDate: true,
+                activity: true,
+                usedQty: true,
+                usedUnit: true,
+                remainingQty: true,
+                remainingUnit: true,
+                reporter: {
+                  select: {
+                    name: true,
+                    email: true,
+                  }
+                }
              }
           }
         },
@@ -60,48 +74,9 @@ export default async function ProjectEmployeePerformancePage({
     },
   });
 
-  let employees: EmployeeStat[] = [];
-
-  if (schedule) {
-      const employeeStats = new Map<string, EmployeeStat>();
-
-      schedule.items.forEach(item => {
-          // Track Assignees
-          item.assignees.forEach(assignee => {
-              const name = [assignee.givenName, assignee.surname].filter(Boolean).join(' ') || 'Unknown';
-              if (!employeeStats.has(assignee.id)) {
-                  employeeStats.set(assignee.id, {
-                      id: assignee.id,
-                      name,
-                      role: assignee.role,
-                      tasksAssigned: 0,
-                      tasksCompleted: 0,
-                      reportsSubmitted: 0,
-                      lastActive: null
-                  });
-              }
-              const stats = employeeStats.get(assignee.id)!;
-              stats.tasksAssigned++;
-              if (item.status === 'DONE') {
-                  stats.tasksCompleted++;
-              }
-          });
-
-          // Track Reporters
-          item.reports.forEach(report => {
-               if (employeeStats.has(report.reporterId)) {
-                   const stats = employeeStats.get(report.reporterId)!;
-                   stats.reportsSubmitted++;
-                   const reportDate = new Date(report.reportedForDate);
-                   if (!stats.lastActive || reportDate.toISOString() > stats.lastActive!) {
-                       stats.lastActive = reportDate.toISOString();
-                   }
-               }
-          });
-      });
-
-      employees = Array.from(employeeStats.values()).sort((a, b) => b.tasksAssigned - a.tasksAssigned);
-  }
+  const { employees, ganttItems, timesheets } = schedule
+    ? buildEmployeePerformanceData([{ ...schedule, project }])
+    : { employees: [], ganttItems: [], timesheets: [] };
 
   return (
     <div className="p-6 space-y-8 max-w-[1400px] mx-auto bg-gray-50 min-h-screen">
@@ -142,7 +117,7 @@ export default async function ProjectEmployeePerformancePage({
           </div>
       ) : (
         // Render the client component for interactivity
-        <EmployeePerformanceView employees={employees} />
+        <EmployeePerformanceView employees={employees} ganttItems={ganttItems} timesheets={timesheets} />
       )}
     </div>
   );

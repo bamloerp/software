@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getEmployees } from './actions';
 import ClientEmployeeList from './ClientEmployeeList';
 import EmployeeTableToolbar from './components/EmployeeTableToolbar';
@@ -32,6 +33,12 @@ export default async function EmployeesPage({
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Employees</h1>
+        <Link
+          href="/reports/employee-performance"
+          className="inline-flex items-center rounded-lg bg-barmlo-blue px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+        >
+          Performance Report
+        </Link>
       </div>
       
       <div className="bg-white p-4 rounded-lg shadow border border-gray-200 mb-6">

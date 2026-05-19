@@ -1,9 +1,10 @@
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import PrintHeader from '@/components/PrintHeader';
 import { getProjectsForReports } from '../projects/actions';
 import ReportsProjectList from './ReportsProjectList';
-import { GlobeAltIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, GlobeAltIcon } from '@heroicons/react/24/outline';
 
 export default async function GlobalReportsPage() {
   const user = await getCurrentUser();
@@ -34,6 +35,13 @@ export default async function GlobalReportsPage() {
                 : ' You are viewing all active projects.'}
            </p>
         </div>
+        <Link
+          href="/reports/employee-performance"
+          className="inline-flex items-center gap-2 rounded-lg bg-barmlo-blue px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+        >
+          <ChartBarIcon className="h-4 w-4" />
+          Employee Performance
+        </Link>
       </div>
 
       <ReportsProjectList projects={projects} />
