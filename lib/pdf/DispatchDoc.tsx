@@ -126,7 +126,8 @@ export default function DispatchDoc({
         <View style={s.header}>
           <View style={{ width: 180 }}>
             {logoData && (
-              <Image src={logoData} style={{ width: 160, height: 70, objectFit: 'contain' }} />
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={logoData} style={{ width: 220, height: 100, objectFit: 'contain' }} />
             )}
           </View>
           <View style={s.companyInfo}>

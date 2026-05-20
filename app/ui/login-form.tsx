@@ -21,35 +21,32 @@ export default function LoginForm() {
   const toggleVisibility = () => setIsVisible(!isVisible);
 
   return (
-    <form action={formAction} className="space-y-3 w-full max-w-sm mx-auto">
-      <div className="flex-1 px-6 pb-4 pt-4">
-        <h1 className="mb-6 text-2xl text-center text-white font-bold drop-shadow-md">
-          Welcome Back!
-        </h1>
+    <form action={formAction} className="w-full">
+      <div className="flex-1">
         <div className="w-full space-y-4">
           <div>
-            <label className="sr-only" htmlFor="email">
+            <label className="mb-2 block text-sm font-semibold text-slate-700" htmlFor="email">
               Email
             </label>
             <div className="relative">
               <input
-                className="peer block w-full rounded-full border-0 py-3 pl-10 text-sm outline-none placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 shadow-lg"
+                className="peer block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pl-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
                 id="email"
                 type="email"
                 name="email"
-                placeholder="Username or Email"
+                placeholder="name@barmlo.co.zw"
                 required
               />
-              <UserIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
+              <UserIcon className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 peer-focus:text-blue-700" />
             </div>
           </div>
           <div>
-            <label className="sr-only" htmlFor="password">
+            <label className="mb-2 block text-sm font-semibold text-slate-700" htmlFor="password">
               Password
             </label>
             <div className="relative">
               <input
-                className="peer block w-full rounded-full border-0 py-3 pl-10 pr-10 text-sm outline-none placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 shadow-lg"
+                className="peer block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pl-11 pr-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
                 id="password"
                 type={isVisible ? 'text' : 'password'}
                 name="password"
@@ -57,9 +54,9 @@ export default function LoginForm() {
                 required
                 minLength={6}
               />
-              <KeyIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
+              <KeyIcon className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 peer-focus:text-blue-700" />
               <button
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700 focus:outline-none"
                 type="button"
                 onClick={toggleVisibility}
                 aria-label="Toggle password visibility"
@@ -74,34 +71,28 @@ export default function LoginForm() {
           </div>
         </div>
         <input type="hidden" name="redirectTo" value={callbackUrl} />
-        <Button 
-          className="mt-6 w-full rounded-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 shadow-lg transition-colors uppercase tracking-wider justify-center" 
+        <Button
+          className="mt-6 w-full justify-center rounded-xl bg-blue-700 py-3 font-bold text-white shadow-lg shadow-blue-700/20 transition-colors hover:bg-blue-800"
           aria-disabled={isPending}
         >
-          Login
+          {isPending ? 'Signing in...' : 'Sign in'}
         </Button>
-        
+
         <div className="mt-4 text-center">
-          <a href="#" className="text-sm text-white hover:text-gray-200 drop-shadow-md">
+          <a href="#" className="text-sm font-medium text-blue-700 hover:text-blue-900">
             Forgot Username or Password?
           </a>
         </div>
-        
-        <div className="mt-8 text-center">
-          {/* <a href="#" className="text-sm text-white font-semibold hover:text-gray-200 drop-shadow-md">
-            Create new account
-          </a> */}
-        </div>
 
         <div
-          className="flex h-8 items-end space-x-1 justify-center mt-2"
+          className="mt-4 flex h-8 items-end justify-center space-x-1"
           aria-live="polite"
           aria-atomic="true"
         >
           {errorMessage && (
             <>
               <ExclamationCircleIcon className="h-5 w-5 text-red-500" />
-              <p className="text-sm text-red-500 font-bold bg-white/80 px-2 rounded">{errorMessage}</p>
+              <p className="rounded bg-red-50 px-2 text-sm font-bold text-red-600">{errorMessage}</p>
             </>
           )}
         </div>

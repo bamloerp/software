@@ -761,13 +761,13 @@ export default function SidebarShell({
           lg:translate-x-0 lg:static lg:block lg:sticky lg:top-0 lg:h-dvh overflow-y-auto scrollbar-none`}
         >
           <div
-            className={`py-5 flex items-center gap-3 border-b border-gray-100 dark:border-gray-700/50 ${collapsed ? 'justify-center px-0' : 'px-6'}`}
+            className={`py-5 flex items-center gap-3 border-b border-gray-100 dark:border-gray-700/50 ${collapsed ? 'justify-center px-0' : 'px-5'}`}
           >
-            <div className="relative h-10 w-10 shrink-0 rounded-full overflow-hidden bg-gray-50 border border-gray-100">
-              <Image src="/barmlo_logo.png" alt="Barmlo Logo" fill className="object-contain p-1" />
+            <div className={`relative shrink-0 ${collapsed ? 'h-12 w-12' : 'h-16 w-44'}`}>
+              <Image src="/Barmlo%20Logo%202026.png" alt="Barmlo Logo" fill className="object-contain object-left" />
             </div>
             {!collapsed && (
-              <div className="flex flex-col">
+              <div className="sr-only">
                 <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">
                   Barmlo
                 </span>

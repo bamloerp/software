@@ -29,8 +29,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   logo: {
-    width: 100,
-    height: 40,
+    width: 150,
+    height: 70,
     objectFit: 'contain',
   },
   
@@ -195,6 +195,7 @@ const DailyProjectReport = ({ data, logoData }: DailyReportDocProps) => (
           <Text style={styles.reportDate}>{new Date(data.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
         </View>
         {logoData && (
+            // eslint-disable-next-line jsx-a11y/alt-text
            <Image 
               src={logoData} 
               style={styles.logo} 

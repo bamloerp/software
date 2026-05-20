@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   themeColor: '#1d4ed8',
   icons: {
-    icon: '/barmlo_logo111.png',
+    icon: '/Barmlo%20Logo%202026.png',
   },
 };
 import { Toaster } from 'sonner';

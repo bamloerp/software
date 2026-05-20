@@ -53,7 +53,7 @@ export class PuppeteerRenderer implements PdfRenderer {
     const currency = quote.currency ?? "USD";
 
     // Read logo
-    const logoPath = path.join(process.cwd(), "public", "barmlo_logo.png");
+    const logoPath = path.join(process.cwd(), "public", "Barmlo Logo 2026.png");
     let logoBase64 = BARMLO_LOGO_BASE64;
     if (fs.existsSync(logoPath)) {
       try {
@@ -274,7 +274,7 @@ export class PuppeteerRenderer implements PdfRenderer {
     <!-- Top Section: Logo & Contact -->
     <div class="flex justify-between items-start mb-6">
       <div class="flex flex-col items-start">
-        <div class="w-64 h-32 mb-2 relative">
+        <div class="w-80 h-40 mb-2 relative">
           ${logoBase64 ? `<img src="${logoBase64}" class="logo-img object-contain" alt="Barmlo Logo" />` : '<div style="background:#eee;width:100%;height:100%;display:flex;align-items:center;justify-content:center;">Logo</div>'}
         </div>
       </div>
@@ -565,7 +565,7 @@ export class PuppeteerRenderer implements PdfRenderer {
 /* ── Shared helpers ── */
 
 function loadLogo(): string {
-  const logoPath = path.join(process.cwd(), "public", "barmlo_logo.png");
+  const logoPath = path.join(process.cwd(), "public", "Barmlo Logo 2026.png");
   try {
     if (fs.existsSync(logoPath)) {
       const buf = fs.readFileSync(logoPath);
@@ -617,7 +617,7 @@ const BASE_STYLES = `
   table { width: 100%; border-collapse: collapse; }
   th { font-size: 0.7rem; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.04em; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #166534; }
-  .logo-img { width: 160px; height: 70px; object-fit: contain; }
+  .logo-img { width: 230px; height: 105px; object-fit: contain; }
   .company-info { text-align: right; font-size: 10px; color: #166534; }
   .company-info .title { font-size: 18px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
   .info-grid { display: flex; justify-content: space-between; margin-bottom: 20px; }

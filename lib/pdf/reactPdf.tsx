@@ -78,7 +78,7 @@ export async function renderReactPdf(quoteId: string): Promise<PdfResult> {
 
   let logoData: string = BARMLO_LOGO_BASE64;
   try {
-    const logoPath = path.join(process.cwd(), 'public', 'barmlo_logo.png');
+    const logoPath = path.join(process.cwd(), 'public', 'Barmlo Logo 2026.png');
     if (fs.existsSync(logoPath)) {
       const logoBuffer = fs.readFileSync(logoPath);
       logoData = `data:image/png;base64,${logoBuffer.toString('base64')}`;
@@ -185,7 +185,7 @@ export async function renderRequisitionPdf(requisitionId: string): Promise<PdfRe
 
   let logoData: string = BARMLO_LOGO_BASE64;
   try {
-    const logoPath = path.join(process.cwd(), 'public', 'barmlo_logo.png');
+    const logoPath = path.join(process.cwd(), 'public', 'Barmlo Logo 2026.png');
     if (fs.existsSync(logoPath)) {
       const logoBuffer = fs.readFileSync(logoPath);
       logoData = `data:image/png;base64,${logoBuffer.toString('base64')}`;
@@ -277,7 +277,7 @@ export async function renderDispatchPdf(dispatchId: string): Promise<PdfResult> 
 
   let logoData: string = BARMLO_LOGO_BASE64;
   try {
-    const logoPath = path.join(process.cwd(), 'public', 'barmlo_logo.png');
+    const logoPath = path.join(process.cwd(), 'public', 'Barmlo Logo 2026.png');
     if (fs.existsSync(logoPath)) {
       const logoBuffer = fs.readFileSync(logoPath);
       logoData = `data:image/png;base64,${logoBuffer.toString('base64')}`;
@@ -350,7 +350,7 @@ export async function renderPurchaseOrderPdf(poId: string): Promise<PdfResult> {
 
   let logoData: string = BARMLO_LOGO_BASE64;
   try {
-    const logoPath = path.join(process.cwd(), 'public', 'barmlo_logo.png');
+    const logoPath = path.join(process.cwd(), 'public', 'Barmlo Logo 2026.png');
     if (fs.existsSync(logoPath)) {
       const logoBuffer = fs.readFileSync(logoPath);
       logoData = `data:image/png;base64,${logoBuffer.toString('base64')}`;

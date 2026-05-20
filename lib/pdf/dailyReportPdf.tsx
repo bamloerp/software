@@ -19,7 +19,7 @@ export async function generateDailyReportPdf(projectId: string, date: string) {
     // Read logo for Daily Report
     let logoData: string = BARMLO_LOGO_BASE64;
     try {
-        const logoPath = path.join(process.cwd(), 'public', 'barmlo_logo.png');
+        const logoPath = path.join(process.cwd(), 'public', 'Barmlo Logo 2026.png');
         if (fs.existsSync(logoPath)) {
             const logoBuffer = fs.readFileSync(logoPath);
             logoData = `data:image/png;base64,${logoBuffer.toString('base64')}`;

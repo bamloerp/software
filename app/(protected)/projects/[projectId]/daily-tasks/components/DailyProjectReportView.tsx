@@ -51,9 +51,9 @@ export function DailyProjectReportView({ data }: DailyReportDocProps) {
           <h1 className="text-2xl font-bold text-emerald-800 uppercase tracking-wide">Site Daily Report</h1>
           <p className="text-gray-500 mt-1">{formattedDate}</p>
         </div>
-        <div className="relative w-32 h-16">
+        <div className="relative h-24 w-52">
           <Image 
-            src="https://bamlo.com/wp-content/uploads/2021/04/bamlo-logo-1.png" 
+            src="/Barmlo%20Logo%202026.png"
             alt="Barmlo Logo"
             fill
             className="object-contain"

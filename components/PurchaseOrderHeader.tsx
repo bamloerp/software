@@ -39,9 +39,9 @@ export default function PurchaseOrderHeader({
       {/* Top Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start mb-8 border-b-2 border-orange-500 pb-6 print:mb-4 print:pb-4">
         <div className="flex flex-col items-start">
-          <div className="relative w-64 h-28 mb-2">
+          <div className="relative mb-2 h-36 w-80 max-w-full">
             <Image 
-              src="/barmlo_logo.png" 
+              src="/Barmlo%20Logo%202026.png"
               alt="Barmlo Logo" 
               fill 
               className="object-contain object-left" 

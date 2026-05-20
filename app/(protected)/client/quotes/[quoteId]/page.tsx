@@ -268,8 +268,8 @@ export default async function ClientQuotePage({ params }: ClientQuotePageParams)
       <div className="bg-white p-8 shadow-sm border border-gray-200 rounded-lg print:border-none print:shadow-none">
         {/* Top Section: Logo & Contact */}
         <div className="flex flex-col md:flex-row justify-between items-start mb-6">
-             <div className="relative w-64 h-32 mb-2">
-                <Image src="/barmlo_logo.png" alt="Barmlo Logo" fill className="object-contain" />
+             <div className="relative mb-2 h-40 w-80 max-w-full">
+               <Image src="/Barmlo%20Logo%202026.png" alt="Barmlo Logo" fill className="object-contain object-left" />
              </div>
 
           <div className="flex flex-col gap-2 text-sm text-blue-900 mt-4 md:mt-0 text-right md:items-end">

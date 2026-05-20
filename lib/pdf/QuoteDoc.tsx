@@ -195,7 +195,7 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
         <View style={styles.headerContainer}>
           <View style={{ width: 180 }}>
             {/* eslint-disable-next-line jsx-a11y/alt-text */}
-            {logoData && <Image src={logoData} style={{ width: 160, height: 70, objectFit: 'contain' }} />}
+            {logoData && <Image src={logoData} style={{ width: 220, height: 100, objectFit: 'contain' }} />}
           </View>
           <View style={styles.companyInfo}>
              <Text style={[styles.companyText, { fontWeight: 'bold' }]}>BARMLO CONSTRUCTION</Text>
