@@ -26,7 +26,7 @@ export default async function NewQuotePage() {
   for (const s of settings) systemSettings[s.key] = s.value;
 
   return (
-    <div className="space-y-6 h-screen overflow-y-auto p-6 scrollbar-y">
+    <div className="space-y-6 h-screen overflow-y-auto p-6 scrollbar-none">
       <h1 className="text-2xl font-bold">New Quote :: Take Off</h1>
       <p className="text-sm text-gray-600">
         Enter base values (red inputs/outputs and formulas mirror your Excel sheet). Totals update
