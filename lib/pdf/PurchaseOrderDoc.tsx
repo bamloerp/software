@@ -144,7 +144,7 @@ export default function PurchaseOrderDoc({
           <View style={{ width: 180 }}>
             {logoData && (
               // eslint-disable-next-line jsx-a11y/alt-text
-              <Image src={logoData} style={{ width: 220, height: 100, objectFit: 'contain' }} />
+              <Image src={logoData} style={{ width: 190, height: 112, objectFit: 'contain' }} />
             )}
           </View>
           <View style={s.companyInfo}>

@@ -15,7 +15,7 @@ export default function PrintHeader({ className, showOnScreen }: PrintHeaderProp
   return (
     <div className={cn(base, className)}>
       <div className="flex flex-col items-center">
-        <div className="relative h-40 w-80 max-w-full">
+        <div className="relative h-32 w-72 max-w-full">
           <Image src="/Barmlo%20Logo%202026.png" alt="Barmlo Logo" fill className="object-contain object-left" />
         </div>
       </div>

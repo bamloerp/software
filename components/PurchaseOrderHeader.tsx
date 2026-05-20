@@ -39,7 +39,7 @@ export default function PurchaseOrderHeader({
       {/* Top Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start mb-8 border-b-2 border-orange-500 pb-6 print:mb-4 print:pb-4">
         <div className="flex flex-col items-start">
-          <div className="relative mb-2 h-36 w-80 max-w-full">
+          <div className="relative mb-2 h-32 w-72 max-w-full">
             <Image 
               src="/Barmlo%20Logo%202026.png"
               alt="Barmlo Logo" 
