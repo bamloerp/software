@@ -2,12 +2,18 @@
 
 import { useMemo } from 'react';
 import Money from '@/components/Money';
+import {
+  compareConstructionSummaryCategories,
+  getConstructionSummaryCategory,
+  type ConstructionSummaryCategory,
+} from '@/lib/constructionSummary';
 
 type QuoteSummaryProps = {
   lines: Array<{
     lineTotalMinor: bigint;
     itemType: string | null;
     section: string | null;
+    description: string;
   }>;
   pgRate: number;
   contingencyRate: number;
@@ -18,7 +24,10 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, currency 
   const totals = useMemo(() => {
     let totalLabour = 0n;
     let totalMaterials = 0n;
-    const sectionTotals: Record<string, bigint> = {};
+    const sectionTotals = new Map<
+      string,
+      { category: ConstructionSummaryCategory; amount: bigint }
+    >();
 
     lines.forEach(line => {
       const amount = line.lineTotalMinor;
@@ -30,10 +39,12 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, currency 
         totalMaterials += amount;
       }
 
-      // Section Totals
-      if (line.section) {
-        sectionTotals[line.section] = (sectionTotals[line.section] || 0n) + amount;
-      }
+      const category = getConstructionSummaryCategory(line);
+      const current = sectionTotals.get(category.key);
+      sectionTotals.set(category.key, {
+        category,
+        amount: (current?.amount ?? 0n) + amount,
+      });
     });
 
     const totalFixSupply = totalLabour + totalMaterials;
@@ -76,7 +87,9 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, currency 
       totalLabour,
       totalMaterials,
       totalFixSupply,
-      sectionTotals,
+      sectionTotals: Array.from(sectionTotals.values()).sort((a, b) =>
+        compareConstructionSummaryCategories(a.category, b.category)
+      ),
       pgAmount,
       contingencyAmount,
       grandTotal
@@ -106,9 +119,9 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, currency 
       {/* Section Breakdown */}
       <div className="space-y-3 border-t pt-4">
         <h4 className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Section Summary</h4>
-        {Object.entries(totals.sectionTotals).map(([section, amount]) => (
-          <div key={section} className="flex justify-between text-sm">
-            <span className="text-gray-700 capitalize">{section.toLowerCase()}</span>
+        {totals.sectionTotals.map(({ category, amount }) => (
+          <div key={category.key} className="flex justify-between text-sm">
+            <span className="text-gray-700 uppercase">{category.label}</span>
             <Money minor={amount} currency={currency} />
           </div>
         ))}

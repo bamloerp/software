@@ -72,6 +72,11 @@ import NegotiationsList from './NegotiationsList';
 import QuoteSummary from '@/components/QuoteSummary';
 import QuoteNotes from '@/components/QuoteNotes';
 import { updateQuoteNotes } from './actions';
+import {
+  compareConstructionSummaryCategories,
+  getConstructionSummaryCategory,
+  type ConstructionSummaryCategory,
+} from '@/lib/constructionSummary';
 
 const USER_ROLE_SET = new Set<UserRole>(USER_ROLES as unknown as UserRole[]);
 
@@ -202,10 +207,14 @@ type LineRow = {
 };
 
 type LineGroup = {
+  key: string;
+
   section: string;
 
   /** Display label (e.g. "FOUNDATIONS" or "LABOUR - FOUNDATIONS") */
   label: string;
+
+  summaryCategory: ConstructionSummaryCategory;
 
   /** true when this group holds labour items */
   isLabour: boolean;
@@ -301,13 +310,20 @@ function buildLineGroups(
     const cycle = typeof line.cycle === 'number' ? line.cycle : 0;
     const isCurrentCycle = cycle === activeCycle;
     const isLabour = line.itemType === 'LABOUR';
+    const summaryCategory = getConstructionSummaryCategory({
+      section,
+      description: line.description,
+      itemType: line.itemType,
+    });
     const targetMap = isLabour ? labGroups : matGroups;
-    const groupKey = section;
+    const groupKey = `${section}:${summaryCategory.key}`;
 
     if (!targetMap.has(groupKey)) {
       targetMap.set(groupKey, {
+        key: groupKey,
         section,
-        label: isLabour ? `LABOUR - ${section}` : section,
+        label: isLabour ? `LABOUR - ${summaryCategory.detailLabel}` : summaryCategory.detailLabel,
+        summaryCategory,
         isLabour,
         rows: [],
         subtotal: 0,
@@ -366,29 +382,14 @@ function buildLineGroups(
   matGroups.forEach(sortRows);
   labGroups.forEach(sortRows);
 
-  const SECTION_ORDER: Record<string, number> = {
-    FOUNDATIONS: 1,
-    'SUPERSTRUCTURE BRICKWORK': 2,
-    'SUPERSTRUCTURE TO RING BEAM': 2.5,
-    'ABOVE RING BEAM': 2.6,
-    METALWORK: 3,
-    PLASTERING: 4,
-    SCREEDS: 5,
-    'ROOF COVERINGS': 6,
-    ELECTRICALS: 7,
-    'ELECTRICALS TUBING': 8,
-    MATERIALS: 90,
-    LABOUR: 91,
-  };
-
   const sectionSort = (a: LineGroup, b: LineGroup) => {
-    const aOrder = SECTION_ORDER[a.section] ?? 50;
-    const bOrder = SECTION_ORDER[b.section] ?? 50;
-    if (aOrder !== bOrder) return aOrder - bOrder;
+    const categoryOrder = compareConstructionSummaryCategories(a.summaryCategory, b.summaryCategory);
+    if (categoryOrder !== 0) return categoryOrder;
     const aHasPending = a.rows.some((r) => r.negotiation?.status === 'PENDING');
     const bHasPending = b.rows.some((r) => r.negotiation?.status === 'PENDING');
     if (aHasPending && !bHasPending) return -1;
     if (!aHasPending && bHasPending) return 1;
+    if (a.label !== b.label) return a.label.localeCompare(b.label);
     return 0;
   };
 
@@ -1256,7 +1257,7 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
           {/* Material & Labour running totals */}
           <div className="space-y-8">
             {groups.map((group, gIdx) => (
-              <div key={`${group.section}-${group.isLabour ? 'L' : 'M'}`}>
+              <div key={`${group.key}-${group.isLabour ? 'L' : 'M'}`}>
                 {/* Materials total banner - shown right before first labour group */}
                 {gIdx === firstLabourIdx && firstLabourIdx > 0 && (
                   <div className="mb-6 space-y-3">
@@ -1632,6 +1633,7 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
               lineTotalMinor: l.lineTotalMinor,
               itemType: l.itemType,
               section: l.section,
+              description: l.description,
             }))}
             pgRate={quote.pgRate}
             contingencyRate={quote.contingencyRate}

@@ -44,14 +44,14 @@ export const QUOTE_LINE_MAP: QuoteLineSource[] = [
   { code: 'C4', description: '228mm Timber for Ring Beam Shuttering', unit: 'm', rate: 1.50, section: 'SUPERSTRUCTURE BRICKWORK' },
 
 
-  // METALWORK
-  { code: 'C54', description: 'Door Frames (230mm)', unit: 'no', rate: 65, section: 'METALWORK' },
-  { code: 'D54', description: 'Door Frames (115mm)', unit: 'no', rate: 42, section: 'METALWORK' },
+  // DOOR FRAMES
+  { code: 'C54', description: 'Door Frames (230mm)', unit: 'no', rate: 65, section: 'DOOR FRAMES' },
+  { code: 'D54', description: 'Door Frames (115mm)', unit: 'no', rate: 42, section: 'DOOR FRAMES' },
 
   //PLASTERING
   { code: 'E22+E33', description: 'Cement PC 15 (50kg bags)', unit: 'bags', rate: 12.5, section: 'INTERNAL PLASTERING' },
-  { code: 'H22', description: 'One coat 1:4 cement sand plaster finished with a wood float on internal walls.', unit: 'm2', rate: 2.50, section: 'PLASTERING', itemType: 'LABOUR' },
-  { code: 'I22', description: 'One coat 1:4 cement sand plaster finished with a wood float on extenal wall', unit: 'm3', rate: 3.50, section: 'PLASTERING', itemType: 'LABOUR' },
+  { code: 'H22', description: 'Internal Plastering: One coat 1:4 cement sand plaster finished with a wood float on internal walls.', unit: 'm2', rate: 2.50, section: 'PLASTERING', itemType: 'LABOUR' },
+  { code: 'I22', description: 'External Plastering: One coat 1:4 cement sand plaster finished with a wood float on external walls.', unit: 'm3', rate: 3.50, section: 'PLASTERING', itemType: 'LABOUR' },
   {code : 'A51*3/8', description: 'Pit sand', unit: 'cm3', rate: 19.5, section: 'INTERNAL PLASTERING' },
   // { code: 'D71', description: 'Transport', unit: 'Km', rate: 0.65, section: 'PLASTERING' },
 

@@ -6,6 +6,11 @@ import { BARMLO_LOGO_BASE64 } from "./logo";
 import { prisma } from "@/lib/db";
 import fs from "fs";
 import path from "path";
+import {
+  compareConstructionSummaryCategories,
+  getConstructionSummaryCategory,
+  type ConstructionSummaryCategory,
+} from "@/lib/constructionSummary";
 
 function money(minor: number, cur = "USD") {
   return `${cur === "USD" ? "US$" : ""}${(Number(minor || 0) / 100).toFixed(2)}`;
@@ -72,6 +77,10 @@ export class PuppeteerRenderer implements PdfRenderer {
     type LineGroup = { section: string; rows: any[]; subtotal: number };
     const groups: Record<string, LineGroup> = {};
     const groupOrder: string[] = [];
+    const summaryGroups = new Map<
+      string,
+      { category: ConstructionSummaryCategory; subtotal: number }
+    >();
 
     // Separate labour vs materials for summary
     let totalLabour = 0;
@@ -101,25 +110,21 @@ export class PuppeteerRenderer implements PdfRenderer {
       } else {
         totalMaterials += amt;
       }
+
+      const summaryCategory = getConstructionSummaryCategory({
+        section,
+        description: line.description,
+        itemType,
+      });
+      const summaryGroup = summaryGroups.get(summaryCategory.key);
+      summaryGroups.set(summaryCategory.key, {
+        category: summaryCategory,
+        subtotal: (summaryGroup?.subtotal ?? 0) + amt,
+      });
     }
 
-    // Sort groups — separate materials and labour into distinct groups
-    const orderMap: Record<string, number> = {
-      'FOUNDATIONS': 1,
-      'SUPERSTRUCTURE BRICKWORK': 2,
-      'METALWORK': 3,
-      'PLASTERING': 4,
-      'SCREEDS': 5,
-      'ROOF COVERINGS': 6,
-      'ELECTRICALS': 7,
-      'ELECTRICALS TUBING': 8,
-      'MATERIALS': 90,
-      'LABOUR': 91,
-      'FIX_SUPPLY': 92
-    };
-
     // Split each original group into material-only and labour-only groups
-    type PdfGroup = { section: string; label: string; isLabour: boolean; rows: any[]; subtotal: number };
+    type PdfGroup = { section: string; label: string; isLabour: boolean; rows: any[]; subtotal: number; summaryCategory: ConstructionSummaryCategory };
     const matGroups: Map<string, PdfGroup> = new Map();
     const labGroups: Map<string, PdfGroup> = new Map();
 
@@ -127,21 +132,31 @@ export class PuppeteerRenderer implements PdfRenderer {
       const g = groups[section];
       for (const row of g.rows) {
         const itemType = (row as any).itemType || 'MATERIAL';
+        const summaryCategory = getConstructionSummaryCategory({
+          section,
+          description: row.description,
+          itemType,
+        });
+        const groupKey = `${section}:${summaryCategory.key}`;
         if (itemType === 'LABOUR') {
-          if (!labGroups.has(section)) labGroups.set(section, { section, label: `LABOUR – ${section}`, isLabour: true, rows: [], subtotal: 0 });
-          const lg = labGroups.get(section)!;
+          if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section, label: `LABOUR - ${summaryCategory.detailLabel}`, isLabour: true, rows: [], subtotal: 0, summaryCategory });
+          const lg = labGroups.get(groupKey)!;
           lg.rows.push(row);
           lg.subtotal += (row as any).amt;
         } else {
-          if (!matGroups.has(section)) matGroups.set(section, { section, label: section, isLabour: false, rows: [], subtotal: 0 });
-          const mg = matGroups.get(section)!;
+          if (!matGroups.has(groupKey)) matGroups.set(groupKey, { section, label: summaryCategory.detailLabel, isLabour: false, rows: [], subtotal: 0, summaryCategory });
+          const mg = matGroups.get(groupKey)!;
           mg.rows.push(row);
           mg.subtotal += (row as any).amt;
         }
       }
     }
 
-    const sortByOrder = (a: PdfGroup, b: PdfGroup) => (orderMap[a.section] || 99) - (orderMap[b.section] || 99);
+    const sortByOrder = (a: PdfGroup, b: PdfGroup) => {
+      const categoryOrder = compareConstructionSummaryCategories(a.summaryCategory, b.summaryCategory);
+      if (categoryOrder !== 0) return categoryOrder;
+      return a.label.localeCompare(b.label);
+    };
     // Enforce intra-section ordering: SUPERSTRUCTURE TO RING BEAM must have Brickwork above Door Frame Fittings.
     const rowPriority = (section: string, description: string): number => {
       const d = (description || '').toLowerCase();
@@ -156,6 +171,9 @@ export class PuppeteerRenderer implements PdfRenderer {
     const sortedMat = [...matGroups.values()].sort(sortByOrder);
     const sortedLab = [...labGroups.values()].sort(sortByOrder);
     const allGroups: PdfGroup[] = [...sortedMat, ...sortedLab];
+    const summaryOrder = [...summaryGroups.values()].sort((a, b) =>
+      compareConstructionSummaryCategories(a.category, b.category)
+    );
 
     // Calculate totals matching QuoteDoc.tsx logic
     const baseTotal = totalLabour + totalMaterials;
@@ -442,11 +460,11 @@ export class PuppeteerRenderer implements PdfRenderer {
              </tr>
            </thead>
            <tbody>
-             ${groupOrder.map((section, idx) => `
+             ${summaryOrder.map(({ category, subtotal }, idx) => `
              <tr class="border-b border-gray-300">
                <td class="px-4 py-2 text-center text-sm text-gray-500 border-r border-gray-300">${idx + 1}</td>
-               <td class="px-4 py-2 text-sm text-gray-700 border-r border-gray-300 uppercase">${section}</td>
-               <td class="px-4 py-2 text-right text-sm text-gray-900">${money(groups[section].subtotal, currency)}</td>
+               <td class="px-4 py-2 text-sm text-gray-700 border-r border-gray-300 uppercase">${category.label}</td>
+               <td class="px-4 py-2 text-right text-sm text-gray-900">${money(subtotal, currency)}</td>
              </tr>
              `).join("")}
              

@@ -1,6 +1,11 @@
 // lib/pdf/QuoteDoc.tsx
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Image, Svg, Path, Font } from '@react-pdf/renderer';
+import {
+  compareConstructionSummaryCategories,
+  getConstructionSummaryCategory,
+  type ConstructionSummaryCategory,
+} from '@/lib/constructionSummary';
 
 // Register a nice font if possible, otherwise default
 // Font.register({ family: 'Inter', src: '...' });
@@ -109,45 +114,38 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
     groups[section].subtotal += l.lineTotalMinor;
   });
   
-  // Sort groups — separate materials and labour into distinct groups
-  const order: Record<string, number> = {
-    'FOUNDATIONS': 1,
-    'SUPERSTRUCTURE BRICKWORK': 2,
-    'SUPERSTRUCTURE TO RING BEAM': 2.5,
-    'ABOVE RING BEAM': 2.6,
-    'METALWORK': 3,
-    'PLASTERING': 4,
-    'SCREEDS': 5,
-    'ROOF COVERINGS': 6,
-    'ELECTRICALS': 7,
-    'ELECTRICALS TUBING': 8,
-    'MATERIALS': 90,
-    'LABOUR': 91,
-    'FIX_SUPPLY': 92,
-  };
-
-  type DocGroup = { section: string; label: string; isLabour: boolean; lines: PdfLine[]; subtotal: number };
+  type DocGroup = { section: string; label: string; isLabour: boolean; lines: PdfLine[]; subtotal: number; summaryCategory: ConstructionSummaryCategory };
   const matGroups: Map<string, DocGroup> = new Map();
   const labGroups: Map<string, DocGroup> = new Map();
 
   Object.values(groups).forEach(g => {
     for (const line of g.lines) {
       const itemType = line.itemType || 'MATERIAL';
+      const summaryCategory = getConstructionSummaryCategory({
+        section: g.section,
+        description: line.description,
+        itemType,
+      });
+      const groupKey = `${g.section}:${summaryCategory.key}`;
       if (itemType === 'LABOUR') {
-        if (!labGroups.has(g.section)) labGroups.set(g.section, { section: g.section, label: `LABOUR – ${g.section}`, isLabour: true, lines: [], subtotal: 0 });
-        const lg = labGroups.get(g.section)!;
+        if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section: g.section, label: `LABOUR - ${summaryCategory.detailLabel}`, isLabour: true, lines: [], subtotal: 0, summaryCategory });
+        const lg = labGroups.get(groupKey)!;
         lg.lines.push(line);
         lg.subtotal += line.lineTotalMinor;
       } else {
-        if (!matGroups.has(g.section)) matGroups.set(g.section, { section: g.section, label: g.section, isLabour: false, lines: [], subtotal: 0 });
-        const mg = matGroups.get(g.section)!;
+        if (!matGroups.has(groupKey)) matGroups.set(groupKey, { section: g.section, label: summaryCategory.detailLabel, isLabour: false, lines: [], subtotal: 0, summaryCategory });
+        const mg = matGroups.get(groupKey)!;
         mg.lines.push(line);
         mg.subtotal += line.lineTotalMinor;
       }
     }
   });
 
-  const sortByOrder = (a: DocGroup, b: DocGroup) => (order[a.section] || 99) - (order[b.section] || 99);
+  const sortByOrder = (a: DocGroup, b: DocGroup) => {
+    const categoryOrder = compareConstructionSummaryCategories(a.summaryCategory, b.summaryCategory);
+    if (categoryOrder !== 0) return categoryOrder;
+    return a.label.localeCompare(b.label);
+  };
   // Enforce intra-section ordering: SUPERSTRUCTURE TO RING BEAM must have Brickwork above Door Frame Fittings.
   const rowPriority = (section: string, description: string): number => {
     const d = (description || '').toLowerCase();
@@ -196,6 +194,7 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
         {/* Header */}
         <View style={styles.headerContainer}>
           <View style={{ width: 180 }}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
             {logoData && <Image src={logoData} style={{ width: 160, height: 70, objectFit: 'contain' }} />}
           </View>
           <View style={styles.companyInfo}>
