@@ -58,7 +58,11 @@ export default function SettingsClient({
         setConfirmPassword('');
         if (forced) {
           // Force a fresh sign-in so JWT mustChangePassword clears cleanly
-          setTimeout(() => signOut({ callbackUrl: '/login?reason=password-changed' }), 600);
+          setTimeout(() => {
+            void signOut({ redirect: false }).then(() => {
+              window.location.replace(`/login?reason=password-changed&t=${Date.now()}`);
+            });
+          }, 600);
         } else {
           router.refresh();
         }

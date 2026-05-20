@@ -26,9 +26,12 @@ const STATUS_BADGE: Record<string, string> = {
   REVIEWED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
   SENT_TO_SALES: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   NEGOTIATION: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  NEGOTIATION_REVIEW: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300',
   FINALIZED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
   ARCHIVED: 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 };
+
+const SENIOR_QS_REVIEW_STATUSES = ['SUBMITTED_REVIEW', 'NEGOTIATION_REVIEW'] as const;
 
 // Map status to Impazamon style "Waiting for assessment" red pill etc. if needed, 
 // but sticking to existing logic with rounded pills is safer for now, just styled similarly.
@@ -53,6 +56,7 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
   const page = Number(searchParams.page) || 1;
   const pageSize = Number(searchParams.limit) || 20;
   const statusFilter = searchParams.status as string | undefined;
+  const reviewFilter = searchParams.review as string | undefined;
   const searchQuery = searchParams.q as string | undefined;
 
   const skip = (page - 1) * pageSize;
@@ -76,6 +80,10 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
   } else if (role === 'SALES') {
     where = { ...where, status: { in: ['REVIEWED', 'SENT_TO_SALES', 'NEGOTIATION'] } };
   } // ADMIN sees all
+
+  if (role === 'SENIOR_QS' && reviewFilter === 'pending') {
+    where = { ...where, status: { in: [...SENIOR_QS_REVIEW_STATUSES] } };
+  }
 
   // Override role filter if status is explicitly requested (and allowed? For now assuming filters are additive or strict override)
   // Actually, usually users filter WITHIN their allowed scope.
@@ -141,6 +149,12 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
   if (view === 'my') {
     pageTitle = 'My Quotes';
     pageDescription = 'Quotations created by you';
+  } else if (role === 'SENIOR_QS' && reviewFilter === 'pending') {
+    pageTitle = 'Review Quotations';
+    pageDescription = 'Quotations waiting for Senior QS action';
+  } else if (role === 'SENIOR_QS' && view === 'all') {
+    pageTitle = 'All Quotations';
+    pageDescription = 'All quotations regardless of who created them';
   } else if (statusFilter === 'SENT_TO_SALES') {
     pageTitle = 'New Quotations';
     pageDescription = 'Quotations sent to sales pending review';

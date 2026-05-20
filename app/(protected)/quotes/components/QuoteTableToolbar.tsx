@@ -43,8 +43,14 @@ export default function QuoteTableToolbar() {
     setSearch('');
     setStatus('');
     setPageSize('20');
+    const params = new URLSearchParams();
+    const view = searchParams.get('view');
+    const review = searchParams.get('review');
+    if (view) params.set('view', view);
+    if (review) params.set('review', review);
     startTransition(() => {
-        router.push(pathname);
+        const query = params.toString();
+        router.push(query ? `${pathname}?${query}` : pathname);
     });
   };
 
@@ -53,6 +59,7 @@ export default function QuoteTableToolbar() {
       <div className="flex items-center gap-2">
          <span className="bg-barmlo-blue text-white px-2 py-1 rounded text-xs font-bold shadow-sm">Show</span>
          <select
+          title="Rows per page"
             value={pageSize}
             onChange={(e) => {
                 setPageSize(e.target.value);
@@ -76,6 +83,7 @@ export default function QuoteTableToolbar() {
       <div className="flex items-center gap-2">
          <span className="bg-barmlo-blue text-white px-2 py-1 rounded text-xs font-bold shadow-sm">Status</span>
          <select
+          title="Filter by status"
             value={status}
             onChange={(e) => {
                 setStatus(e.target.value);
@@ -91,6 +99,7 @@ export default function QuoteTableToolbar() {
             <option value="SUBMITTED_REVIEW">Submitted Review</option>
             <option value="REVIEWED">Reviewed</option>
             <option value="NEGOTIATION">Negotiation</option>
+            <option value="NEGOTIATION_REVIEW">Negotiation Review</option>
             <option value="FINALIZED">Finalized</option>
             <option value="ARCHIVED">Archived</option>
          </select>
@@ -99,6 +108,7 @@ export default function QuoteTableToolbar() {
       <div className="flex items-center gap-2">
          <span className="bg-barmlo-blue text-white px-2 py-1 rounded text-xs font-bold shadow-sm">Age</span>
          <select
+          title="Filter by age"
             disabled
             className="rounded border-gray-300 py-1 text-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 shadow-sm bg-gray-100 text-gray-400 cursor-not-allowed"
          >

@@ -11,9 +11,16 @@ const authMiddleware = secret
   ? NextAuth({ ...authConfig, secret }).auth
   : null;
 
+function noStore(response: NextResponse) {
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  response.headers.set('Expires', '0');
+  return response;
+}
+
 async function handler(req: NextRequest) {
   // No auth secret → just pass through (login page will render, auth won't work)
-  if (!authMiddleware) return NextResponse.next();
+  if (!authMiddleware) return noStore(NextResponse.next());
 
   // Run the NextAuth middleware
   return (authMiddleware as any)(async (authReq: any) => {
@@ -29,7 +36,7 @@ async function handler(req: NextRequest) {
         const url = authReq.nextUrl.clone();
         url.pathname = '/settings';
         url.search = '?force=1';
-        return NextResponse.redirect(url);
+        return noStore(NextResponse.redirect(url));
       }
 
       const method = authReq.method;
@@ -49,6 +56,8 @@ async function handler(req: NextRequest) {
         }),
       }).catch(() => { });
     }
+
+    return noStore(NextResponse.next());
   })(req);
 }
 

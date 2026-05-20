@@ -12,6 +12,9 @@ import ToastProvider from '@/components/ToastProvider';
 import IdleLogout from '@/components/IdleLogout';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function ProtectedLayout({ children }: { children: ReactNode }) {
   const [currentUser, flash] = await Promise.all([getCurrentUser(), readFlashMessage()]);
 

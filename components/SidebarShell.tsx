@@ -62,6 +62,12 @@ const PAGE_DEFS: PageDef[] = [
     icon: 'list',
     roles: ['QS', 'SENIOR_QS', 'ADMIN'],
   },
+  {
+    label: 'All Quotations',
+    href: '/quotes?view=all',
+    icon: 'quote',
+    roles: ['SENIOR_QS', 'ADMIN'],
+  },
   { label: 'New Quotations', href: '/quotes?status=SENT_TO_SALES', icon: 'list', roles: ['SALES'] },
   {
     label: 'Pending Endorsements',
@@ -992,9 +998,10 @@ export default function SidebarShell({
                   </Link>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       setIsLoggingOut(true);
-                      signOut({ callbackUrl: '/login', redirect: true });
+                      await signOut({ redirect: false });
+                      window.location.replace(`/login?logout=${Date.now()}`);
                     }}
                     disabled={isLoggingOut}
                     className="p-2 text-gray-500 hover:bg-gray-100 hover:text-red-600 rounded-full transition-colors dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-red-400"

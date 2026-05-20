@@ -19,9 +19,10 @@ export default function IdleLogout() {
     if (countdownTimer.current) clearInterval(countdownTimer.current);
   }
 
-  function doLogout() {
+  async function doLogout() {
     clearAll();
-    signOut({ callbackUrl: '/login?reason=inactive' });
+    await signOut({ redirect: false });
+    window.location.replace(`/login?reason=inactive&t=${Date.now()}`);
   }
 
   function reset() {
@@ -34,7 +35,7 @@ export default function IdleLogout() {
         setSecondsLeft((s) => (s > 1 ? s - 1 : 0));
       }, 1000);
     }, IDLE_MS - WARN_MS);
-    idleTimer.current = setTimeout(doLogout, IDLE_MS);
+    idleTimer.current = setTimeout(() => { void doLogout(); }, IDLE_MS);
   }
 
   useEffect(() => {

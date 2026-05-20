@@ -1864,7 +1864,6 @@ export default async function DashboardPage({
     const reviewCount = await prisma.quote.count({
       where: {
         status: { in: ['SUBMITTED_REVIEW', 'NEGOTIATION_REVIEW'] },
-        office: user.office ?? undefined,
       },
     });
 
@@ -1875,9 +1874,12 @@ export default async function DashboardPage({
         </div>
 
         <Link
-          href="/quotes"
-          className="inline-flex w-full max-w-3xl justify-center items-center gap-4 rounded-2xl bg-green-500 px-8 py-10 text-3xl font-bold text-white shadow-lg transition-all hover:bg-green-600 hover:shadow-xl hover:-translate-y-1"
+          href="/quotes?review=pending"
+          className="relative inline-flex w-full max-w-3xl justify-center items-center gap-4 rounded-2xl bg-green-500 px-8 py-10 text-3xl font-bold text-white shadow-lg transition-all hover:bg-green-600 hover:shadow-xl hover:-translate-y-1"
         >
+          <span className="absolute right-5 top-5 flex min-h-8 min-w-8 items-center justify-center rounded-full bg-white px-2 text-sm font-black text-green-600 shadow-sm ring-2 ring-green-100">
+            {reviewCount}
+          </span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -1893,11 +1895,6 @@ export default async function DashboardPage({
             />
           </svg>
           Review Quotations
-          {reviewCount > 0 && (
-            <span className="ml-4 flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm text-green-600">
-              {reviewCount}
-            </span>
-          )}
         </Link>
       </div>
     );
