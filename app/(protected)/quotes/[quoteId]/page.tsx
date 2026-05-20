@@ -1529,6 +1529,16 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
                 </div>
               )}
               <div className="flex justify-end">
+                <div className="rounded-lg bg-blue-100 px-6 py-3 dark:bg-blue-900/30">
+                  <span className="text-sm font-bold text-blue-900 dark:text-blue-200">
+                    TOTAL MATERIALS:{' '}
+                  </span>
+                  <span className="text-sm font-bold text-blue-900 dark:text-blue-100">
+                    <Money value={materialTotal} />
+                  </span>
+                </div>
+              </div>
+              <div className="flex justify-end">
                 <div className="rounded-lg bg-green-100 px-6 py-4 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
                   <span className="text-base font-bold text-green-900 dark:text-green-200">
                     TOTAL FIX &amp; SUPPLY:{' '}
