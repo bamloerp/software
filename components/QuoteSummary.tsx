@@ -38,8 +38,6 @@ function vatPercentFromBps(vatBps: bigint | number | null | undefined): number {
 
 export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, currency }: QuoteSummaryProps) {
   const totals = useMemo(() => {
-    let totalLabour = 0n;
-    let totalMaterials = 0n;
     const sectionTotals = new Map<
       string,
       { category: ConstructionSummaryCategory; amount: bigint }
@@ -47,13 +45,6 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, c
 
     lines.forEach(line => {
       const amount = line.lineTotalMinor;
-      
-      // Category Totals
-      if (line.itemType === 'LABOUR') {
-        totalLabour += amount;
-      } else {
-        totalMaterials += amount;
-      }
 
       const category = getConstructionSummaryCategory(line);
       const current = sectionTotals.get(category.key);
@@ -63,8 +54,10 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, c
       });
     });
 
-    const totalFixSupply = totalLabour + totalMaterials;
-    const totalMeasuredWorks = totalFixSupply; // Or sum of sections, should vary slightly if sections missing
+    const orderedSections = Array.from(sectionTotals.values()).sort((a, b) =>
+      compareConstructionSummaryCategories(a.category, b.category)
+    );
+    const totalMeasuredWorks = orderedSections.reduce((total, section) => total + section.amount, 0n);
     
     const pgAmount = BigInt(Math.round(Number(totalMeasuredWorks) * (pgRate / 100)));
     const subtotalWithPg = totalMeasuredWorks + pgAmount;
@@ -76,15 +69,10 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, c
     const grandTotal = subtotalBeforeVat + vatAmount;
 
     return {
-      totalLabour,
-      totalMaterials,
-      totalFixSupply,
-      sectionTotals: Array.from(sectionTotals.values()).sort((a, b) =>
-        compareConstructionSummaryCategories(a.category, b.category)
-      ),
+      totalMeasuredWorks,
+      sectionTotals: orderedSections,
       pgAmount,
       contingencyAmount,
-      subtotalBeforeVat,
       vatPercent,
       vatAmount,
       grandTotal
@@ -92,66 +80,72 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, c
   }, [lines, pgRate, contingencyRate, vatBps]);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6 mt-8">
-      <h3 className="text-lg font-bold text-gray-900 border-b pb-4 mb-4">Construction Cost Summary</h3>
-      
-      {/* High Level Totals */}
-      <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-6 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Total Labour</span>
-          <Money minor={totals.totalLabour} currency={currency} />
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Total Materials</span>
-          <Money minor={totals.totalMaterials} currency={currency} />
-        </div>
-        <div className="flex justify-between font-medium border-t pt-2 mt-2 col-span-2">
-          <span>Total Fix & Supply</span>
-          <Money minor={totals.totalFixSupply} currency={currency} />
-        </div>
+    <div className="mt-8 overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
+      <div className="border-b border-gray-300 px-4 py-3">
+        <h3 className="text-base font-bold uppercase text-gray-900">Construction Cost Summary</h3>
       </div>
 
-      {/* Section Breakdown */}
-      <div className="space-y-3 border-t pt-4">
-        <h4 className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Section Summary</h4>
-        {totals.sectionTotals.map(({ category, amount }) => (
-          <div key={category.key} className="flex justify-between text-sm">
-            <span className="text-gray-700 uppercase">{category.label}</span>
+      <div className="grid grid-cols-[3rem_1fr_10rem] border-b border-gray-300 bg-blue-50 text-xs font-bold uppercase text-gray-700">
+        <div className="border-r border-gray-300 px-3 py-2 text-center">#</div>
+        <div className="border-r border-gray-300 px-3 py-2">Description</div>
+        <div className="px-3 py-2 text-right">Amount</div>
+      </div>
+
+      <div className="grid grid-cols-[3rem_1fr_10rem] border-b border-gray-300 text-sm font-bold uppercase text-gray-900">
+        <div className="border-r border-gray-300 px-3 py-2" />
+        <div className="border-r border-gray-300 px-3 py-2">Builder&apos;s Work</div>
+        <div className="px-3 py-2" />
+      </div>
+
+      {totals.sectionTotals.map(({ category, amount }, index) => (
+        <div key={category.key} className="grid grid-cols-[3rem_1fr_10rem] border-b border-gray-200 text-sm">
+          <div className="border-r border-gray-300 px-3 py-2 text-center text-gray-600">{index + 1}</div>
+          <div className="border-r border-gray-300 px-3 py-2 font-semibold uppercase text-gray-800">
+            {category.label}
+          </div>
+          <div className="bg-blue-50 px-3 py-2 text-right font-semibold text-gray-900">
             <Money minor={amount} currency={currency} />
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
 
-      {/* Final Calculation */}
-      <div className="mt-6 space-y-3 bg-gray-50 p-4 rounded-lg">
-        <div className="flex justify-between text-sm font-medium">
-          <span>Total Measured Works</span>
-          <Money minor={totals.totalFixSupply} currency={currency} />
+      <div className="border-t-2 border-gray-400">
+        <div className="grid grid-cols-[3rem_1fr_10rem] border-b border-gray-300 text-sm font-bold uppercase">
+          <div className="border-r border-gray-300 px-3 py-2" />
+          <div className="border-r border-gray-300 px-3 py-2 text-gray-900">Total Measured Works</div>
+          <div className="bg-blue-50 px-3 py-2 text-right text-gray-900">
+            <Money minor={totals.totalMeasuredWorks} currency={currency} />
+          </div>
         </div>
-        
-        <div className="flex justify-between text-sm text-gray-600">
-          <span>Add P&Gs ({formatPercentRate(pgRate)})</span>
-          <Money minor={totals.pgAmount} currency={currency} />
+        <div className="grid grid-cols-[3rem_1fr_10rem] border-b border-gray-300 text-sm">
+          <div className="border-r border-gray-300 px-3 py-2" />
+          <div className="border-r border-gray-300 px-3 py-2">Add P&amp;Gs ({formatPercentRate(pgRate)})</div>
+          <div className="bg-blue-50 px-3 py-2 text-right font-semibold">
+            <Money minor={totals.pgAmount} currency={currency} />
+          </div>
         </div>
-        
-        <div className="flex justify-between text-sm text-gray-600">
-          <span>Add Contingencies ({contingencyRate}%)</span>
-          <Money minor={totals.contingencyAmount} currency={currency} />
+        <div className="grid grid-cols-[3rem_1fr_10rem] border-b border-gray-300 text-sm">
+          <div className="border-r border-gray-300 px-3 py-2" />
+          <div className="border-r border-gray-300 px-3 py-2">Add {formatPercentRate(contingencyRate)} contingencies</div>
+          <div className="bg-blue-50 px-3 py-2 text-right font-semibold">
+            <Money minor={totals.contingencyAmount} currency={currency} />
+          </div>
         </div>
-
-        <div className="flex justify-between text-sm font-medium text-gray-700 border-t border-gray-200 pt-3">
-          <span>Subtotal before VAT</span>
-          <Money minor={totals.subtotalBeforeVat} currency={currency} />
+        <div className="grid grid-cols-[3rem_1fr_10rem] border-b border-gray-300 text-sm">
+          <div className="border-r border-gray-300 px-3 py-2" />
+          <div className="border-r border-gray-300 px-3 py-2">
+            {totals.vatPercent > 0 ? `Add VAT (${formatPercentRate(totals.vatPercent)})` : 'VAT Missing'}
+          </div>
+          <div className="bg-blue-50 px-3 py-2 text-right font-semibold">
+            <Money minor={totals.vatAmount} currency={currency} />
+          </div>
         </div>
-
-        <div className="flex justify-between text-sm text-gray-600">
-          <span>{totals.vatPercent > 0 ? `Add VAT (${formatPercentRate(totals.vatPercent)})` : 'VAT Missing'}</span>
-          <Money minor={totals.vatAmount} currency={currency} />
-        </div>
-
-        <div className="flex justify-between text-lg font-bold text-gray-900 border-t border-gray-200 pt-3 mt-2">
-          <span>Grand Total</span>
-          <Money minor={totals.grandTotal} currency={currency} />
+        <div className="grid grid-cols-[3rem_1fr_10rem] bg-gray-50 text-base font-bold uppercase text-gray-900">
+          <div className="border-r border-gray-300 px-3 py-2" />
+          <div className="border-r border-gray-300 px-3 py-2">Grand Total</div>
+          <div className="bg-blue-100 px-3 py-2 text-right">
+            <Money minor={totals.grandTotal} currency={currency} />
+          </div>
         </div>
       </div>
     </div>

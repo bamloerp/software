@@ -69,6 +69,7 @@ import QSEditButton from '@/components/QSEditButton';
 import QuoteHeader from '@/components/QuoteHeader';
 import SalesEndorsementForm from './SalesEndorsementForm';
 import NegotiationsList from './NegotiationsList';
+import QuoteSummary from '@/components/QuoteSummary';
 import QuoteNotes from '@/components/QuoteNotes';
 import { updateQuoteNotes } from './actions';
 import {
@@ -1307,11 +1308,9 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
 
       {!canSalesEndorse && (
         <>
-          {/* Material & Labour running totals */}
           <div className="space-y-8">
             {groups.map((group, gIdx) => (
               <div key={`${group.key}-${group.isLabour ? 'L' : 'M'}`}>
-                {/* Materials total banner - shown right before first labour group */}
                 {gIdx === firstLabourIdx && firstLabourIdx > 0 && (
                   <div className="mb-6 space-y-3">
                     <div className="flex justify-end">
@@ -1421,6 +1420,31 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
                                   {row.labourNote}
                                 </div>
                               )}
+
+                              <div className="space-y-3">
+                                {labourTotal > 0 && (
+                                  <div className="flex justify-end">
+                                    <div className="rounded-lg bg-amber-100 px-6 py-3 dark:bg-amber-900/30">
+                                      <span className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                                        TOTAL LABOUR:{' '}
+                                      </span>
+                                      <span className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                                        <Money value={labourTotal} />
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="flex justify-end">
+                                  <div className="rounded-lg bg-green-100 px-6 py-4 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
+                                    <span className="text-base font-bold text-green-900 dark:text-green-200">
+                                      TOTAL FIX &amp; SUPPLY:{' '}
+                                    </span>
+                                    <span className="text-base font-bold text-green-900 dark:text-green-100">
+                                      <Money value={materialTotal + labourTotal} />
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
                               {row.labourNote !== null && isReviewer && (
                                 <LabourNoteEditor
                                   quoteId={quote.id}
@@ -1515,31 +1539,6 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
               </div>
             ))}
 
-            {/* Labour Total + Fix & Supply Grand Total */}
-            <div className="space-y-3">
-              {labourTotal > 0 && (
-                <div className="flex justify-end">
-                  <div className="rounded-lg bg-amber-100 px-6 py-3 dark:bg-amber-900/30">
-                    <span className="text-sm font-bold text-amber-900 dark:text-amber-200">
-                      TOTAL LABOUR:{' '}
-                    </span>
-                    <span className="text-sm font-bold text-amber-900 dark:text-amber-100">
-                      <Money value={labourTotal} />
-                    </span>
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-end">
-                <div className="rounded-lg bg-green-100 px-6 py-4 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
-                  <span className="text-base font-bold text-green-900 dark:text-green-200">
-                    TOTAL FIX &amp; SUPPLY:{' '}
-                  </span>
-                  <span className="text-base font-bold text-green-900 dark:text-green-100">
-                    <Money value={materialTotal + labourTotal} />
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
           {role === 'ADMIN' && (
             <section className="rounded border bg-white p-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
@@ -1679,6 +1678,19 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
               closeNegotiationAction={closeNegotiationAction}
             />
           )}
+
+          <QuoteSummary
+            lines={quote.lines.map((line) => ({
+              lineTotalMinor: line.lineTotalMinor,
+              itemType: line.itemType,
+              section: line.section,
+              description: line.description,
+            }))}
+            pgRate={quote.pgRate}
+            contingencyRate={quote.contingencyRate}
+            vatBps={quote.vatBps}
+            currency={quote.currency ?? 'USD'}
+          />
 
           {/* Quote Notes (Barmlo Template) */}
           <QuoteNotes

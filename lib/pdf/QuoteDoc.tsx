@@ -161,6 +161,26 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
   const sortedLab = [...labGroups.values()].sort(sortByOrder);
   const allDocGroups: DocGroup[] = [...sortedMat, ...sortedLab];
 
+  const summaryGroups = new Map<string, { category: ConstructionSummaryCategory; subtotal: number }>();
+  for (const group of allDocGroups) {
+    const existing = summaryGroups.get(group.summaryCategory.key);
+    summaryGroups.set(group.summaryCategory.key, {
+      category: group.summaryCategory,
+      subtotal: (existing?.subtotal ?? 0) + group.subtotal,
+    });
+  }
+  const summaryRows = [...summaryGroups.values()].sort((a, b) =>
+    compareConstructionSummaryCategories(a.category, b.category)
+  );
+  const totalMeasuredWorks = summaryRows.reduce((total, row) => total + row.subtotal, 0);
+  const pgAmount = (totalMeasuredWorks * quote.pgRate) / 100;
+  const contingencyAmount = (pgAmount * quote.contingencyRate) / 100;
+  const subtotalBeforeVat = totalMeasuredWorks + pgAmount + contingencyAmount;
+  const effectiveVatBps = quote.vatBps > 0 && quote.vatBps < 100 ? quote.vatBps * 100 : quote.vatBps;
+  const vatPercent = effectiveVatBps / 100;
+  const vatAmount = subtotalBeforeVat * (vatPercent / 100);
+  const grandTotal = subtotalBeforeVat + vatAmount;
+
   const materialLines = lines.filter(l => l.itemType !== 'LABOUR'); // Default to material if missing/other
   const totalMaterials = materialLines.reduce((acc, l) => acc + l.lineTotalMinor, 0);
 
@@ -251,6 +271,54 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
             </View>
           ));
         })()}
+
+        <View style={{ marginTop: 20, borderWidth: 1, borderColor: '#d1d5db' }} wrap={false}>
+          <View style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: '#d1d5db' }}>
+            <Text style={{ fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>Construction Cost Summary</Text>
+          </View>
+          <View style={{ flexDirection: 'row', backgroundColor: '#eff6ff', borderBottomWidth: 1, borderBottomColor: '#d1d5db' }}>
+            <Text style={{ width: 30, padding: 6, fontSize: 8, fontWeight: 'bold', textAlign: 'center', borderRightWidth: 1, borderRightColor: '#d1d5db' }}>#</Text>
+            <Text style={{ flex: 1, padding: 6, fontSize: 8, fontWeight: 'bold', borderRightWidth: 1, borderRightColor: '#d1d5db' }}>DESCRIPTION</Text>
+            <Text style={{ width: 90, padding: 6, fontSize: 8, fontWeight: 'bold', textAlign: 'right' }}>AMOUNT</Text>
+          </View>
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#d1d5db' }}>
+            <Text style={{ width: 30, padding: 6, borderRightWidth: 1, borderRightColor: '#d1d5db' }} />
+            <Text style={{ flex: 1, padding: 6, fontSize: 9, fontWeight: 'bold', textTransform: 'uppercase', borderRightWidth: 1, borderRightColor: '#d1d5db' }}>Builder&apos;s Work</Text>
+            <Text style={{ width: 90, padding: 6 }} />
+          </View>
+          {summaryRows.map(({ category, subtotal }, index) => (
+            <View key={category.key} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
+              <Text style={{ width: 30, padding: 6, fontSize: 8, textAlign: 'center', borderRightWidth: 1, borderRightColor: '#d1d5db' }}>{index + 1}</Text>
+              <Text style={{ flex: 1, padding: 6, fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase', borderRightWidth: 1, borderRightColor: '#d1d5db' }}>{category.label}</Text>
+              <Text style={{ width: 90, padding: 6, fontSize: 8, fontWeight: 'bold', textAlign: 'right', backgroundColor: '#eff6ff' }}>{currencySymbol} {formatMoney(subtotal, currency)}</Text>
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', borderTopWidth: 2, borderTopColor: '#6b7280', borderBottomWidth: 1, borderBottomColor: '#d1d5db' }}>
+            <Text style={{ width: 30, padding: 6, borderRightWidth: 1, borderRightColor: '#d1d5db' }} />
+            <Text style={{ flex: 1, padding: 6, fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase', borderRightWidth: 1, borderRightColor: '#d1d5db' }}>Total Measured Works</Text>
+            <Text style={{ width: 90, padding: 6, fontSize: 8, fontWeight: 'bold', textAlign: 'right', backgroundColor: '#eff6ff' }}>{currencySymbol} {formatMoney(totalMeasuredWorks, currency)}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#d1d5db' }}>
+            <Text style={{ width: 30, padding: 6, borderRightWidth: 1, borderRightColor: '#d1d5db' }} />
+            <Text style={{ flex: 1, padding: 6, fontSize: 8, borderRightWidth: 1, borderRightColor: '#d1d5db' }}>Add P&amp;Gs ({quote.pgRate}%)</Text>
+            <Text style={{ width: 90, padding: 6, fontSize: 8, textAlign: 'right', backgroundColor: '#eff6ff' }}>{currencySymbol} {formatMoney(pgAmount, currency)}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#d1d5db' }}>
+            <Text style={{ width: 30, padding: 6, borderRightWidth: 1, borderRightColor: '#d1d5db' }} />
+            <Text style={{ flex: 1, padding: 6, fontSize: 8, borderRightWidth: 1, borderRightColor: '#d1d5db' }}>Add Contingencies ({quote.contingencyRate}%)</Text>
+            <Text style={{ width: 90, padding: 6, fontSize: 8, textAlign: 'right', backgroundColor: '#eff6ff' }}>{currencySymbol} {formatMoney(contingencyAmount, currency)}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#d1d5db' }}>
+            <Text style={{ width: 30, padding: 6, borderRightWidth: 1, borderRightColor: '#d1d5db' }} />
+            <Text style={{ flex: 1, padding: 6, fontSize: 8, borderRightWidth: 1, borderRightColor: '#d1d5db' }}>{vatPercent > 0 ? `Add VAT (${vatPercent}%)` : 'VAT Missing'}</Text>
+            <Text style={{ width: 90, padding: 6, fontSize: 8, textAlign: 'right', backgroundColor: '#eff6ff' }}>{currencySymbol} {formatMoney(vatAmount, currency)}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', backgroundColor: '#1e3a8a' }}>
+            <Text style={{ width: 30, padding: 6, borderRightWidth: 1, borderRightColor: '#1e40af' }} />
+            <Text style={{ flex: 1, padding: 6, fontSize: 9, fontWeight: 'bold', color: '#ffffff', textTransform: 'uppercase', borderRightWidth: 1, borderRightColor: '#1e40af' }}>Grand Total</Text>
+            <Text style={{ width: 90, padding: 6, fontSize: 9, fontWeight: 'bold', color: '#ffffff', textAlign: 'right' }}>{currencySymbol} {formatMoney(grandTotal, currency)}</Text>
+          </View>
+        </View>
 
         {/* Notes */}
         {(assumptions.length > 0 || exclusions.length > 0) && (

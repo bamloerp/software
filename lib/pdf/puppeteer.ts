@@ -71,8 +71,7 @@ export class PuppeteerRenderer implements PdfRenderer {
     const groups: Record<string, LineGroup> = {};
     const groupOrder: string[] = [];
 
-    // Separate labour vs materials for summary
-    let totalLabour = 0;
+    // Materials total is shown before the labour section.
     let totalMaterials = 0;
 
     for (const line of quote.lines) {
@@ -94,9 +93,7 @@ export class PuppeteerRenderer implements PdfRenderer {
       groups[section].subtotal += amt;
 
       const itemType = line.itemType || 'MATERIAL';
-      if (itemType === 'LABOUR') {
-        totalLabour += amt;
-      } else {
+      if (itemType !== 'LABOUR') {
         totalMaterials += amt;
       }
 
@@ -150,7 +147,29 @@ export class PuppeteerRenderer implements PdfRenderer {
     const sortedMat = [...matGroups.values()].sort(sortByOrder);
     const sortedLab = [...labGroups.values()].sort(sortByOrder);
     const allGroups: PdfGroup[] = [...sortedMat, ...sortedLab];
-    const baseTotal = totalLabour + totalMaterials;
+    const summaryGroups = new Map<
+      string,
+      { category: ConstructionSummaryCategory; subtotal: number }
+    >();
+    for (const group of allGroups) {
+      const existing = summaryGroups.get(group.summaryCategory.key);
+      summaryGroups.set(group.summaryCategory.key, {
+        category: group.summaryCategory,
+        subtotal: (existing?.subtotal ?? 0) + group.subtotal,
+      });
+    }
+    const summaryRows = [...summaryGroups.values()].sort((a, b) =>
+      compareConstructionSummaryCategories(a.category, b.category)
+    );
+    const totalMeasuredWorks = summaryRows.reduce((total, row) => total + row.subtotal, 0);
+    const pgAmount = (totalMeasuredWorks * (Number(quote.pgRate) || 0)) / 100;
+    const contingencyAmount = (pgAmount * (Number(quote.contingencyRate) || 0)) / 100;
+    const subtotalBeforeVat = totalMeasuredWorks + pgAmount + contingencyAmount;
+    const rawVatBps = Number(quote.vatBps || 0);
+    const effectiveVatBps = rawVatBps > 0 && rawVatBps < 100 ? rawVatBps * 100 : rawVatBps;
+    const vatPercent = effectiveVatBps / 100;
+    const vatAmount = subtotalBeforeVat * (vatPercent / 100);
+    const grandTotal = subtotalBeforeVat + vatAmount;
 
     const html = `<!doctype html>
 <html>
@@ -392,25 +411,58 @@ export class PuppeteerRenderer implements PdfRenderer {
     }).join("")}
     </div>
 
-    <!-- Grand Totals Summary & Notes -->
+    <!-- Construction Cost Summary & Notes -->
     <div class="mt-8">
-      
-      <!-- Top Level Totals (Labour/Material) -->
-      <div class="flex justify-end mb-8">
-        <div class="w-1/2">
-           <div class="flex justify-between py-1 text-sm">
-             <span class="font-bold text-gray-700">TOTAL LABOUR</span>
-             <span class="font-bold text-gray-900">${money(totalLabour, currency)}</span>
-           </div>
-           <div class="flex justify-between py-1 text-sm">
-             <span class="font-bold text-gray-700">TOTAL MATERIALS</span>
-             <span class="font-bold text-gray-900">${money(totalMaterials, currency)}</span>
-           </div>
-           <div class="flex justify-between py-1 text-sm border-t border-gray-300 mt-1 pt-1">
-             <span class="font-bold text-blue-900">TOTAL FIX AND SUPPLY</span>
-             <span class="font-bold text-blue-900">${money(baseTotal, currency)}</span>
-           </div>
-        </div>
+      <div class="mb-8 page-break-inside-avoid">
+        <h4 class="font-bold text-gray-900 text-sm mb-3 uppercase">CONSTRUCTION COST SUMMARY</h4>
+        <table class="w-full border border-gray-300">
+          <thead>
+            <tr class="text-gray-700" style="background:#eff6ff;">
+              <th class="px-3 py-2 text-center border-r border-gray-300 w-12">#</th>
+              <th class="px-3 py-2 text-left border-r border-gray-300">DESCRIPTION</th>
+              <th class="px-3 py-2 text-right w-40">AMOUNT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b border-gray-300">
+              <td class="px-3 py-2 border-r border-gray-300"></td>
+              <td class="px-3 py-2 border-r border-gray-300 font-bold uppercase">Builder's Work</td>
+              <td class="px-3 py-2"></td>
+            </tr>
+            ${summaryRows.map(({ category, subtotal }, index) => `
+              <tr class="border-b border-gray-200">
+                <td class="px-3 py-2 text-center border-r border-gray-300 text-gray-600">${index + 1}</td>
+                <td class="px-3 py-2 border-r border-gray-300 font-semibold uppercase text-gray-800">${category.label}</td>
+                <td class="px-3 py-2 text-right font-semibold" style="background:#eff6ff;">${money(subtotal, currency)}</td>
+              </tr>
+            `).join("")}
+            <tr class="border-t-2 border-gray-400 border-b border-gray-300">
+              <td class="px-3 py-2 border-r border-gray-300"></td>
+              <td class="px-3 py-2 border-r border-gray-300 font-bold uppercase">TOTAL MEASURED WORKS</td>
+              <td class="px-3 py-2 text-right font-bold" style="background:#eff6ff;">${money(totalMeasuredWorks, currency)}</td>
+            </tr>
+            <tr class="border-b border-gray-300">
+              <td class="px-3 py-2 border-r border-gray-300"></td>
+              <td class="px-3 py-2 border-r border-gray-300">ADD P&Gs (${Number(quote.pgRate || 0)}%)</td>
+              <td class="px-3 py-2 text-right font-semibold" style="background:#eff6ff;">${money(pgAmount, currency)}</td>
+            </tr>
+            <tr class="border-b border-gray-300">
+              <td class="px-3 py-2 border-r border-gray-300"></td>
+              <td class="px-3 py-2 border-r border-gray-300">ADD CONTINGENCIES (${Number(quote.contingencyRate || 0)}%)</td>
+              <td class="px-3 py-2 text-right font-semibold" style="background:#eff6ff;">${money(contingencyAmount, currency)}</td>
+            </tr>
+            <tr class="border-b border-gray-300">
+              <td class="px-3 py-2 border-r border-gray-300"></td>
+              <td class="px-3 py-2 border-r border-gray-300">${vatPercent > 0 ? `ADD VAT (${vatPercent}%)` : 'VAT MISSING'}</td>
+              <td class="px-3 py-2 text-right font-semibold" style="background:#eff6ff;">${money(vatAmount, currency)}</td>
+            </tr>
+            <tr class="font-bold text-white" style="background:#1e3a8a;">
+              <td class="px-3 py-2 border-r border-blue-800"></td>
+              <td class="px-3 py-2 border-r border-blue-800 uppercase">GRAND TOTAL</td>
+              <td class="px-3 py-2 text-right">${money(grandTotal, currency)}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
     <!-- Notes Section -->
