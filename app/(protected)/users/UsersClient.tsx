@@ -371,7 +371,10 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
           </div>
           <input
             ref={searchRef}
+            name="users-search"
             type="text"
+            autoComplete="off"
+            spellCheck={false}
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search users…  (Ctrl+K)"
@@ -418,11 +421,11 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
               const isLocked = user.lockedUntil && new Date(user.lockedUntil) > new Date();
               const isEditing = editUserFor === user.id;
               const isExpanded = expandedUser === user.id;
-              const openUp = rowIndex >= paginated.length - 2;
+              const openUp = paginated.length > 3 && rowIndex >= paginated.length - 2;
               return (
                 <tr
                   key={user.id}
-                  className={`group border-b border-gray-50 transition-colors last:border-0 hover:bg-gray-50/50 dark:border-gray-800/50 dark:hover:bg-gray-800/30 ${user.disabled ? 'opacity-50' : ''}`}
+                  className={`group border-b border-gray-50 transition-colors last:border-0 hover:bg-gray-50/50 dark:border-gray-800/50 dark:hover:bg-gray-800/30 ${isExpanded ? 'relative z-40' : ''} ${user.disabled ? 'opacity-50' : ''}`}
                 >
                   {/* User (avatar + name + email) */}
                   <td className="px-5 py-4">
@@ -542,7 +545,7 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                   </td>
 
                   {/* Actions */}
-                  <td className="relative px-5 py-4 text-right">
+                  <td className={`relative px-5 py-4 text-right ${isExpanded ? 'z-50' : ''}`}>
                     <div className="flex items-center justify-end gap-1.5">
                       {isEditing ? (
                         <>
@@ -570,7 +573,7 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                             <IconDots />
                           </button>
                           {isExpanded && (
-                            <div className={`absolute right-0 z-30 w-48 rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl dark:border-gray-700 dark:bg-gray-900 ${openUp ? 'bottom-full mb-1 origin-bottom-right' : 'top-full mt-1 origin-top-right'}`}>
+                            <div className={`absolute right-0 z-[80] w-56 rounded-xl border border-gray-200 bg-white py-1.5 shadow-2xl dark:border-gray-700 dark:bg-gray-900 ${openUp ? 'bottom-full mb-1 origin-bottom-right' : 'top-full mt-1 origin-top-right'}`}>
                               <button
                                 onClick={() => {
                                   setEditUserFor(user.id);
@@ -632,7 +635,19 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                     {resetPasswordFor === user.id && !isEditing && (
                       <div className="mt-2 flex items-center justify-end gap-1.5">
                         <input
+                          name={`admin-reset-username-${user.id}`}
+                          type="text"
+                          autoComplete="username"
+                          value={user.email}
+                          readOnly
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          className="sr-only"
+                        />
+                        <input
+                          name={`admin-reset-password-${user.id}`}
                           type="password"
+                          autoComplete="new-password"
                           value={newPassword}
                           onChange={e => setNewPassword(e.target.value)}
                           placeholder="New password"
