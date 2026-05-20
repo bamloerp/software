@@ -5,8 +5,14 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { DEFAULT_OFFICE, OFFICE_OPTIONS, normalizeOffice } from '@/lib/office';
 
 type ActionResult = { ok: true } | { ok: false; error: string };
+
+const OfficeSchema = z.preprocess(
+  value => (typeof value === 'string' && value.trim() ? normalizeOffice(value) : DEFAULT_OFFICE),
+  z.enum(OFFICE_OPTIONS),
+);
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -39,7 +45,7 @@ const CreateUserSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Valid email required'),
   role: z.string().min(1, 'Role is required'),
-  office: z.string().optional(),
+  office: OfficeSchema,
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -59,7 +65,7 @@ export async function createUser(data: {
     return { ok: false, error: parsed.error.errors.map(e => e.message).join(', ') };
   }
 
-  const { name, email, role, office, password } = parsed.data;
+  const { name, email, role, password } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { ok: false, error: 'A user with this email already exists' };
@@ -67,7 +73,7 @@ export async function createUser(data: {
   const passwordHash = await bcrypt.hash(password, 10);
 
   await prisma.user.create({
-    data: { name, email, role, office: office || null, passwordHash, mustChangePassword: true },
+    data: { name, email, role, office: DEFAULT_OFFICE, passwordHash, mustChangePassword: true },
   });
 
   revalidatePath('/users');
@@ -131,7 +137,7 @@ export async function changeUserRole(userId: string, role: string): Promise<Acti
 
   await prisma.user.update({
     where: { id: userId },
-    data: { role },
+    data: { role, office: DEFAULT_OFFICE },
   });
 
   revalidatePath('/users');
@@ -141,7 +147,7 @@ export async function changeUserRole(userId: string, role: string): Promise<Acti
 const UpdateUserSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Valid email required'),
-  office: z.string().optional(),
+  office: OfficeSchema,
 });
 
 /** Update user name / email / office (admin only) */
@@ -157,7 +163,7 @@ export async function updateUser(
     return { ok: false, error: parsed.error.errors.map(e => e.message).join(', ') };
   }
 
-  const { name, email, office } = parsed.data;
+  const { name, email } = parsed.data;
 
   // Check email uniqueness (exclude current user)
   const existing = await prisma.user.findFirst({
@@ -167,7 +173,7 @@ export async function updateUser(
 
   await prisma.user.update({
     where: { id: userId },
-    data: { name, email, office: office || null },
+    data: { name, email, office: DEFAULT_OFFICE },
   });
 
   revalidatePath('/users');

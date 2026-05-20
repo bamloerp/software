@@ -10,6 +10,7 @@ import {
   updateUser,
 } from './actions';
 import { USER_ROLES } from '@/lib/workflow';
+import { DEFAULT_OFFICE, OFFICE_OPTIONS, isOfficeOption } from '@/lib/office';
 import {
   Dialog,
   DialogContent,
@@ -171,14 +172,14 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
   const [editRoleFor, setEditRoleFor] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState('');
   const [editUserFor, setEditUserFor] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', email: '', office: '' });
+  const [editForm, setEditForm] = useState({ name: '', email: '', office: DEFAULT_OFFICE });
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
   // Add form state
-  const [form, setForm] = useState({ name: '', email: '', role: 'QS', office: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', role: 'QS', office: DEFAULT_OFFICE, password: '' });
 
   // Stats
   const stats = useMemo(() => {
@@ -215,7 +216,7 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
         flash('error', res.error);
       } else {
         flash('success', 'User created successfully');
-        setForm({ name: '', email: '', role: 'QS', office: '', password: '' });
+        setForm({ name: '', email: '', role: 'QS', office: DEFAULT_OFFICE, password: '' });
         setShowAddModal(false);
       }
     });
@@ -326,7 +327,7 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
           </p>
         </div>
         <button
-          onClick={() => { setForm({ name: '', email: '', role: 'QS', office: '', password: '' }); setShowAddModal(true); }}
+          onClick={() => { setForm({ name: '', email: '', role: 'QS', office: DEFAULT_OFFICE, password: '' }); setShowAddModal(true); }}
           className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md active:scale-[0.98]"
         >
           <IconPlus /> Add User
@@ -499,13 +500,16 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                   {/* Office */}
                   <td className="hidden px-5 py-4 md:table-cell">
                     {isEditing ? (
-                      <input
-                        type="text"
+                      <select
+                        title="Change office"
                         value={editForm.office}
                         onChange={e => setEditForm(f => ({ ...f, office: e.target.value }))}
-                        placeholder="—"
                         className="w-full rounded-lg border border-gray-300 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                      />
+                      >
+                        {OFFICE_OPTIONS.map(office => (
+                          <option key={office} value={office}>{office}</option>
+                        ))}
+                      </select>
                     ) : (
                       <span className="text-sm text-gray-600 dark:text-gray-400">{user.office || '—'}</span>
                     )}
@@ -577,7 +581,7 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                               <button
                                 onClick={() => {
                                   setEditUserFor(user.id);
-                                  setEditForm({ name: user.name || '', email: user.email, office: user.office || '' });
+                                  setEditForm({ name: user.name || '', email: user.email, office: isOfficeOption(user.office) ? user.office : DEFAULT_OFFICE });
                                   setExpandedUser(null);
                                 }}
                                 className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -805,13 +809,16 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   Office
                 </label>
-                <input
-                  type="text"
+                <select
+                  title="Office"
                   value={form.office}
                   onChange={e => setForm(f => ({ ...f, office: e.target.value }))}
-                  placeholder="Optional"
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
-                />
+                >
+                  {OFFICE_OPTIONS.map(office => (
+                    <option key={office} value={office}>{office}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div>
