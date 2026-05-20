@@ -161,28 +161,8 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
   const sortedLab = [...labGroups.values()].sort(sortByOrder);
   const allDocGroups: DocGroup[] = [...sortedMat, ...sortedLab];
 
-  // LABOUR vs MATERIALS calculation based on itemType
-  const labourLines = lines.filter(l => l.itemType === 'LABOUR');
   const materialLines = lines.filter(l => l.itemType !== 'LABOUR'); // Default to material if missing/other
-
-  const totalLabour = labourLines.reduce((acc, l) => acc + l.lineTotalMinor, 0);
   const totalMaterials = materialLines.reduce((acc, l) => acc + l.lineTotalMinor, 0);
-
-  // Calculations
-  const baseTotal = totalLabour + totalMaterials;
-  const pgAmount = (baseTotal * quote.pgRate) / 100;
-  const subtotal1 = baseTotal + pgAmount;
-  const contingencyAmount = (subtotal1 * quote.contingencyRate) / 100;
-  const subtotal2 = subtotal1 + contingencyAmount;
-  
-  // Fix VAT: If bps < 100, assume it's a percentage (15 = 15%) => 1500 bps
-  const effectiveVatBps = (quote.vatBps > 0 && quote.vatBps < 100) 
-    ? quote.vatBps * 100 
-    : quote.vatBps;
-    
-  const vatRate = effectiveVatBps / 10000;
-  const vatAmount = subtotal2 * vatRate;
-  const grandTotal = subtotal2 + vatAmount;
 
   const assumptions = quote.assumptions ? JSON.parse(quote.assumptions) as string[] : [];
   const exclusions = quote.exclusions ? JSON.parse(quote.exclusions) as string[] : [];
@@ -271,57 +251,6 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
             </View>
           ));
         })()}
-
-        {/* Summary Footer which can break across pages if needed, but preferable kept together */}
-        <View style={styles.summaryContainer} wrap={false}>
-          <Text style={styles.summaryTitle}>Construction Cost Summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>TOTAL LABOUR</Text>
-            <Text style={styles.summaryValue}>{formatMoney(totalLabour, currency)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>TOTAL MATERIALS</Text>
-            <Text style={styles.summaryValue}>{formatMoney(totalMaterials, currency)}</Text>
-          </View>
-          <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: '#d1d5db', marginTop: 2, paddingTop: 2 }]}>
-            <Text style={[styles.summaryLabel, { fontWeight: 'bold' }]}>TOTAL FIX AND SUPPLY</Text>
-            <Text style={[styles.summaryValue, { fontWeight: 'bold' }]}>{formatMoney(baseTotal, currency)}</Text>
-          </View>
-          
-          {quote.pgRate > 0 && (
-             <View style={styles.summaryRow}>
-               <Text style={styles.summaryLabel}>Add P&Gs ({quote.pgRate}%)</Text>
-               <Text style={styles.summaryValue}>{formatMoney(pgAmount, currency)}</Text>
-             </View>
-          )}
-
-          <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 2 }]}>
-             <Text style={styles.summaryLabel}>SUB-TOTAL</Text>
-             <Text style={styles.summaryValue}>{formatMoney(subtotal1, currency)}</Text>
-          </View>
-
-          {quote.contingencyRate > 0 && (
-             <View style={styles.summaryRow}>
-               <Text style={styles.summaryLabel}>Add Contingency ({quote.contingencyRate}%)</Text>
-               <Text style={styles.summaryValue}>{formatMoney(contingencyAmount, currency)}</Text>
-             </View>
-          )}
-          
-          <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 2 }]}>
-             <Text style={[styles.summaryLabel, { fontWeight: 'bold' }]}>SUB-TOTAL (Net)</Text>
-             <Text style={[styles.summaryValue, { fontWeight: 'bold' }]}>{formatMoney(subtotal2, currency)}</Text>
-          </View>
-
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Add VAT ({(effectiveVatBps / 100).toFixed(1)}%)</Text>
-            <Text style={styles.summaryValue}>{formatMoney(vatAmount, currency)}</Text>
-          </View>
-          
-          <View style={styles.grandTotalRow}>
-             <Text style={styles.grandTotalLabel}>GRAND TOTAL</Text>
-             <Text style={styles.grandTotalLabel}>{currencySymbol} {formatMoney(grandTotal, currency)}</Text>
-          </View>
-        </View>
 
         {/* Notes */}
         {(assumptions.length > 0 || exclusions.length > 0) && (

@@ -17,10 +17,26 @@ type QuoteSummaryProps = {
   }>;
   pgRate: number;
   contingencyRate: number;
+  vatBps?: bigint | number | null;
   currency: string;
 };
 
-export default function QuoteSummary({ lines, pgRate, contingencyRate, currency }: QuoteSummaryProps) {
+function formatPercentRate(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0%';
+  }
+
+  const rounded = Math.round(value * 100) / 100;
+  return `${rounded.toFixed(Number.isInteger(rounded) ? 0 : 2)}%`;
+}
+
+function vatPercentFromBps(vatBps: bigint | number | null | undefined): number {
+  const raw = Number(vatBps ?? 0);
+  const effectiveBps = raw > 0 && raw < 100 ? raw * 100 : raw;
+  return effectiveBps / 100;
+}
+
+export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, currency }: QuoteSummaryProps) {
   const totals = useMemo(() => {
     let totalLabour = 0n;
     let totalMaterials = 0n;
@@ -50,38 +66,14 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, currency 
     const totalFixSupply = totalLabour + totalMaterials;
     const totalMeasuredWorks = totalFixSupply; // Or sum of sections, should vary slightly if sections missing
     
-    // P&Gs
     const pgAmount = BigInt(Math.round(Number(totalMeasuredWorks) * (pgRate / 100)));
-    
-    // Contingencies (usually on top of P&Gs or just measured works? Barmlo template implies sequential)
-    // Template: =10% * (Total Measured + P&Gs) ... wait, row 365 says '=10%*G364' where G364 is P&Gs?
-    // Let's check template analysis: "Add 10% contingencies (10% of P&Gs)" -> That seems low.
-    // Usually contingencies are on the subtotal.
-    // Row 364: ADD P&Gs = 2% * G363 (Total Measured)
-    // Row 365: Add 10% contingencies = 10% * G364 (P&Gs) ?? No, that would be tiny.
-    // Let's re-read the template analysis in Step 1928.
-    // "Add 10% contingencies (10% of P&Gs)" -> The formula says =10%*G364. 
-    // If G364 is P&Gs, then contingencies is 10% of P&Gs? That's weird.
-    // Let's assume standard practice: Contingencies on (Measured + P&Gs).
-    // Or maybe the formula was meant to be 10% of cumulative?
-    // Let's look at Row 364/365 again from Step 1922 output.
-    // Row 364: '=2%*G363' (G363 is Total Measured)
-    // Row 365: '=10%*G364' (G364 is P&Gs) -> This effectively means Contingency is 10% of P&Gs?
-    // That seems very small. Maybe it's a typo in the template or I'm misreading the row numbers.
-    // Row 363 is Total Measured.
-    // Row 364 is P&Gs.
-    // Row 365 is Contingencies. 
-    // If formula is 10%*G364, it is indeed 10% of P&Gs.
-    // However, usually Contingencies are 10% of the PROJECT COST. 
-    // I will implement it as 10% of (Measured + P&Gs) to be safe, or make it configurable. 
-    // actually, let's stick to the template *interpretation* or standard. 
-    // Let's use 10% of (Measured Works + P&Gs) for now as a safe default.
-    
     const subtotalWithPg = totalMeasuredWorks + pgAmount;
-    //const contingencyAmount = BigInt(Math.round(Number(subtotalWithPg) * (contingencyRate / 100)));
-    const contingencyAmount = BigInt(Math.round(Number(pgAmount) * (contingencyRate / 100))); // Following the template's apparent logic
+    const contingencyAmount = BigInt(Math.round(Number(pgAmount) * (contingencyRate / 100)));
+    const subtotalBeforeVat = subtotalWithPg + contingencyAmount;
+    const vatPercent = vatPercentFromBps(vatBps);
+    const vatAmount = BigInt(Math.round(Number(subtotalBeforeVat) * (vatPercent / 100)));
     
-    const grandTotal = subtotalWithPg + contingencyAmount;
+    const grandTotal = subtotalBeforeVat + vatAmount;
 
     return {
       totalLabour,
@@ -92,9 +84,12 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, currency 
       ),
       pgAmount,
       contingencyAmount,
+      subtotalBeforeVat,
+      vatPercent,
+      vatAmount,
       grandTotal
     };
-  }, [lines, pgRate, contingencyRate]);
+  }, [lines, pgRate, contingencyRate, vatBps]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border p-6 mt-8">
@@ -135,13 +130,23 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, currency 
         </div>
         
         <div className="flex justify-between text-sm text-gray-600">
-          <span>Add P&Gs ({pgRate}%)</span>
+          <span>Add P&Gs ({formatPercentRate(pgRate)})</span>
           <Money minor={totals.pgAmount} currency={currency} />
         </div>
         
         <div className="flex justify-between text-sm text-gray-600">
           <span>Add Contingencies ({contingencyRate}%)</span>
           <Money minor={totals.contingencyAmount} currency={currency} />
+        </div>
+
+        <div className="flex justify-between text-sm font-medium text-gray-700 border-t border-gray-200 pt-3">
+          <span>Subtotal before VAT</span>
+          <Money minor={totals.subtotalBeforeVat} currency={currency} />
+        </div>
+
+        <div className="flex justify-between text-sm text-gray-600">
+          <span>{totals.vatPercent > 0 ? `Add VAT (${formatPercentRate(totals.vatPercent)})` : 'VAT Missing'}</span>
+          <Money minor={totals.vatAmount} currency={currency} />
         </div>
 
         <div className="flex justify-between text-lg font-bold text-gray-900 border-t border-gray-200 pt-3 mt-2">

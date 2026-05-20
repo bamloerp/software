@@ -69,7 +69,6 @@ import QSEditButton from '@/components/QSEditButton';
 import QuoteHeader from '@/components/QuoteHeader';
 import SalesEndorsementForm from './SalesEndorsementForm';
 import NegotiationsList from './NegotiationsList';
-import QuoteSummary from '@/components/QuoteSummary';
 import QuoteNotes from '@/components/QuoteNotes';
 import { updateQuoteNotes } from './actions';
 import {
@@ -270,6 +269,21 @@ function formatDecisionLabel(status: string): string {
     .toLowerCase()
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatPercentRate(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0%';
+  }
+
+  const rounded = Math.round(value * 100) / 100;
+  return `${rounded.toFixed(Number.isInteger(rounded) ? 0 : 2)}%`;
+}
+
+function vatPercentFromBps(vatBps: bigint | number | null | undefined): number {
+  const raw = Number(vatBps ?? 0);
+  const effectiveBps = raw > 0 && raw < 100 ? raw * 100 : raw;
+  return effectiveBps / 100;
 }
 
 // ... (start of buildLineGroups)
@@ -848,7 +862,7 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
       }
     : computedTotals;
 
-  const vatPercent = fromMinor(quote.vatBps) / 100;
+  const vatPercent = vatPercentFromBps(quote.vatBps);
 
   const versions = quote.versions.map((version) => ({
     ...version,
@@ -973,6 +987,45 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
   return (
     <div className="space-y-6">
       <QuoteHeader quote={quote} title={isSales ? 'Sales Endorsement' : undefined} />
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            P&amp;Gs
+          </div>
+          <div className="mt-1 text-xl font-bold text-gray-900 dark:text-white">
+            {formatPercentRate(Number(quote.pgRate ?? 0))}
+          </div>
+        </div>
+        <div
+          className={clsx(
+            'rounded-xl border p-4 shadow-sm',
+            vatPercent > 0
+              ? 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+              : 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20'
+          )}
+        >
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            VAT
+          </div>
+          <div
+            className={clsx(
+              'mt-1 text-xl font-bold',
+              vatPercent > 0 ? 'text-gray-900 dark:text-white' : 'text-amber-700 dark:text-amber-200'
+            )}
+          >
+            {vatPercent > 0 ? formatPercentRate(vatPercent) : 'Missing'}
+          </div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Contingency
+          </div>
+          <div className="mt-1 text-xl font-bold text-gray-900 dark:text-white">
+            {formatPercentRate(Number(quote.contingencyRate ?? 0))}
+          </div>
+        </div>
+      </section>
 
       {/* Summary section hidden as per request */}
       {/* <section className="rounded border bg-white p-4 shadow-sm dark:bg-gray-800 dark:border-gray-700">
@@ -1626,19 +1679,6 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
               closeNegotiationAction={closeNegotiationAction}
             />
           )}
-
-          {/* Quote Summary (Barmlo Template) */}
-          <QuoteSummary
-            lines={quote.lines.map((l) => ({
-              lineTotalMinor: l.lineTotalMinor,
-              itemType: l.itemType,
-              section: l.section,
-              description: l.description,
-            }))}
-            pgRate={quote.pgRate}
-            contingencyRate={quote.contingencyRate}
-            currency={quote.currency ?? undefined}
-          />
 
           {/* Quote Notes (Barmlo Template) */}
           <QuoteNotes

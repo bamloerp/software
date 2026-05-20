@@ -46,13 +46,6 @@ export class PuppeteerRenderer implements PdfRenderer {
     });
     if (!quote) throw new Error("Quote not found");
 
-    // Fix VAT: If bps < 100, assume it's a percentage (15 = 15%) => 1500 bps
-    const qtVatBps = Number(quote.vatBps || 0);
-    const effectiveVatBps = (qtVatBps > 0 && qtVatBps < 100)
-      ? qtVatBps * 100
-      : qtVatBps;
-    const vatPct = effectiveVatBps / 100; // e.g. 1500 -> 15%
-
     // Logic for notes
     const assumptions = quote.assumptions ? JSON.parse(quote.assumptions as string) : [];
     const exclusions = quote.exclusions ? JSON.parse(quote.exclusions as string) : [];
@@ -77,10 +70,6 @@ export class PuppeteerRenderer implements PdfRenderer {
     type LineGroup = { section: string; rows: any[]; subtotal: number };
     const groups: Record<string, LineGroup> = {};
     const groupOrder: string[] = [];
-    const summaryGroups = new Map<
-      string,
-      { category: ConstructionSummaryCategory; subtotal: number }
-    >();
 
     // Separate labour vs materials for summary
     let totalLabour = 0;
@@ -111,16 +100,6 @@ export class PuppeteerRenderer implements PdfRenderer {
         totalMaterials += amt;
       }
 
-      const summaryCategory = getConstructionSummaryCategory({
-        section,
-        description: line.description,
-        itemType,
-      });
-      const summaryGroup = summaryGroups.get(summaryCategory.key);
-      summaryGroups.set(summaryCategory.key, {
-        category: summaryCategory,
-        subtotal: (summaryGroup?.subtotal ?? 0) + amt,
-      });
     }
 
     // Split each original group into material-only and labour-only groups
@@ -171,21 +150,7 @@ export class PuppeteerRenderer implements PdfRenderer {
     const sortedMat = [...matGroups.values()].sort(sortByOrder);
     const sortedLab = [...labGroups.values()].sort(sortByOrder);
     const allGroups: PdfGroup[] = [...sortedMat, ...sortedLab];
-    const summaryOrder = [...summaryGroups.values()].sort((a, b) =>
-      compareConstructionSummaryCategories(a.category, b.category)
-    );
-
-    // Calculate totals matching QuoteDoc.tsx logic
     const baseTotal = totalLabour + totalMaterials;
-    const pgAmount = (baseTotal * (Number(quote.pgRate) || 0)) / 100;
-
-    // Excel Logic Match: Contingency is based on P&G amount, not the subtotal
-    // Excel: = (P&G * 10%)
-    const contingencyAmount = (pgAmount * (Number(quote.contingencyRate) || 0)) / 100;
-
-    const subtotal2 = baseTotal + pgAmount + contingencyAmount;
-    const taxAmount = subtotal2 * (effectiveVatBps / 10000);
-    const grandTotal = subtotal2 + taxAmount;
 
     const html = `<!doctype html>
 <html>
@@ -446,57 +411,6 @@ export class PuppeteerRenderer implements PdfRenderer {
              <span class="font-bold text-blue-900">${money(baseTotal, currency)}</span>
            </div>
         </div>
-      </div>
-
-      <!-- Construction Cost Summary Table -->
-      <div class="mb-8">
-        <h4 class="font-bold text-gray-700 text-sm mb-3 uppercase">CONSTRUCTION COST SUMMARY</h4>
-        <table class="w-full border border-gray-300">
-           <thead>
-             <tr class="border-b border-gray-300 text-gray-500">
-               <th class="px-4 py-2 text-center border-r border-gray-300 w-16 font-medium">ITEM</th>
-               <th class="px-4 py-2 text-left border-r border-gray-300 font-medium">DESCRIPTION</th>
-               <th class="px-4 py-2 text-right w-48 font-medium">AMOUNT</th>
-             </tr>
-           </thead>
-           <tbody>
-             ${summaryOrder.map(({ category, subtotal }, idx) => `
-             <tr class="border-b border-gray-300">
-               <td class="px-4 py-2 text-center text-sm text-gray-500 border-r border-gray-300">${idx + 1}</td>
-               <td class="px-4 py-2 text-sm text-gray-700 border-r border-gray-300 uppercase">${category.label}</td>
-               <td class="px-4 py-2 text-right text-sm text-gray-900">${money(subtotal, currency)}</td>
-             </tr>
-             `).join("")}
-             
-             <!-- Totals Row -->
-             <tr class="bg-gray-50 border-t-2 border-gray-300">
-               <td colspan="2" class="px-4 py-2 text-right text-sm text-gray-700 border-r border-gray-300 font-bold uppercase">TOTAL MEASURED WORKS</td>
-               <td class="px-4 py-2 text-right text-sm text-gray-900 font-bold">${money(baseTotal, currency)}</td>
-             </tr>
-
-             ${Number(quote.pgRate) > 0 ? `
-             <tr class="border-b border-gray-300">
-               <td colspan="2" class="px-4 py-2 text-right text-sm text-gray-700 border-r border-gray-300">ADD P&Gs (${quote.pgRate}%)</td>
-               <td class="px-4 py-2 text-right text-sm text-gray-900">${money(pgAmount, currency)}</td>
-             </tr>` : ''}
-
-             ${Number(quote.contingencyRate) > 0 ? `
-             <tr class="border-b border-gray-300">
-               <td colspan="2" class="px-4 py-2 text-right text-sm text-gray-700 border-r border-gray-300">ADD CONTINGENCY (${quote.contingencyRate}%)</td>
-               <td class="px-4 py-2 text-right text-sm text-gray-900">${money(contingencyAmount, currency)}</td>
-             </tr>` : ''}
-
-             <tr class="border-b border-gray-300">
-               <td colspan="2" class="px-4 py-2 text-right text-sm text-gray-700 border-r border-gray-300">ADD VAT (${vatPct.toFixed(1)}%)</td>
-               <td class="px-4 py-2 text-right text-sm text-gray-900">${money(taxAmount, currency)}</td>
-             </tr>
-
-             <tr class="bg-blue-900 text-white font-bold">
-               <td colspan="2" class="px-4 py-2 text-right text-sm uppercase border-r border-blue-800">GRAND TOTAL</td>
-               <td class="px-4 py-2 text-right text-sm">${money(grandTotal, currency)}</td>
-             </tr>
-           </tbody>
-        </table>
       </div>
 
     <!-- Notes Section -->
