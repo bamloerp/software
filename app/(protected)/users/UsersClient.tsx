@@ -789,37 +789,20 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                 className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400" htmlFor="modal-add-role">
-                  Role
-                </label>
-                <select
-                  id="modal-add-role"
-                  value={form.role}
-                  onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
-                >
-                  {USER_ROLES.map(r => (
-                    <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Office
-                </label>
-                <select
-                  title="Office"
-                  value={form.office}
-                  onChange={e => setForm(f => ({ ...f, office: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
-                >
-                  {OFFICE_OPTIONS.map(office => (
-                    <option key={office} value={office}>{office}</option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400" htmlFor="modal-add-role">
+                Role
+              </label>
+              <select
+                id="modal-add-role"
+                value={form.role}
+                onChange={e => setForm(f => ({ ...f, role: e.target.value, office: DEFAULT_OFFICE }))}
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+              >
+                {USER_ROLES.map(r => (
+                  <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
