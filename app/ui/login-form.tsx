@@ -17,6 +17,7 @@ export default function LoginForm() {
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const [errorMessage, formAction, isPending] = useActionState(authenticate, undefined);
   const [isVisible, setIsVisible] = useState(false);
+  const [password, setPassword] = useState('');
 
   const toggleVisibility = () => setIsVisible(!isVisible);
 
@@ -42,22 +43,28 @@ export default function LoginForm() {
             </div>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700" htmlFor="password">
+            <label className="mb-2 block text-sm font-semibold text-slate-700" htmlFor="access-key">
               Password
             </label>
             <div className="relative">
               <input
-                className="peer block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pl-11 pr-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100"
-                id="password"
-                type={isVisible ? 'text' : 'password'}
-                name="password"
+                className={`peer block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pl-11 pr-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-100 ${isVisible ? '' : '[-webkit-text-security:disc]'}`}
+                id="access-key"
+                type="text"
+                name="barmlo-access-key"
                 placeholder="Password"
-                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 data-lpignore="true"
                 data-1p-ignore="true"
                 required
                 minLength={6}
               />
+              <input type="hidden" name="password" value={password} />
               <KeyIcon className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 peer-focus:text-blue-700" />
               <button
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700 focus:outline-none"
