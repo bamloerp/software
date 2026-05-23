@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Parser } from 'expr-eval';
-import { SHEET_COLUMNS, TAKEOFF_LAYOUT } from '@/lib/takeoffLayout';
+import { TAKEOFF_DEFAULTS, TAKEOFF_LAYOUT } from '@/lib/takeoffLayout';
 import { createQuote, upsertCustomer } from '@/app/(protected)/actions';
 import { QUOTE_LINE_MAP, ELECTRICAL_ITEMS_CATALOG, type ElectricalItem } from '@/lib/quoteMap';
 import { normalizeContext, missingVars, evalExpr } from '@/lib/expr';
@@ -12,13 +12,6 @@ import Money from '@/components/Money';
 import { UserIcon, EnvelopeIcon, PhoneIcon, BuildingOfficeIcon, MapPinIcon, WrenchScrewdriverIcon, BeakerIcon, ArrowDownTrayIcon, PlusIcon, TrashIcon, CheckCircleIcon, BoltIcon } from '@heroicons/react/24/outline';
 
 const parser = new Parser({ allowMemberAccess: false });
-
-const TAKEOFF_DEFAULTS: Record<string, number> = {
-  A2: 3000,
-  B2: 0.6,
-  C2: 0.6,
-  D2: 100,
-};
 
 type UnitMap = Record<string, string>; // code -> unit label (optional)
 

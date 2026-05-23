@@ -12,6 +12,15 @@ export type SheetRow =
 
 export const SHEET_COLUMNS = 7; // matches your screenshot (A..G)
 
+export const TAKEOFF_DEFAULTS: Record<string, number> = {
+  A2: 3000,
+  B2: 0.6,
+  C2: 0.6,
+  D2: 100,
+  E2: 15,
+  A21: 24,
+};
+
 export const TAKEOFF_LAYOUT: SheetRow[] = [
   { type: 'heading', title: 'MATERIALS' },
   { type: 'subheading', title: 'FOUNDATION' },
@@ -22,7 +31,7 @@ export const TAKEOFF_LAYOUT: SheetRow[] = [
       { code: 'B2', label: 'Trench width (m)', kind: 'input' },
       { code: 'C2', label: 'Trench depth (m)', kind: 'input' },
       { code: 'D2', label: 'Cement bags per load', kind: 'input' },
-      null,
+      { code: 'E2', label: 'Number of courses', kind: 'input' },
       null,
       null,
     ],
@@ -48,8 +57,8 @@ export const TAKEOFF_LAYOUT: SheetRow[] = [
       { code: 'B7', label: 'River Sand', kind: 'calc', expr: 'D12 + F12' },
       { code: 'C7', label: 'Pit Sand', kind: 'calc', expr: 'E12 * 3' },
       { code: 'D7', label: 'Concrete', kind: 'calc', expr: 'D12 + F12' },
-      { code: 'E7', label: '230mm Brickforce', kind: 'calc', expr: 'A4 / 15 * 3' },
-      { code: 'F7', label: '115mm Brickforce', kind: 'calc', expr: 'B4 / 15 * 3' },
+      { code: 'E7', label: '230mm Brickforce', kind: 'calc', expr: 'A4 / E2 * 3' },
+      { code: 'F7', label: '115mm Brickforce', kind: 'calc', expr: 'B4 / E2 * 3' },
       { code: 'G7', label: 'Gravel', kind: 'calc', expr: 'C4 * 0.5' },
       { code: 'B8', label: '', kind: 'calc', expr: 'B7 * 2 / 8' },
       { code: 'C8', label: '', kind: 'calc', expr: 'C7 / 8' },
@@ -60,8 +69,8 @@ export const TAKEOFF_LAYOUT: SheetRow[] = [
   {
     type: 'cells',
     cells: [
-      { code: 'A12', label: 'BRICKS\n230 wall', kind: 'calc', expr: 'A4 / 0.23 * 2 * 15' },
-      { code: 'B12', label: '115 wall', kind: 'calc', expr: 'B4 / 0.23 * 15' },
+      { code: 'A12', label: 'BRICKS\n230 wall', kind: 'calc', expr: 'A4 / 0.23 * 2 * E2' },
+      { code: 'B12', label: '115 wall', kind: 'calc', expr: 'B4 / 0.23 * E2' },
       null,
       { code: 'D12', label: 'CEMENT\nFooting', kind: 'calc', expr: 'C4 * 0.23 * B2 * 3' },
       { code: 'E12', label: 'Brick work', kind: 'calc', expr: 'A15 / 250' },
@@ -107,8 +116,20 @@ export const TAKEOFF_LAYOUT: SheetRow[] = [
   {
     type: 'cells',
     cells: [
-      { code: 'A22', label: 'BRICKS to Ringbeam\n230 wall', kind: 'calc', expr: 'A4 / 0.23 * 2 * 24' },
-      { code: 'B22', label: '115 wall', kind: 'calc', expr: 'B4 / 0.23 * 24' },
+      { code: 'A21', label: 'Superstructure height', kind: 'input' },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+    ],
+  },
+  {
+    type: 'cells',
+    cells: [
+      { code: 'A22', label: 'BRICKS to Ringbeam\n230 wall', kind: 'calc', expr: 'A4 / 0.23 * 2 * A21' },
+      { code: 'B22', label: '115 wall', kind: 'calc', expr: 'B4 / 0.23 * A21' },
       null,
       { code: 'D22', label: 'CEMENT\nBrick work', kind: 'calc', expr: 'A25 / 250' },
       { code: 'E22', label: 'Inter Plastering', kind: 'calc', expr: 'F25 / 7' },

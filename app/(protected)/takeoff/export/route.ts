@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { evaluateAll } from '@/lib/ruleEngine';
 import * as XLSX from 'xlsx';
 import { QUOTE_LINE_MAP } from '@/lib/quoteMap';
+import { TAKEOFF_DEFAULTS, TAKEOFF_LAYOUT } from '@/lib/takeoffLayout';
 
 export const runtime = 'nodejs';
 
@@ -15,6 +15,41 @@ function resolveQty(context: Record<string, unknown>, code: string): number {
     .map(s => s.trim())
     .filter(Boolean)
     .reduce((sum, c) => sum + num(context[c]), 0);
+}
+
+function varsInExpr(expr: string): string[] {
+  return Array.from(new Set(expr.toUpperCase().match(/[A-Z][A-Z0-9_]*/g) ?? []));
+}
+
+function evaluateTakeoffLayout(base: Record<string, number>) {
+  const context: Record<string, number> = { ...TAKEOFF_DEFAULTS, ...base };
+  const evaluated = new Map<string, { code: string; value: number; expression: string; dependsOn: string[] }>();
+
+  let safety = 0;
+  let progressed = true;
+  while (progressed && safety++ < 120) {
+    progressed = false;
+    for (const row of TAKEOFF_LAYOUT) {
+      if (row.type !== 'cells') continue;
+      for (const cell of row.cells) {
+        if (!cell || cell.kind !== 'calc' || !cell.expr) continue;
+        const dependsOn = varsInExpr(cell.expr);
+        const canEval = dependsOn.every((code) => code in context && Number.isFinite(Number(context[code])));
+        if (!canEval) continue;
+
+        const value = evalExpr(context, cell.expr);
+        if (!Number.isFinite(value)) continue;
+
+        if (context[cell.code] !== value) {
+          context[cell.code] = value;
+          progressed = true;
+        }
+        evaluated.set(cell.code, { code: cell.code, value, expression: cell.expr, dependsOn });
+      }
+    }
+  }
+
+  return { context, evaluated: Array.from(evaluated.values()) };
 }
 
 // --- tiny expression engine (supports A1, B22, numbers, + - * / and parentheses) ---
@@ -105,7 +140,7 @@ export async function POST(req: NextRequest) {
     const inputs: Record<string, number> = body?.inputs || {};
     const label: string = body?.label || 'takeoff';
 
-    const { context, evaluated } = await evaluateAll(inputs);
+    const { context, evaluated } = evaluateTakeoffLayout(inputs);
 
     // Build workbook
     const wb = XLSX.utils.book_new();
