@@ -21,7 +21,7 @@ export default function LoginForm() {
   const toggleVisibility = () => setIsVisible(!isVisible);
 
   return (
-    <form action={formAction} className="w-full">
+    <form action={formAction} className="w-full" autoComplete="off">
       <div className="flex-1">
         <div className="w-full space-y-4">
           <div>
@@ -35,6 +35,7 @@ export default function LoginForm() {
                 type="email"
                 name="email"
                 placeholder="name@barmlo.co.zw"
+                autoComplete="username"
                 required
               />
               <UserIcon className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 peer-focus:text-blue-700" />
@@ -51,6 +52,9 @@ export default function LoginForm() {
                 type={isVisible ? 'text' : 'password'}
                 name="password"
                 placeholder="Password"
+                autoComplete="new-password"
+                data-lpignore="true"
+                data-1p-ignore="true"
                 required
                 minLength={6}
               />

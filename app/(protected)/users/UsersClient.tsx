@@ -652,6 +652,8 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                           name={`admin-reset-password-${user.id}`}
                           type="password"
                           autoComplete="new-password"
+                          data-lpignore="true"
+                          data-1p-ignore="true"
                           value={newPassword}
                           onChange={e => setNewPassword(e.target.value)}
                           placeholder="New password"
@@ -810,9 +812,13 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
               </label>
               <input
                 type="password"
+                name="new-user-password"
                 value={form.password}
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                 placeholder="Min. 6 characters"
+                autoComplete="new-password"
+                data-lpignore="true"
+                data-1p-ignore="true"
                 className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               />
             </div>

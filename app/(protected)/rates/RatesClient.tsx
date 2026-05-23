@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { updateRate, updateSystemSetting } from './actions';
 
 type RateItem = {
@@ -27,6 +28,7 @@ export default function RatesClient({
   sections: Section[];
   settings: Settings;
 }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [editingCode, setEditingCode] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export default function RatesClient({
       } else {
         setFeedback('Rate updated');
         setEditingCode(null);
+        router.refresh();
         setTimeout(() => setFeedback(null), 2000);
       }
     });
@@ -101,6 +104,7 @@ export default function RatesClient({
         setSettings(prev => ({ ...prev, [key]: storeVal }));
         setEditingSetting(null);
         setFeedback('Setting updated');
+        router.refresh();
         setTimeout(() => setFeedback(null), 2000);
       }
     });

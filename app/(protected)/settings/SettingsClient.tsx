@@ -172,15 +172,18 @@ export default function SettingsClient({
 
       {/* Security tab */}
       {tab === 'security' && (
-        <form onSubmit={onPasswordSubmit} className="mt-6 space-y-5 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <form onSubmit={onPasswordSubmit} className="mt-6 space-y-5 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800" autoComplete="off">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Current password</label>
             <input
               type="password"
+              name="profile-current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
+              data-lpignore="true"
+              data-1p-ignore="true"
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-barmlo-blue focus:ring-1 focus:ring-barmlo-blue dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
             />
           </div>
@@ -188,11 +191,14 @@ export default function SettingsClient({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">New password</label>
             <input
               type="password"
+              name="profile-new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
               minLength={8}
               autoComplete="new-password"
+              data-lpignore="true"
+              data-1p-ignore="true"
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-barmlo-blue focus:ring-1 focus:ring-barmlo-blue dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
             />
             <p className="mt-1 text-xs text-gray-500">At least 8 characters. Use a mix of letters, numbers and symbols.</p>
@@ -201,11 +207,14 @@ export default function SettingsClient({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirm new password</label>
             <input
               type="password"
+              name="profile-confirm-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
               autoComplete="new-password"
+              data-lpignore="true"
+              data-1p-ignore="true"
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-barmlo-blue focus:ring-1 focus:ring-barmlo-blue dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
             />
           </div>

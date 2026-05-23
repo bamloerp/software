@@ -67,11 +67,7 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
 
   // Base role filter
   if (role === 'QS') {
-    if (view === 'my') {
-      where = { ...where, createdById: me.id };
-    } else {
-      where = { ...where, status: 'DRAFT' };
-    }
+    where = { ...where, createdById: me.id };
   } else if (role === 'SENIOR_QS') {
     if (view === 'my') {
       where = { ...where, createdById: me.id };
@@ -146,7 +142,7 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
   let pageTitle = 'Quotes';
   let pageDescription = 'Manage and view your quotations';
 
-  if (view === 'my') {
+  if (view === 'my' || role === 'QS') {
     pageTitle = 'My Quotes';
     pageDescription = 'Quotations created by you';
   } else if (role === 'SENIOR_QS' && reviewFilter === 'pending') {

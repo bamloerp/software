@@ -8,7 +8,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 import { resolveOfficeForRole } from '@/lib/office';
 
-import { QUOTE_STATUSES, USER_ROLES, type QuoteStatus, type UserRole } from '@/lib/workflow';
+import { USER_ROLES, type QuoteStatus, type UserRole } from '@/lib/workflow';
 
 import Money from '@/components/Money';
 
@@ -108,17 +108,15 @@ export default async function MyQuotesPage() {
 
     description = 'All quotations across the organisation.';
   } else if (role === 'QS') {
-    statusFilter = QUOTE_STATUSES.filter(
-      (status) => status !== 'FINALIZED' && status !== 'ARCHIVED'
-    ) as QuoteStatus[];
+    if (!currentUserId) {
+      return <div className="p-6 text-sm text-gray-700">User identifier missing.</div>;
+    }
 
-    where.office = userOffice ?? undefined;
+    where.createdById = currentUserId;
 
-    where.status = { in: statusFilter };
+    title = 'My Quotes';
 
-    title = 'Active Quotations';
-
-    description = 'All active quotations in your office.';
+    description = 'Quotations created by you.';
   } else if (role === 'SENIOR_QS') {
     statusFilter = ['SUBMITTED_REVIEW', 'NEGOTIATION'];
 

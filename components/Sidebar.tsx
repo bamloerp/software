@@ -2,7 +2,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { SidebarNavigation } from './SidebarNavigation';
 
 const BASE: { label:string; href:string; icon:string; roles?: string[] }[] = [
-  { label: 'My Quotes', href: '/quotes', icon: 'quote', roles: ['QS','SENIOR_QS','SALES','ADMIN'] },
+  { label: 'My Quotes', href: '/quotes?view=my', icon: 'quote', roles: ['QS','SENIOR_QS','SALES','ADMIN'] },
   { label: 'Projects', href: '/projects', icon: 'folder', roles: ['ADMIN','PROJECT_OPERATIONS_OFFICER','PROCUREMENT','ACCOUNTS','CASHIER','ACCOUNTING_OFFICER','ACCOUNTING_AUDITOR','ACCOUNTING_CLERK','GENERAL_MANAGER','MANAGING_DIRECTOR'] },
   { label: 'New Quote', href: '/quotes/new', icon: 'quote', roles: ['QS','SENIOR_QS','ADMIN'] },
   { label: 'Requisitions', href: '/procurement/requisitions', icon: 'list', roles: ['PROJECT_OPERATIONS_OFFICER','PROJECT_COORDINATOR','PROCUREMENT','ADMIN'] },

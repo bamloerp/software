@@ -36,6 +36,13 @@ function varsFromExpr(expr: string): string[] {
 type RateOverrides = Record<string, number>; // code -> overridden rate
 type SystemSettings = { vatBps?: string; pgRate?: string; contingencyRate?: string };
 
+function applyElectricalRateOverrides(rateOverrides: RateOverrides): ElectricalItem[] {
+  return ELECTRICAL_ITEMS_CATALOG.map(item => ({
+    ...item,
+    rate: rateOverrides[item.id] ?? item.rate,
+  }));
+}
+
 export default function TakeOffSheet({
   rateOverrides = {},
   systemSettings = {},
@@ -81,7 +88,7 @@ export default function TakeOffSheet({
   // Electricals section
   const [includeElectricals, setIncludeElectricals] = useState(false);
   const [electricalItems, setElectricalItems] = useState<ElectricalItem[]>(
-    ELECTRICAL_ITEMS_CATALOG.map(item => ({ ...item }))
+    () => applyElectricalRateOverrides(rateOverrides)
   );
 
 
@@ -260,7 +267,7 @@ export default function TakeOffSheet({
     if (includeElectricals) {
       for (const ei of electricalItems) {
         if (!ei.description || !(Number.isFinite(ei.qty) && ei.qty > 0)) continue;
-        const rate = rateOverrides[ei.id] ?? Number(ei.rate || 0);
+        const rate = Number(ei.rate || 0);
         lines.push({
           description: ei.description,
           quantity: Math.ceil(Number(ei.qty)),
@@ -269,7 +276,7 @@ export default function TakeOffSheet({
           itemType: ei.itemType || 'MATERIAL',
           lineTotalMinor: BigInt(Math.round(Math.ceil(Number(ei.qty)) * rate * 100)),
           unit: ei.unit,
-          code: 'ELECTRICAL',
+          code: ei.id,
         });
       }
     }
@@ -626,12 +633,10 @@ export default function TakeOffSheet({
                 ? row.cells.filter((c) => c && c.label && c.label.trim() !== '' && c.kind === 'input')
                 : [];
             if (row.type === 'cells' && visibleCells.length === 0) return null;
-            const cols = Math.max(1, visibleCells.length);
             return (
               <div
                 key={rIdx}
-                className="grid gap-6"
-                style={{ gridTemplateColumns: `repeat(auto-fit, minmax(250px, 1fr))` }}
+                className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]"
               >
                 {visibleCells.map((cell, cIdx) => {
                   const isInput = cell!.kind === 'input';
