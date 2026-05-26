@@ -73,6 +73,7 @@ export class PuppeteerRenderer implements PdfRenderer {
 
     // Materials total is shown before the labour section.
     let totalMaterials = 0;
+    let totalLabour = 0;
 
     for (const line of quote.lines) {
       let meta: any = {};
@@ -93,7 +94,9 @@ export class PuppeteerRenderer implements PdfRenderer {
       groups[section].subtotal += amt;
 
       const itemType = line.itemType || 'MATERIAL';
-      if (itemType !== 'LABOUR') {
+      if (itemType === 'LABOUR') {
+        totalLabour += amt;
+      } else {
         totalMaterials += amt;
       }
 
@@ -115,7 +118,7 @@ export class PuppeteerRenderer implements PdfRenderer {
         });
         const groupKey = `${section}:${summaryCategory.key}`;
         if (itemType === 'LABOUR') {
-          if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section, label: `LABOUR - ${summaryCategory.detailLabel}`, isLabour: true, rows: [], subtotal: 0, summaryCategory });
+          if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section, label: summaryCategory.detailLabel, isLabour: true, rows: [], subtotal: 0, summaryCategory });
           const lg = labGroups.get(groupKey)!;
           lg.rows.push(row);
           lg.subtotal += (row as any).amt;
@@ -170,6 +173,7 @@ export class PuppeteerRenderer implements PdfRenderer {
     const vatPercent = effectiveVatBps / 100;
     const vatAmount = subtotalBeforeVat * (vatPercent / 100);
     const grandTotal = subtotalBeforeVat + vatAmount;
+    const totalFixAndSupply = totalMaterials + totalLabour;
 
     const html = `<!doctype html>
 <html>
@@ -409,6 +413,20 @@ export class PuppeteerRenderer implements PdfRenderer {
         </div>
         `;
     }).join("")}
+    </div>
+
+    <div class="mt-8" style="display:flex; flex-direction:column; gap:0.75rem; align-items:flex-end;">
+      ${totalLabour > 0
+        ? `<div style="background:#fef3c7; border-radius:0.5rem; padding:0.75rem 1.5rem; min-width:18rem; text-align:right;">
+             <span class="font-bold text-sm" style="color:#78350f;">TOTAL LABOUR: ${money(totalLabour, currency)}</span>
+           </div>`
+        : ''}
+      <div style="background:#dbeafe; border-radius:0.5rem; padding:0.75rem 1.5rem; min-width:18rem; text-align:right;">
+        <span class="font-bold text-sm" style="color:#1e3a5f;">TOTAL MATERIALS: ${money(totalMaterials, currency)}</span>
+      </div>
+      <div style="background:#dcfce7; border:1px solid #86efac; border-radius:0.5rem; padding:0.875rem 1.5rem; min-width:18rem; text-align:right;">
+        <span class="font-bold" style="font-size:1rem; color:#166534;">TOTAL FIX &amp; SUPPLY: ${money(totalFixAndSupply, currency)}</span>
+      </div>
     </div>
 
     <!-- Construction Cost Summary & Notes -->

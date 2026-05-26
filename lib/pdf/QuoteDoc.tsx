@@ -101,6 +101,13 @@ const formatMoney = (minor: number, currency: string) => {
 export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; lines: PdfLine[]; logoData?: string }) {
   const currency = quote.currency || 'USD';
   const currencySymbol = currency === 'USD' ? '$' : currency;
+  const totalMaterials = lines
+    .filter((line) => line.itemType !== 'LABOUR')
+    .reduce((acc, line) => acc + line.lineTotalMinor, 0);
+  const totalLabour = lines
+    .filter((line) => line.itemType === 'LABOUR')
+    .reduce((acc, line) => acc + line.lineTotalMinor, 0);
+  const totalFixAndSupply = totalMaterials + totalLabour;
 
   // Group lines
   const groups: Record<string, { section: string; lines: PdfLine[]; subtotal: number }> = {};
@@ -128,7 +135,7 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
       });
       const groupKey = `${g.section}:${summaryCategory.key}`;
       if (itemType === 'LABOUR') {
-        if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section: g.section, label: `LABOUR - ${summaryCategory.detailLabel}`, isLabour: true, lines: [], subtotal: 0, summaryCategory });
+        if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section: g.section, label: summaryCategory.detailLabel, isLabour: true, lines: [], subtotal: 0, summaryCategory });
         const lg = labGroups.get(groupKey)!;
         lg.lines.push(line);
         lg.subtotal += line.lineTotalMinor;
@@ -180,9 +187,6 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
   const vatPercent = effectiveVatBps / 100;
   const vatAmount = subtotalBeforeVat * (vatPercent / 100);
   const grandTotal = subtotalBeforeVat + vatAmount;
-
-  const materialLines = lines.filter(l => l.itemType !== 'LABOUR'); // Default to material if missing/other
-  const totalMaterials = materialLines.reduce((acc, l) => acc + l.lineTotalMinor, 0);
 
   const assumptions = quote.assumptions ? JSON.parse(quote.assumptions) as string[] : [];
   const exclusions = quote.exclusions ? JSON.parse(quote.exclusions) as string[] : [];
@@ -271,6 +275,26 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
             </View>
           ));
         })()}
+
+        <View style={{ marginTop: 14, alignItems: 'flex-end', gap: 6 }}>
+          {totalLabour > 0 && (
+            <View style={{ backgroundColor: '#fef3c7', borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6, minWidth: 170 }}>
+              <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#78350f', textAlign: 'right' }}>
+                TOTAL LABOUR: {currencySymbol} {formatMoney(totalLabour, currency)}
+              </Text>
+            </View>
+          )}
+          <View style={{ backgroundColor: '#dbeafe', borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6, minWidth: 170 }}>
+            <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1e3a5f', textAlign: 'right' }}>
+              TOTAL MATERIALS: {currencySymbol} {formatMoney(totalMaterials, currency)}
+            </Text>
+          </View>
+          <View style={{ backgroundColor: '#dcfce7', borderRadius: 4, borderWidth: 1, borderColor: '#86efac', paddingHorizontal: 12, paddingVertical: 8, minWidth: 170 }}>
+            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#166534', textAlign: 'right' }}>
+              TOTAL FIX & SUPPLY: {currencySymbol} {formatMoney(totalFixAndSupply, currency)}
+            </Text>
+          </View>
+        </View>
 
         <View style={{ marginTop: 20, borderWidth: 1, borderColor: '#d1d5db' }} wrap={false}>
           <View style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: '#d1d5db' }}>

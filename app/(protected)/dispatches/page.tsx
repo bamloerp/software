@@ -33,7 +33,7 @@ export default async function DispatchesPage({
   if (!me) redirect('/login');
 
   try {
-    assertRoles(me.role as any, ['PROJECT_OPERATIONS_OFFICER', 'PROCUREMENT', 'SENIOR_PROCUREMENT', 'SECURITY', 'ADMIN', 'STORE_KEEPER', 'DRIVER'] as any);
+    assertRoles(me.role as any, ['PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'PROCUREMENT', 'SENIOR_PROCUREMENT', 'SECURITY', 'ADMIN', 'STORE_KEEPER', 'DRIVER'] as any);
   } catch {
     redirect('/projects');
   }
