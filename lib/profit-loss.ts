@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { readQuoteGrandTotal } from '@/lib/accounting';
 import { Prisma } from '@prisma/client';
 
 export type PnLSummary = {
@@ -225,7 +226,7 @@ function calculatePnL(project: any): { summary: PnLSummary; items: VarianceItem[
     }
 
     // Revenue
-    const contractValueMinor = project.quote?.lines?.reduce((acc: bigint, l: any) => acc + l.lineTotalMinor, 0n) || 0n;
+    const contractValueMinor = project.quote ? BigInt(Math.round(readQuoteGrandTotal(project.quote) * 100)) : 0n;
 
     const netProfitLossMinor =
         negotiationVarianceMinor +

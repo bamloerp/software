@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import clsx from 'clsx';
 import { Money } from '@/components/Money';
 import { readQuoteGrandTotal } from '@/lib/accounting';
+import { reconcilePaymentScheduleToGrandTotal } from '@/app/lib/payments';
 
 const formatMoney = (minor: bigint | number) => {
   return new Intl.NumberFormat('en-US', {
@@ -32,6 +33,8 @@ export default async function ProjectPaymentsPage({
   if (!['SALES_ACCOUNTS', 'ACCOUNTS', 'ADMIN'].includes(me.role as string)) {
     redirect(`/projects/${projectId}`);
   }
+
+   await reconcilePaymentScheduleToGrandTotal(projectId);
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },

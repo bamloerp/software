@@ -671,6 +671,109 @@ function companyHeader(logoBase64: string, title: string): string {
   </div>`;
 }
 
+function formatDate(value: Date | string | null | undefined): string {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("en-GB");
+}
+
+/* ── Project Schedule PDF ── */
+
+export async function renderProjectSchedulePdf(projectId: string): Promise<PdfResult> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      quote: { include: { customer: true } },
+      schedules: {
+        include: {
+          items: {
+            orderBy: { createdAt: "asc" },
+            include: {
+              assignees: { select: { givenName: true, surname: true, role: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!project) throw new Error("Project not found");
+
+  const schedule = project.schedules;
+  if (!schedule) throw new Error("Project schedule not found");
+
+  const quote = project.quote;
+  const customer = quote?.customer;
+  const addressJson = customer?.addressJson as { line1?: string; city?: string } | null;
+  const logoBase64 = loadLogo();
+  const projectRef = project.projectNumber || project.name || project.id.slice(0, 10);
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><style>${BASE_STYLES}
+    .schedule-meta { display:flex; gap:12px; margin-bottom:12px; }
+    .schedule-meta .info-box { flex:1; width:auto; }
+    .workers { color:#064e3b; font-weight:600; }
+    .note-cell { color:#4b5563; }
+  </style></head><body>
+    ${companyHeader(logoBase64, "Work Schedule")}
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-box-header">Customer Info</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Name:</span><span class="info-value">${esc(customer?.displayName)}</span></div>
+          <div class="info-row"><span class="info-label">Address:</span><span class="info-value">${esc(customer?.city || addressJson?.city || addressJson?.line1 || "N/A")}</span></div>
+          <div class="info-row"><span class="info-label">Phone:</span><span class="info-value">${esc(customer?.phone || customer?.email || "N/A")}</span></div>
+          <div class="info-row"><span class="info-label">Ref:</span><span class="info-value">${esc(project.name || projectRef)}</span></div>
+        </div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-header">Schedule Details</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Quote #:</span><span class="info-value">${esc(quote?.number || quote?.id?.slice(0, 8))}</span></div>
+          <div class="info-row"><span class="info-label">Project:</span><span class="info-value">${esc(projectRef)}</span></div>
+          <div class="info-row"><span class="info-label">Status:</span><span class="info-value">${esc(schedule.status)}</span></div>
+          <div class="info-row"><span class="info-label">Generated:</span><span class="info-value">${formatDate(new Date())}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead class="tbl-header"><tr>
+        <th style="text-align:left;padding:5px 6px">Task</th>
+        <th style="text-align:center;padding:5px 6px;width:48px">Unit</th>
+        <th style="text-align:right;padding:5px 6px;width:55px">Qty</th>
+        <th style="text-align:center;padding:5px 6px;width:75px">Start</th>
+        <th style="text-align:center;padding:5px 6px;width:75px">End</th>
+        <th style="text-align:right;padding:5px 6px;width:55px">Hours</th>
+        <th style="text-align:left;padding:5px 6px;width:145px">Workers</th>
+        <th style="text-align:left;padding:5px 6px;width:145px">Note</th>
+      </tr></thead>
+      <tbody>
+      ${schedule.items.map((item) => {
+        const workers = item.assignees
+          .map((worker) => `${worker.givenName}${worker.surname ? ` ${worker.surname}` : ""}`)
+          .join(", ");
+        return `<tr class="tbl-row">
+          <td>${esc(item.title || item.description || "-")}</td>
+          <td class="text-center">${esc(item.unit || "-")}</td>
+          <td class="text-right">${Number(item.quantity ?? 0).toLocaleString()}</td>
+          <td class="text-center">${formatDate(item.plannedStart)}</td>
+          <td class="text-center">${formatDate(item.plannedEnd)}</td>
+          <td class="text-right">${Number(item.estHours ?? 0) || "-"}</td>
+          <td class="workers">${esc(workers || "No workers assigned")}</td>
+          <td class="note-cell">${esc(item.note || "-")}</td>
+        </tr>`;
+      }).join("")}
+      </tbody>
+    </table>
+
+    ${schedule.note ? `<div class="note-box"><div class="note-title">Schedule Note:</div><div class="note-text">${esc(schedule.note)}</div></div>` : ""}
+    ${schedule.items.length === 0 ? '<div style="padding:20px;text-align:center;color:#6b7280;font-size:11px">No schedule tasks found.</div>' : ""}
+
+    <div class="footer">Schedule Ref: ${esc(projectRef)} | Generated ${formatDate(new Date())}</div>
+  </body></html>`;
+
+  const buffer = await htmlToPdf(html);
+  return { buffer, filename: `Work-Schedule-${projectRef}.pdf` };
+}
+
 /* ── Requisition PDF ── */
 
 export async function renderRequisitionPdf(requisitionId: string): Promise<PdfResult> {

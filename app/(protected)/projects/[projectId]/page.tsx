@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { assertRole } from '@/lib/workflow';
 import { computeBalances, nextDueDate, formatDateYMD } from '@/lib/accounting';
+import { reconcilePaymentScheduleToGrandTotal } from '@/app/lib/payments';
 import Link from 'next/link';
 import DispatchTableClient from '@/components/DispatchTableClient';
 import { revalidatePath } from 'next/cache';
@@ -272,6 +273,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       console.error('Failed to auto-generate payment schedule', e);
     }
   }
+  await reconcilePaymentScheduleToGrandTotal(projectId);
 
   const schedule = await prisma.paymentSchedule.findMany({
     where: { projectId },

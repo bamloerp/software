@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
+import { renderProjectSchedulePdf } from '@/lib/pdf/puppeteer';
 
 type Settings = {
   builderShare: number;
@@ -17,6 +18,29 @@ type Settings = {
   tilerBuilder: number;
   tilerAssistant: number;
 };
+
+type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
+
+export async function generateSchedulePdf(
+  projectId: string,
+): Promise<ActionResult<{ base64: string; filename: string }>> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+
+    const result = await renderProjectSchedulePdf(projectId);
+    return {
+      ok: true,
+      data: {
+        base64: result.buffer.toString('base64'),
+        filename: result.filename,
+      },
+    };
+  } catch (error) {
+    console.error('[generateSchedulePdf]', error);
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to generate PDF' };
+  }
+}
 
 export async function saveProductivitySettings(projectId: string, settings: Settings) {
   const user = await getCurrentUser();

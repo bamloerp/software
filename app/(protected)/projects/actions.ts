@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import { redirect } from 'next/navigation';
 import { getRemainingDispatchMap } from '@/lib/dispatch';
 import { recalculateRipple, ScheduleItemMinimal, addWorkingTime, inferTaskType as engineInferTaskType, ProductivitySettings as EngineProductivitySettings } from '@/lib/schedule-engine';
+import { getQuoteGrandTotalMinor } from '@/app/lib/payments';
 
 
 const ROLE_SET = new Set<UserRole>(USER_ROLES as unknown as UserRole[]);
@@ -3483,9 +3484,7 @@ export async function generatePaymentSchedule(projectId: string) {
   // Idempotence: if schedule exists, do nothing
   if (project.paymentSchedules.length > 0) return { ok: true, created: 0 };
 
-  // Compute grand total (fallback to summing lines)
-  let grandTotalMinor =
-    project.quote?.lines?.reduce((acc, l) => acc + BigInt(l.lineTotalMinor || 0), 0n) ?? 0n;
+  const grandTotalMinor = await getQuoteGrandTotalMinor(projectId);
 
   // pull sales inputs
   const depositMinor = BigInt(project.depositMinor ?? 0);

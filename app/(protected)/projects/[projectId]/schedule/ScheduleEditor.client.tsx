@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import EmployeeAssignmentModal from './EmployeeAssignmentModal';
 import {
@@ -75,6 +75,19 @@ export default function ScheduleEditor({
   const [error, setError] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [checkingConflicts, setCheckingConflicts] = useState(false);
+  const employeeNameById = useMemo(() => {
+    return new Map(
+      employees.map((employee) => [
+        employee.id,
+        `${employee.givenName}${employee.surname ? ` ${employee.surname}` : ''}`,
+      ])
+    );
+  }, [employees]);
+
+  const workerLabel = (employeeIds: string[] = []) => {
+    const names = employeeIds.map((id) => employeeNameById.get(id)).filter(Boolean);
+    return names.length > 0 ? names.join(', ') : 'Select Team';
+  };
 
   // Auto-scheduling state
   const [projectStartDate, setProjectStartDate] = useState<string>(
@@ -195,7 +208,7 @@ export default function ScheduleEditor({
         setCheckingConflicts(false);
       }
     },
-    [calculateSchedule]
+    [calculateSchedule, projectId]
   );
 
   // Perform initial ripple if any items are missing dates (e.g. newly extracted)
@@ -206,7 +219,7 @@ export default function ScheduleEditor({
       const updated = calculateSchedule(items);
       setItems(updated);
     }
-  }, [calculateSchedule, items.length]); // We check items.length to know if items were loaded
+  }, [calculateSchedule, items]);
 
   // Automated health check on load
   useEffect(() => {
@@ -379,7 +392,7 @@ export default function ScheduleEditor({
   return (
     <div className="space-y-6">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg shadow-sm border mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg shadow-sm border mb-6 print:hidden">
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
             <label className="text-xs font-medium text-gray-500 mb-1">Project Start Date</label>
@@ -637,7 +650,7 @@ export default function ScheduleEditor({
                             setModalOpen(true);
                           }}
                           className={cn(
-                            'inline-flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-all shadow-sm relative',
+                            'inline-flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition-all shadow-sm relative',
                             it.hasConflict
                               ? 'bg-red-600 text-white hover:bg-red-700 ring-2 ring-red-300'
                               : it.employeeIds && it.employeeIds.length > 0
@@ -648,7 +661,7 @@ export default function ScheduleEditor({
                           {it.employeeIds && it.employeeIds.length > 0 ? (
                             <>
                               <CheckCircleIcon className="h-3.5 w-3.5" />
-                              {it.employeeIds.length} Assigned
+                              <span className="truncate">{workerLabel(it.employeeIds)}</span>
                             </>
                           ) : (
                             'Select Team'
@@ -685,6 +698,7 @@ export default function ScheduleEditor({
                         {it.note && it.note.trim().length > 0 && (
                           <button
                             type="button"
+                            title="Clear task note"
                             onClick={() => updateField(i, 'note', '')}
                             className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 transition-colors"
                           >
@@ -700,7 +714,7 @@ export default function ScheduleEditor({
           </div>
 
           {/* Bottom Controls */}
-          <div className="border-t bg-gray-50 p-4 space-y-4">
+          <div className="border-t bg-gray-50 p-4 space-y-4 print:hidden">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Schedule Note</label>
               <input

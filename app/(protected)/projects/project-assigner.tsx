@@ -25,7 +25,7 @@ export function ProjectAssigner({ projectId, initialAssigneeId, projectManagers,
         await assignProjectToManager(projectId, selectedId);
         router.refresh();
       } catch (e: any) {
-        alert('Failed to assign project: ' + e.message);
+        alert('Failed to save project assignment: ' + e.message);
       }
     });
   };
@@ -37,6 +37,7 @@ export function ProjectAssigner({ projectId, initialAssigneeId, projectManagers,
     return (
       <div className="flex items-center gap-2">
         <select
+          title="Project operations officer"
           className="block w-48 rounded-md border-gray-300 py-1.5 text-xs focus:border-green-500 focus:ring-green-500 sm:text-sm"
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
@@ -54,7 +55,7 @@ export function ProjectAssigner({ projectId, initialAssigneeId, projectManagers,
           disabled={isPending || !selectedId || !isChanged}
           className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
         >
-          {isPending ? '...' : 'Assign'}
+          {isPending ? '...' : hasAssignee ? 'Reassign' : 'Assign'}
         </button>
       </div>
     );
@@ -68,6 +69,7 @@ export function ProjectAssigner({ projectId, initialAssigneeId, projectManagers,
       <div className="flex flex-col gap-3">
         <div className="relative">
           <select
+            title="Project operations officer"
             className="block w-full appearance-none rounded-lg border-gray-300 bg-white py-2.5 pl-3 pr-10 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-green-400 dark:focus:ring-green-400"
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
@@ -89,7 +91,7 @@ export function ProjectAssigner({ projectId, initialAssigneeId, projectManagers,
           disabled={isPending || !selectedId || !isChanged}
           className="inline-flex w-full justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
-          {isPending ? 'Saving...' : 'Save Assignment'}
+          {isPending ? 'Saving...' : hasAssignee ? 'Reassign' : 'Assign'}
         </button>
       </div>
     </div>
