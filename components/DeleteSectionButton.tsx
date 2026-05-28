@@ -13,20 +13,39 @@ interface Props {
 
 export default function DeleteSectionButton({ quoteId, section, itemType, label }: Props) {
   const [open, setOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(false);
   const [isPending, startTransition] = useTransition();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (open) dialogRef.current?.showModal();
     else dialogRef.current?.close();
   }, [open]);
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
   function handleDelete() {
-    startTransition(async () => {
-      const result = await deleteQuoteSection(quoteId, section, itemType);
-      if (result && !result.ok) alert(result.error);
-      setOpen(false);
-    });
+    setOpen(false);
+    setPendingDelete(true);
+    timerRef.current = setTimeout(() => {
+      startTransition(async () => {
+        const result = await deleteQuoteSection(quoteId, section, itemType);
+        setPendingDelete(false);
+        timerRef.current = null;
+        if (result && !result.ok) alert(result.error);
+      });
+    }, 6000);
+  }
+
+  function undoDelete() {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+    setPendingDelete(false);
   }
 
   return (
@@ -34,11 +53,21 @@ export default function DeleteSectionButton({ quoteId, section, itemType, label 
       <button
         type="button"
         onClick={() => setOpen(true)}
+        disabled={pendingDelete || isPending}
         className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 transition-colors"
         title={`Delete section: ${label}`}
       >
         <TrashIcon className="h-5 w-5" />
       </button>
+
+      {pendingDelete && (
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-lg border border-red-200 bg-white px-4 py-3 text-sm shadow-lg dark:border-red-800 dark:bg-gray-900">
+          <span className="text-gray-700 dark:text-gray-200">{label} will be deleted in a few seconds.</span>
+          <button type="button" onClick={undoDelete} className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
+            Undo
+          </button>
+        </div>
+      )}
 
       <dialog
         ref={dialogRef}
@@ -63,7 +92,7 @@ export default function DeleteSectionButton({ quoteId, section, itemType, label 
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
             Are you sure you want to delete the entire{' '}
             <span className="font-bold text-gray-900 dark:text-white">{label}</span> section? All
-            line items in this section will be permanently removed. This action cannot be undone.
+            line items in this section will be removed after a short undo window.
           </p>
 
           <div className="flex justify-end gap-3">

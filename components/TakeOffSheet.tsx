@@ -7,6 +7,7 @@ import { createQuote, upsertCustomer } from '@/app/(protected)/actions';
 import { QUOTE_LINE_MAP, ELECTRICAL_ITEMS_CATALOG, type ElectricalItem } from '@/lib/quoteMap';
 import { normalizeContext, missingVars, evalExpr } from '@/lib/expr';
 import { DEFAULT_NOTES } from '@/lib/quoteDefaults';
+import { manualRateCode, type ManualCatalogItem } from '@/lib/manualItemCatalogShared';
 import ClearableNumberInput from './ClearableNumberInput';
 import Money from '@/components/Money';
 import { UserIcon, EnvelopeIcon, PhoneIcon, BuildingOfficeIcon, MapPinIcon, WrenchScrewdriverIcon, BeakerIcon, ArrowDownTrayIcon, PlusIcon, TrashIcon, CheckCircleIcon, BoltIcon } from '@heroicons/react/24/outline';
@@ -39,9 +40,11 @@ function applyElectricalRateOverrides(rateOverrides: RateOverrides): ElectricalI
 export default function TakeOffSheet({
   rateOverrides = {},
   systemSettings = {},
+  manualCatalog = [],
 }: {
   rateOverrides?: RateOverrides;
   systemSettings?: SystemSettings;
+  manualCatalog?: ManualCatalogItem[];
 } = {}) {
   const [vals, setVals] = useState<Record<string, number>>({
     ...TAKEOFF_DEFAULTS,
@@ -63,14 +66,16 @@ export default function TakeOffSheet({
   const [creating, setCreating] = useState(false);
   const router = useRouter();
   type CustomItem = {
+    catalogId?: string;
     description: string;
     unit: string;
     qty: number;
     rate: number;
     section: string;
+    itemType?: 'MATERIAL' | 'LABOUR';
   };
   const [customItems, setCustomItems] = useState<CustomItem[]>([
-    { description: '', unit: '', qty: 0, rate: 0, section: 'FOUNDATIONS' },
+    { description: '', unit: '', qty: 0, rate: 0, section: 'FOUNDATIONS', itemType: 'MATERIAL' },
   ]);
   const [notesText, setNotesText] = useState(DEFAULT_NOTES);
   const [formError, setFormError] = useState<string | null>(null);
@@ -223,12 +228,31 @@ export default function TakeOffSheet({
     QUOTE_LINE_MAP.forEach(m => {
       if (m.section) s.add(m.section.toUpperCase());
     });
+    manualCatalog.forEach((item) => {
+      if (item.section) s.add(item.section.toUpperCase());
+    });
     // Add common fallback ones if not present
     s.add('PRELIMINARIES');
     s.add('LABOUR');
     s.add('ELECTRICALS');
     return Array.from(s).sort();
-  }, []);
+  }, [manualCatalog]);
+
+  const catalogBySection = useMemo(() => {
+    const map = new Map<string, ManualCatalogItem[]>();
+    manualCatalog.forEach((item) => {
+      const section = (item.section || 'OTHER').toUpperCase();
+      if (!map.has(section)) map.set(section, []);
+      map.get(section)!.push({
+        ...item,
+        rate: rateOverrides[manualRateCode(item.id)] ?? item.rate,
+      });
+    });
+    for (const items of map.values()) {
+      items.sort((a, b) => a.description.localeCompare(b.description));
+    }
+    return map;
+  }, [manualCatalog, rateOverrides]);
 
   const quoteLinesPreview = useMemo(() => {
     const lines: any[] = [];
@@ -279,7 +303,7 @@ export default function TakeOffSheet({
       if (!ci.description || !(Number.isFinite(ci.qty) && ci.qty > 0)) continue;
       
       // Or if the section is 'LABOUR'
-      const isLabour = ci.description.toLowerCase().includes('labour') || 
+      const isLabour = ci.itemType === 'LABOUR' || ci.description.toLowerCase().includes('labour') ||
                        ci.description.toLowerCase().includes('labor') ||
                        (ci.section || '').toUpperCase().includes('LABOUR');
 
@@ -291,7 +315,7 @@ export default function TakeOffSheet({
         itemType: isLabour ? 'LABOUR' : 'MATERIAL',
         lineTotalMinor: BigInt(Math.round(Math.ceil(Number(ci.qty)) * Number(ci.rate || 0) * 100)),
         unit: ci.unit,
-        code: 'MANUAL',
+        code: ci.catalogId ? manualRateCode(ci.catalogId) : 'MANUAL',
       });
     }
     return lines;
@@ -861,6 +885,41 @@ export default function TakeOffSheet({
         <div className="space-y-4">
           {customItems.map((ci, idx) => (
             <div key={idx} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:bg-gray-900/50 dark:border-gray-700 md:flex-row md:items-start">
+              <div className="w-full md:w-48 space-y-1">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Pick Saved Item</label>
+                <select
+                  aria-label="Pick saved manual item"
+                  className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  value={ci.catalogId ?? ''}
+                  onChange={(e) => {
+                    const catalogId = e.target.value;
+                    const item = catalogBySection.get((ci.section || '').toUpperCase())?.find((entry) => entry.id === catalogId);
+                    setCustomItems((arr) =>
+                      arr.map((x, i) =>
+                        i === idx && item
+                          ? {
+                              ...x,
+                              catalogId: item.id,
+                              description: item.description,
+                              unit: item.unit,
+                              qty: item.quantity,
+                              rate: item.rate,
+                              section: item.section,
+                              itemType: item.itemType,
+                            }
+                          : i === idx
+                            ? { ...x, catalogId: undefined }
+                            : x
+                      )
+                    );
+                  }}
+                >
+                  <option value="">Type manually</option>
+                  {(catalogBySection.get((ci.section || '').toUpperCase()) ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>{item.description}</option>
+                  ))}
+                </select>
+              </div>
               <div className="flex-1 space-y-1">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Description</label>
                 <input
@@ -869,7 +928,7 @@ export default function TakeOffSheet({
                   value={ci.description}
                   onChange={(e) =>
                     setCustomItems((arr) =>
-                      arr.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x))
+                      arr.map((x, i) => (i === idx ? { ...x, catalogId: undefined, description: e.target.value } : x))
                     )
                   }
                 />
@@ -927,7 +986,7 @@ export default function TakeOffSheet({
                     onChange={(e) => {
                       const val = e.target.value;
                       setCustomItems((arr) =>
-                        arr.map((x, i) => (i === idx ? { ...x, section: val } : x))
+                        arr.map((x, i) => (i === idx ? { ...x, catalogId: undefined, section: val } : x))
                       );
                     }}
                   >
@@ -970,7 +1029,7 @@ export default function TakeOffSheet({
             onClick={() =>
               setCustomItems((arr) => [
                 ...arr,
-                { description: '', unit: '', qty: 0, rate: 0, section: sections[0] || 'FOUNDATIONS' },
+                { description: '', unit: '', qty: 0, rate: 0, section: sections[0] || 'FOUNDATIONS', itemType: 'MATERIAL' },
               ])
             }
           >

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { QUOTE_LINE_MAP, ELECTRICAL_ITEMS_CATALOG } from '@/lib/quoteMap';
+import { getManualCatalog, manualRateCode } from '@/lib/manualItemCatalog';
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -55,9 +56,10 @@ export async function updateSystemSetting(key: string, value: string): Promise<A
 
 /** Fetch all rate overrides + system settings for the rates page */
 export async function getRatesData() {
-  const [overrides, settings] = await Promise.all([
+  const [overrides, settings, manualCatalog] = await Promise.all([
     prisma.rateOverride.findMany(),
     prisma.systemSetting.findMany(),
+    getManualCatalog(),
   ]);
 
   const overrideMap = new Map(overrides.map(o => [o.code, o.rate]));
@@ -91,6 +93,20 @@ export async function getRatesData() {
       unit: item.unit,
       defaultRate: item.rate,
       currentRate: overrideMap.get(item.id) ?? item.rate,
+      itemType: item.itemType,
+    });
+  }
+
+  for (const item of manualCatalog) {
+    const groupKey = item.itemType === 'LABOUR' ? `MANUAL LABOUR – ${item.section}` : `MANUAL – ${item.section}`;
+    if (!sectionMap.has(groupKey)) sectionMap.set(groupKey, []);
+    const code = manualRateCode(item.id);
+    sectionMap.get(groupKey)!.push({
+      code,
+      description: item.description,
+      unit: item.unit,
+      defaultRate: item.rate,
+      currentRate: overrideMap.get(code) ?? item.rate,
       itemType: item.itemType,
     });
   }

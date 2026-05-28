@@ -81,6 +81,12 @@ const PAGE_DEFS: PageDef[] = [
     icon: 'plus-document',
     roles: ['QS', 'SENIOR_QS', 'ADMIN'],
   },
+  {
+    label: 'Manual Items',
+    href: '/manual-items',
+    icon: 'list',
+    roles: ['SENIOR_QS', 'ADMIN'],
+  },
   // Projects
   {
     label: 'Projects',
@@ -758,7 +764,7 @@ export default function SidebarShell({
           className={`bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-200 ease-in-out
           ${collapsed ? 'w-20' : 'w-64'}
           ${open ? 'translate-x-0' : '-translate-x-full'} block fixed top-0 left-0 h-dvh z-30
-          lg:translate-x-0 lg:static lg:block lg:sticky lg:top-0 lg:h-dvh overflow-y-auto scrollbar-none`}
+          lg:translate-x-0 lg:static lg:block lg:sticky lg:top-0 lg:h-dvh overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600`}
         >
           <div
             className={`py-5 flex items-center gap-3 border-b border-gray-100 dark:border-gray-700/50 ${collapsed ? 'justify-center px-0' : 'px-5'}`}
@@ -1049,7 +1055,7 @@ export default function SidebarShell({
             </div>
           </header>
 
-          <main className="w-full px-6 md:px-8 pb-6 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 min-h-0 relative z-10">
+          <main className="w-full px-6 md:px-8 pb-6 overflow-y-auto overflow-x-hidden scrollbar-none min-h-0 relative z-10">
             {children}
           </main>
         </div>
