@@ -20,11 +20,12 @@ function vatPercentFromBps(vatBps: bigint | number | null | undefined): number {
 }
 
 export function readQuoteGrandTotal(quote: Partial<Quote> & { lines?: Array<{ lineTotalMinor?: bigint | number | null }> }): number {
+  let storedGrandTotal: number | null = null;
   try {
     const meta = quote.metaJson ? JSON.parse(quote.metaJson) : null;
     const grand = meta?.totals?.grandTotal;
-    if (typeof grand === 'number' && Number.isFinite(grand)) return grand;
-    if (typeof grand === 'string' && Number.isFinite(Number(grand))) return Number(grand);
+    if (typeof grand === 'number' && Number.isFinite(grand)) storedGrandTotal = grand;
+    if (typeof grand === 'string' && Number.isFinite(Number(grand))) storedGrandTotal = Number(grand);
   } catch {
     // Fall through to calculated totals below.
   }
@@ -40,7 +41,8 @@ export function readQuoteGrandTotal(quote: Partial<Quote> & { lines?: Array<{ li
   const subtotalBeforeVat = totalMeasuredWorksMinor + pgAmount + contingencyAmount;
   const vatPercent = vatPercentFromBps(quote.vatBps);
   const vatAmount = BigInt(Math.round(Number(subtotalBeforeVat) * (vatPercent / 100)));
-  return fromMinor(subtotalBeforeVat + vatAmount);
+  const calculatedGrandTotal = fromMinor(subtotalBeforeVat + vatAmount);
+  return Math.max(storedGrandTotal ?? 0, calculatedGrandTotal);
 }
 
 /**

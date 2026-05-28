@@ -17,12 +17,13 @@ export async function getQuoteGrandTotalMinor(projectId: string): Promise<bigint
     },
   });
   if (!p?.quote) throw new Error('Quote totals not found');
+  let storedGrandTotalMinor: bigint | null = null;
   try {
     const meta = JSON.parse(p.quote.metaJson ?? '{}');
     const totals = meta?.totals;
-    if (totals?.grandTotal) return toBigIntMinor(Number(totals.grandTotal));
+    if (totals?.grandTotal) storedGrandTotalMinor = toBigIntMinor(Number(totals.grandTotal));
   } catch {
-    // Fall back to line totals below.
+    // Fall back to calculated totals below.
   }
   const totalMeasuredWorksMinor = p.quote.lines.reduce((sum, line) => sum + BigInt(line.lineTotalMinor ?? 0), 0n);
   const pgAmount = BigInt(Math.round(Number(totalMeasuredWorksMinor) * (Number(p.quote.pgRate ?? 0) / 100)));
@@ -31,7 +32,10 @@ export async function getQuoteGrandTotalMinor(projectId: string): Promise<bigint
   const rawVat = Number(p.quote.vatBps ?? 0);
   const effectiveBps = rawVat > 0 && rawVat < 100 ? rawVat * 100 : rawVat;
   const vatAmount = BigInt(Math.round(Number(subtotalBeforeVat) * ((effectiveBps / 100) / 100)));
-  return subtotalBeforeVat + vatAmount;
+  const calculatedGrandTotalMinor = subtotalBeforeVat + vatAmount;
+  return storedGrandTotalMinor && storedGrandTotalMinor > calculatedGrandTotalMinor
+    ? storedGrandTotalMinor
+    : calculatedGrandTotalMinor;
 }
 
 export async function reconcilePaymentScheduleToGrandTotal(projectId: string) {
