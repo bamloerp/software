@@ -195,7 +195,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      quote: { select: { number: true, metaJson: true, customer: { select: { displayName: true, email: true, phone: true, city: true } } } },
+      quote: { select: { number: true, metaJson: true, lines: { select: { lineTotalMinor: true } }, customer: { select: { displayName: true, email: true, phone: true, city: true } } } },
       requisitions: { include: { items: true, funding: true } },
       dispatches: { include: { items: true } },
       clientPayments: true,
@@ -379,24 +379,24 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         {/* Key Metrics Strip (Clean Cards) */}
         {canViewFinancials && (role as string) !== 'SALES_ACCOUNTS' && (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-             <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+             <dl className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
                 <dt className="truncate text-sm font-medium text-gray-500">Contract Value</dt>
                 <dd className="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
                   <Money minor={BigInt(Math.round(totals.contractTotal * 100))} />
                 </dd>
-             </div>
-             <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+             </dl>
+             <dl className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
                 <dt className="truncate text-sm font-medium text-gray-500">Paid to Date</dt>
                 <dd className="mt-1 text-3xl font-semibold tracking-tight text-emerald-600">
                   <Money minor={BigInt(Math.round(totals.paid * 100))} />
                 </dd>
-             </div>
-             <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+             </dl>
+             <dl className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
                 <dt className="truncate text-sm font-medium text-gray-500">Balance Due</dt>
                 <dd className={cn("mt-1 text-3xl font-semibold tracking-tight", totals.remaining > 0 ? "text-rose-600" : "text-gray-900")}>
                    <Money minor={BigInt(Math.round(totals.remaining * 100))} />
                 </dd>
-             </div>
+             </dl>
           </div>
         )}
 

@@ -56,15 +56,15 @@ export default function DeleteQuoteButton({
           }
         >
           <TrashIcon className="h-4 w-4" />
-          Delete Quotation
+          Move to Recycle Bin
         </button>
       ) : (
         <button
           type="button"
           onClick={() => setOpen(true)}
           disabled={pending}
-          title="Delete quotation (admin only)"
-          aria-label="Delete quotation"
+          title="Move quotation to recycle bin (admin only)"
+          aria-label="Move quotation to recycle bin"
           className={className ?? 'text-red-600 hover:text-red-800 disabled:opacity-50 p-1'}
         >
           <TrashIcon className="h-4 w-4" />
@@ -73,7 +73,7 @@ export default function DeleteQuoteButton({
 
       <ConfirmDialog
         open={open}
-        title="Delete Quotation"
+        title="Move Quotation to Recycle Bin"
         variant="danger"
         busy={pending}
         onCancel={() => {
@@ -82,14 +82,12 @@ export default function DeleteQuoteButton({
         onConfirm={handleConfirm}
         message={
           <>
-            Are you sure you want to permanently delete quotation{' '}
+            Are you sure you want to move quotation{' '}
             <b>{quoteNumber ?? quoteId}</b>?
             <br />
             <br />
-            This will remove <b>everything</b> related to this quote — all line items,
-            versions, negotiations, project tasks, schedules, dispatches, purchase orders,
-            requisitions, payments, and the linked project (if any). This action{' '}
-            <b>cannot be undone</b>.
+            Only quotations without projects can be deleted. This moves the quotation to the
+            recycle bin where it can be restored or permanently deleted.
           </>
         }
       />

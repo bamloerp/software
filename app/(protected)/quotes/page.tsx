@@ -15,6 +15,7 @@ import {
   UserCircleIcon,
   TagIcon,
   BoltIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import QuoteTableToolbar from './components/QuoteTableToolbar';
 import QuotePagination from './components/QuotePagination';
@@ -119,6 +120,10 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
     };
   }
 
+  if (!statusFilter) {
+    where = { ...where, NOT: { status: 'ARCHIVED' } };
+  }
+
   const [quotes, total] = await Promise.all([
     prisma.quote.findMany({
       where,
@@ -167,6 +172,15 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
           <p className="text-sm text-gray-500 dark:text-gray-400">{pageDescription}</p>
         </div>
         <div className="flex gap-3">
+          {role === 'ADMIN' && (
+            <Link
+              href="/quotes/recycle-bin"
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+            >
+              <TrashIcon className="h-4 w-4" />
+              Recycle Bin
+            </Link>
+          )}
           {role !== 'SALES' && (
             <Link
               href="/quotes/new"
@@ -288,7 +302,7 @@ export default async function QuotesPage(props: { searchParams: { [key: string]:
                         {role === 'ADMIN' && (
                           <DeleteQuoteButton
                             quoteId={q.id}
-                            quoteNumber={q.quoteNumber}
+                            quoteNumber={q.number}
                           />
                         )}
                       </div>

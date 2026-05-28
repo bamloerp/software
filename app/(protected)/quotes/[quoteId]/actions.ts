@@ -1575,7 +1575,7 @@ export async function createProjectTask(
 
     revalidatePath(`/quotes/${quote.id}`);
     revalidatePath(`/quotes`);
-    return { quoteId: task.quoteId, taskId: task.id };
+    return { quoteId: quote.id, taskId: task.id };
   });
 }
 
@@ -1795,6 +1795,8 @@ export async function updateProjectTask(
         data: { office: ensuredOffice },
       });
     }
+
+    if (!updated.projectId) throw new Error('Task is not associated with a project');
 
     // revalidate project page (since tasks are now under projects)
     revalidatePath(`/projects/${updated.projectId}`);
@@ -2115,10 +2117,18 @@ export async function updateQuoteNotes(
   }
 }
 
+function parseQuoteMeta(metaJson: string | null | undefined): Record<string, any> {
+  if (!metaJson) return {};
+  try {
+    const parsed = JSON.parse(metaJson);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
- * ADMIN ONLY: Delete a quotation and ALL related records (cascade).
- * Removes lines, versions, negotiations, tasks, and any linked project together with
- * all its dependents (dispatches, requisitions, purchase orders, schedules, payments, etc.).
+ * ADMIN ONLY: Move a quotation without a project to the recycle bin.
  */
 export async function deleteQuote(quoteId: string): Promise<ActionResult> {
   return runAction('deleteQuote', async () => {
@@ -2133,112 +2143,93 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
       where: { id: quoteId },
       select: {
         id: true,
-        lines: { select: { id: true } },
+        status: true,
+        metaJson: true,
         project: { select: { id: true } },
       },
     });
     if (!quote) throw new Error('Quote not found');
 
+    if (quote.project?.id) {
+      throw new Error('This quotation already has a project and cannot be deleted. Close or manage the project instead.');
+    }
+
+    const meta = parseQuoteMeta(quote.metaJson);
+    await prisma.quote.update({
+      where: { id: quoteId },
+      data: {
+        status: 'ARCHIVED',
+        metaJson: JSON.stringify({
+          ...meta,
+          recycleBin: {
+            deletedAt: new Date().toISOString(),
+            deletedById: user.id ?? null,
+            previousStatus: quote.status === 'ARCHIVED' ? 'FINALIZED' : quote.status,
+          },
+        }),
+      },
+    });
+
+    revalidatePath('/quotes');
+    revalidatePath('/quotes/recycle-bin');
+    return undefined;
+  });
+}
+
+export async function restoreDeletedQuote(quoteId: string): Promise<ActionResult> {
+  return runAction('restoreDeletedQuote', async () => {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    const role = assertRole(user.role);
+    if (role !== 'ADMIN') throw new Error('Only an admin can restore a quotation');
+
+    const quote = await prisma.quote.findUnique({
+      where: { id: quoteId },
+      select: { id: true, status: true, metaJson: true },
+    });
+    if (!quote) throw new Error('Quote not found');
+
+    const meta = parseQuoteMeta(quote.metaJson);
+    const previousStatus = meta.recycleBin?.previousStatus && meta.recycleBin.previousStatus !== 'ARCHIVED'
+      ? meta.recycleBin.previousStatus
+      : 'FINALIZED';
+    delete meta.recycleBin;
+
+    await prisma.quote.update({
+      where: { id: quoteId },
+      data: { status: previousStatus, metaJson: JSON.stringify(meta) },
+    });
+
+    revalidatePath('/quotes');
+    revalidatePath('/quotes/recycle-bin');
+    return undefined;
+  });
+}
+
+export async function permanentlyDeleteQuote(quoteId: string): Promise<ActionResult> {
+  return runAction('permanentlyDeleteQuote', async () => {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    const role = assertRole(user.role);
+    if (role !== 'ADMIN') throw new Error('Only an admin can permanently delete a quotation');
+
+    const quote = await prisma.quote.findUnique({
+      where: { id: quoteId },
+      select: {
+        id: true,
+        lines: { select: { id: true } },
+        project: { select: { id: true } },
+      },
+    });
+    if (!quote) throw new Error('Quote not found');
+    if (quote.project?.id) {
+      throw new Error('This quotation already has a project and cannot be permanently deleted.');
+    }
+
     const lineIds = quote.lines.map((l) => l.id);
-    const projectId = quote.project?.id ?? null;
 
     await prisma.$transaction(async (tx) => {
-      // ---- Project cascade (if any) ----
-      if (projectId) {
-        // Schedules
-        const schedule = await tx.schedule.findUnique({
-          where: { projectId },
-          select: { id: true },
-        }).catch(() => null);
-        if (schedule) {
-          await tx.scheduleItem.deleteMany({ where: { scheduleId: schedule.id } });
-          await tx.schedule.delete({ where: { id: schedule.id } });
-        }
-
-        // Dispatches + items
-        const dispatches = await tx.dispatch.findMany({
-          where: { projectId },
-          select: { id: true },
-        });
-        const dispatchIds = dispatches.map((d) => d.id);
-        if (dispatchIds.length) {
-          await tx.dispatchItem.deleteMany({ where: { dispatchId: { in: dispatchIds } } });
-          await tx.dispatch.deleteMany({ where: { id: { in: dispatchIds } } });
-        }
-
-        // Purchase orders + items
-        const purchaseOrders = await tx.purchaseOrder.findMany({
-          where: { projectId },
-          select: { id: true },
-        });
-        const poIds = purchaseOrders.map((p) => p.id);
-        if (poIds.length) {
-          await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: { in: poIds } } });
-          await tx.purchaseOrder.deleteMany({ where: { id: { in: poIds } } });
-        }
-
-        // Procurement requisitions + items (+ topups)
-        const requisitions = await tx.procurementRequisition.findMany({
-          where: { projectId },
-          select: { id: true },
-        });
-        const reqIds = requisitions.map((r) => r.id);
-        if (reqIds.length) {
-          const reqItems = await tx.procurementRequisitionItem.findMany({
-            where: { requisitionId: { in: reqIds } },
-            select: { id: true },
-          });
-          const reqItemIds = reqItems.map((i) => i.id);
-          if (reqItemIds.length) {
-            await tx.requisitionItemTopup.deleteMany({ where: { requisitionItemId: { in: reqItemIds } } }).catch(() => undefined);
-          }
-          await tx.procurementRequisitionItem.deleteMany({ where: { requisitionId: { in: reqIds } } });
-          await tx.procurementRequisition.deleteMany({ where: { id: { in: reqIds } } });
-        }
-
-        // Tasks (project tasks via projectId, plus their assignments/progress)
-        const tasks = await tx.task.findMany({ where: { projectId }, select: { id: true } }).catch(() => []);
-        const taskIds = tasks.map((t) => t.id);
-        if (taskIds.length) {
-          await tx.taskAssignment.deleteMany({ where: { taskId: { in: taskIds } } }).catch(() => undefined);
-          await tx.taskProgress.deleteMany({ where: { taskId: { in: taskIds } } }).catch(() => undefined);
-          await tx.task.deleteMany({ where: { id: { in: taskIds } } });
-        }
-
-        // ProjectTask (linked through projectId or quoteId)
-        const projTasks = await tx.projectTask.findMany({
-          where: { OR: [{ projectId }, { quoteId }] },
-          select: { id: true },
-        });
-        const projTaskIds = projTasks.map((t) => t.id);
-        if (projTaskIds.length) {
-          await tx.taskAssignment.deleteMany({ where: { taskId: { in: projTaskIds } } }).catch(() => undefined);
-          await tx.taskProgress.deleteMany({ where: { taskId: { in: projTaskIds } } }).catch(() => undefined);
-          await tx.projectTask.deleteMany({ where: { id: { in: projTaskIds } } });
-        }
-
-        // Payments & schedules
-        await tx.paymentSchedule.deleteMany({ where: { projectId } }).catch(() => undefined);
-        await tx.payment.deleteMany({ where: { projectId } }).catch(() => undefined);
-        await tx.clientPayment.deleteMany({ where: { projectId } }).catch(() => undefined);
-
-        // Inventory / stock
-        await tx.inventoryAllocation.deleteMany({ where: { projectId } }).catch(() => undefined);
-        await tx.stockMove.deleteMany({ where: { projectId } }).catch(() => undefined);
-
-        // Members & misc
-        await tx.projectMember.deleteMany({ where: { projectId } }).catch(() => undefined);
-        await tx.projectProductivitySetting.deleteMany({ where: { projectId } }).catch(() => undefined);
-
-        // Extra line requests linked to this project
-        await tx.quoteLineExtraRequest.deleteMany({ where: { projectId } }).catch(() => undefined);
-
-        // Finally remove the project
-        await tx.project.delete({ where: { id: projectId } });
-      } else {
-        // No project: still scrub ProjectTasks that point only to this quote
-        await tx.projectTask.deleteMany({ where: { quoteId } }).catch(() => undefined);
-      }
+      await tx.projectTask.deleteMany({ where: { quoteId } }).catch(() => undefined);
 
       // ---- Quote-line descendants ----
       if (lineIds.length) {
@@ -2264,7 +2255,7 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
     }, TX_OPTS);
 
     revalidatePath('/quotes');
-    revalidatePath('/projects');
+    revalidatePath('/quotes/recycle-bin');
     return undefined;
   });
 }

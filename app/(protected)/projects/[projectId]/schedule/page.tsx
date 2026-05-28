@@ -6,6 +6,7 @@ import { getProductivitySettings } from '../../actions';
 import SubmitButton from '@/components/SubmitButton';
 import PrintHeader from '@/components/PrintHeader';
 import QuoteHeader from '@/components/QuoteHeader';
+import PrintButton from '@/components/PrintButton';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
@@ -44,6 +45,9 @@ export default async function ProjectSchedulePage({ params }: { params: Promise<
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 sm:p-6 space-y-6">
+      <div className="flex justify-end print:hidden">
+        <PrintButton />
+      </div>
       {project?.quote ? (
         <QuoteHeader quote={project.quote} title="Work Schedule" />
       ) : (

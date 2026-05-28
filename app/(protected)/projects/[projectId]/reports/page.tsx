@@ -6,6 +6,7 @@ import ProjectReportsClient from './ProjectReports.client';
 import { getProjectReportData } from './actions';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import PrintButton from '@/components/PrintButton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -53,6 +54,7 @@ export default async function ProjectReportsPage({
                         {project.name} ({project.projectNumber || 'No Ref'})
                     </p>
                 </div>
+                <PrintButton />
             </div>
         </div>
 

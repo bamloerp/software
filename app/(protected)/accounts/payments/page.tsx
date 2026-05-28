@@ -14,6 +14,7 @@ import {
 import { SearchInput } from '@/components/ui/search-input';
 import TablePagination from '@/components/ui/table-pagination';
 import PageSizeSelector from '@/components/ui/page-size-selector';
+import { readQuoteGrandTotal } from '@/lib/accounting';
 
 const formatMoney = (minor: bigint | number) => {
   return new Intl.NumberFormat('en-US', {
@@ -142,7 +143,7 @@ export default async function PaymentsDashboard({
                 </tr>
               ) : (
                 projects.map((p) => {
-                  const contractValue = p.quote?.lines?.reduce((sum, line) => sum + BigInt(line.lineTotalMinor), 0n) || 0n;
+                  const contractValue = p.quote ? BigInt(Math.round(readQuoteGrandTotal(p.quote as any) * 100)) : 0n;
                   const totalPaid = p.clientPayments.reduce((sum, pay) => sum + BigInt(pay.amountMinor), 0n);
                   const balance = contractValue - totalPaid;
 

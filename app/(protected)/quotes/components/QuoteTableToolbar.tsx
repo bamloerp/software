@@ -101,7 +101,6 @@ export default function QuoteTableToolbar() {
             <option value="NEGOTIATION">Negotiation</option>
             <option value="NEGOTIATION_REVIEW">Negotiation Review</option>
             <option value="FINALIZED">Finalized</option>
-            <option value="ARCHIVED">Archived</option>
          </select>
       </div>
 

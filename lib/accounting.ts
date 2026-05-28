@@ -13,14 +13,16 @@ export function toMinor(major: number): bigint {
  * Read grand total from quote meta snapshot if present, else sum lines if needed.
  * Expects quote.metaJson to include { totals: { grandTotal } } (as in your app).
  */
-export function readQuoteGrandTotal(quote: Quote): number {
+export function readQuoteGrandTotal(quote: Partial<Quote> & { lines?: Array<{ lineTotalMinor?: bigint | number | null }> }): number {
   try {
     const meta = quote.metaJson ? JSON.parse(quote.metaJson) : null;
     const grand = meta?.totals?.grandTotal;
-    return typeof grand === 'number' ? grand : 0;
+    if (typeof grand === 'number' && Number.isFinite(grand)) return grand;
+    if (typeof grand === 'string' && Number.isFinite(Number(grand))) return Number(grand);
   } catch {
-    return 0;
+    // Fall through to line totals below.
   }
+  return (quote.lines ?? []).reduce((sum, line) => sum + fromMinor(line.lineTotalMinor as any), 0);
 }
 
 /**

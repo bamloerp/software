@@ -3416,9 +3416,7 @@ export async function assignProjectToManager(projectId: string, userId: string) 
 
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!targetUser) throw new Error('User not found');
-
-  // Ideally check if targetUser is actually a PM, but flexible for now or could enforce:
-  // if (targetUser.role !== 'PROJECT_OPERATIONS_OFFICER') throw new Error('User is not a Project Manager');
+  if (targetUser.role !== 'PROJECT_OPERATIONS_OFFICER') throw new Error('User is not a Project Operations Officer');
 
   await prisma.project.update({
     where: { id: projectId },

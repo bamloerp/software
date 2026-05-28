@@ -593,7 +593,15 @@ export default async function ProjectsPage({
                           {isSeniorPM && currentTab === 'assignment' ? (
                             <ProjectAssigner
                               projectId={project.id}
+                              initialAssigneeId={project.assignedToId}
                               projectManagers={projectManagers}
+                            />
+                          ) : isSeniorPM ? (
+                            <ProjectAssigner
+                              projectId={project.id}
+                              initialAssigneeId={project.assignedToId}
+                              projectManagers={projectManagers}
+                              variant="table"
                             />
                           ) : (
                             <div className="flex items-center gap-2">

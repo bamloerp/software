@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import clsx from 'clsx';
 import { Money } from '@/components/Money';
+import { readQuoteGrandTotal } from '@/lib/accounting';
 
 const formatMoney = (minor: bigint | number) => {
   return new Intl.NumberFormat('en-US', {
@@ -47,7 +48,7 @@ export default async function ProjectPaymentsPage({
   const payments = project.clientPayments || [];
   
   // Stats
-  const contractValue = project.quote?.lines?.reduce((sum, line) => sum + BigInt(line.lineTotalMinor), 0n) || 0n;
+   const contractValue = project.quote ? BigInt(Math.round(readQuoteGrandTotal(project.quote as any) * 100)) : 0n;
   const totalPaid = payments.reduce((sum, p) => sum + BigInt(p.amountMinor), 0n);
   const balance = contractValue - totalPaid;
 

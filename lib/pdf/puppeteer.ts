@@ -278,7 +278,7 @@ export class PuppeteerRenderer implements PdfRenderer {
     <!-- Top Section: Logo & Contact -->
     <div class="flex justify-between items-start mb-6">
       <div class="flex flex-col items-start">
-        <div class="mb-2" style="width: 240px; height: 140px;">
+        <div class="mb-2" style="width: 300px; height: 140px;">
           ${logoBase64 ? `<img src="${logoBase64}" class="logo-img object-contain" alt="Barmlo Logo" />` : '<div style="background:#eee;width:100%;height:100%;display:flex;align-items:center;justify-content:center;">Logo</div>'}
         </div>
       </div>

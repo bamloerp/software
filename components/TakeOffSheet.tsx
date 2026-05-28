@@ -337,6 +337,56 @@ export default function TakeOffSheet({
     return { totalLabour, totalMaterials, baseTotal, pg, contingency, grandTotal };
   }, [quoteLinesPreview, pgPct, contingencyPct]);
 
+  const requiredTakeoffInputsFilled = useMemo(() => {
+    return TAKEOFF_LAYOUT.every((row) => {
+      if (row.type !== 'cells') return true;
+      return row.cells.every((cell) => {
+        if (!cell || cell.kind !== 'input' || !cell.label.trim()) return true;
+        const value = vals[cell.code] ?? TAKEOFF_DEFAULTS[cell.code];
+        return Number.isFinite(value) && Number(value) > 0;
+      });
+    });
+  }, [vals]);
+
+  const manualItemsComplete = customItems.every((item) => {
+    const touched =
+      Boolean(item.catalogId) ||
+      item.description.trim() !== '' ||
+      item.unit.trim() !== '' ||
+      Number.isFinite(item.qty) && item.qty > 0 ||
+      Number.isFinite(item.rate) && item.rate > 0;
+    if (!touched) return true;
+    return (
+      item.description.trim() !== '' &&
+      item.unit.trim() !== '' &&
+      item.section.trim() !== '' &&
+      Number.isFinite(item.qty) &&
+      item.qty > 0 &&
+      Number.isFinite(item.rate) &&
+      item.rate >= 0
+    );
+  });
+
+  const electricalItemsComplete = !includeElectricals || electricalItems.every((item) => (
+    item.description.trim() !== '' &&
+    item.unit.trim() !== '' &&
+    Number.isFinite(item.qty) &&
+    item.qty > 0 &&
+    Number.isFinite(item.rate) &&
+    item.rate >= 0
+  ));
+
+  const requiredFieldsFilled =
+    customer.name.trim() !== '' &&
+    customer.email.trim() !== '' &&
+    customer.phone.trim() !== '' &&
+    customer.city.trim() !== '' &&
+    customerAddress.trim() !== '' &&
+    requiredTakeoffInputsFilled &&
+    manualItemsComplete &&
+    electricalItemsComplete &&
+    quoteLinesPreview.length > 0;
+
   useEffect(() => {
     setMissingByCode(missing);
   }, [missing]);
@@ -418,6 +468,11 @@ export default function TakeOffSheet({
     setCreating(true);
     try {
       setFormError(null);
+
+      if (!requiredFieldsFilled) {
+        setFormError('Fill in all customer details, takeoff input fields, and any enabled optional item fields before generating.');
+        return;
+      }
 
       const { customerId } = await upsertCustomer({
         displayName: customer.name || 'Walk-in Customer',
@@ -1061,8 +1116,9 @@ export default function TakeOffSheet({
            </div>
           <button
             className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-green-700 hover:shadow-lg focus:ring-4 focus:ring-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={creating}
+            disabled={creating || !requiredFieldsFilled}
             onClick={onCreateQuote}
+            title={requiredFieldsFilled ? 'Generate quotation' : 'Fill in all customer details, takeoff input fields, and enabled optional item fields first'}
           >
             {creating ? (
               <>Generating...</>

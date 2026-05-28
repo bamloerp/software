@@ -4,6 +4,8 @@ import { notFound, redirect } from 'next/navigation';
 import Money from '@/components/Money';
 import Link from 'next/link';
 import PrintHeader from '@/components/PrintHeader';
+import PrintButton from '@/components/PrintButton';
+import { readQuoteGrandTotal } from '@/lib/accounting';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -28,6 +30,8 @@ export default async function ProjectPaymentHistoryPage({
       quote: {
         select: {
           id: true,
+          metaJson: true,
+          lines: { select: { lineTotalMinor: true } },
           customer: {
             select: {
               displayName: true,
@@ -68,14 +72,7 @@ export default async function ProjectPaymentHistoryPage({
   });
   if (!project) return notFound();
 
-  let quotedMinor = 0n;
-  if (project.quote?.id) {
-    const sum = await prisma.quoteLine.aggregate({
-      where: { quoteId: project.quote.id },
-      _sum: { lineTotalMinor: true },
-    });
-    quotedMinor = BigInt(sum._sum.lineTotalMinor || 0);
-  }
+  const quotedMinor = project.quote ? BigInt(Math.round(readQuoteGrandTotal(project.quote as any) * 100)) : 0n;
 
   // Map recordedById on client payments to user names (for "Received by" column)
   const clientRecordedIds = Array.from(
@@ -238,6 +235,7 @@ export default async function ProjectPaymentHistoryPage({
       </div>
 
       <div className="flex justify-end">
+        <PrintButton className="mr-3" />
         <Link
           href="/reports/payment-history"
           className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
