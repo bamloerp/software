@@ -68,6 +68,12 @@ const PAGE_DEFS: PageDef[] = [
     icon: 'quote',
     roles: ['SENIOR_QS', 'ADMIN'],
   },
+  {
+    label: 'Recycle Bin',
+    href: '/quotes/recycle-bin',
+    icon: 'list',
+    roles: ['ADMIN'],
+  },
   { label: 'New Quotations', href: '/quotes?status=SENT_TO_SALES', icon: 'list', roles: ['SALES'] },
   {
     label: 'Pending Endorsements',
