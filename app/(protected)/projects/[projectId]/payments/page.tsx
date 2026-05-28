@@ -40,7 +40,7 @@ export default async function ProjectPaymentsPage({
     where: { id: projectId },
     include: {
       clientPayments: { orderBy: { receivedAt: 'desc' } },
-      quote: { include: { customer: true, lines: true } },
+         quote: { include: { customer: true, lines: true } },
       paymentSchedules: { select: { id: true, label: true, amountMinor: true, paidMinor: true, dueOn: true, status: true, seq: true }, orderBy: { seq: 'asc' } },
     },
   });

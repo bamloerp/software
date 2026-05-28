@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { safeAction } from '@/lib/safe-action';
 import { revalidatePath } from 'next/cache';
 import { generatePaymentSchedule } from '@/app/(protected)/projects/actions';
+import { readQuoteGrandTotal } from '@/lib/accounting';
 
 const createProjectFromQuoteSchema = z.object({
     quoteId: z.string(),
@@ -41,22 +42,15 @@ export const createProjectFromQuote = safeAction(createProjectFromQuoteSchema, a
         select: {
             number: true,
             metaJson: true,
+            pgRate: true,
+            contingencyRate: true,
+            vatBps: true,
             lines: { select: { lineTotalMinor: true } },
         },
     });
     if (!quote) throw new Error('Quote not found');
 
-    let grandTotalMinor = 0n;
-    try {
-        const meta = typeof quote.metaJson === 'string' ? JSON.parse(quote.metaJson) : quote.metaJson;
-        if (meta?.totals?.grandTotal) {
-            grandTotalMinor = BigInt(Math.round(meta.totals.grandTotal * 100));
-        } else {
-            grandTotalMinor = quote.lines.reduce((sum, line) => sum + BigInt(line.lineTotalMinor ?? 0), 0n);
-        }
-    } catch {
-        grandTotalMinor = quote.lines.reduce((sum, line) => sum + BigInt(line.lineTotalMinor ?? 0), 0n);
-    }
+    const grandTotalMinor = BigInt(Math.round(readQuoteGrandTotal(quote as any) * 100));
 
     const deposit = BigInt(Math.round(depositMinor || 0));
     const installment = BigInt(Math.round(installmentMinor || 0));

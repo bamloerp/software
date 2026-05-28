@@ -31,6 +31,9 @@ export default async function ProjectPaymentHistoryPage({
         select: {
           id: true,
           metaJson: true,
+          pgRate: true,
+          contingencyRate: true,
+          vatBps: true,
           lines: { select: { lineTotalMinor: true } },
           customer: {
             select: {

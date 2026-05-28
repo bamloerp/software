@@ -196,7 +196,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      quote: { select: { number: true, metaJson: true, lines: { select: { lineTotalMinor: true } }, customer: { select: { displayName: true, email: true, phone: true, city: true } } } },
+      quote: { select: { number: true, metaJson: true, pgRate: true, contingencyRate: true, vatBps: true, lines: { select: { lineTotalMinor: true } }, customer: { select: { displayName: true, email: true, phone: true, city: true } } } },
       requisitions: { include: { items: true, funding: true } },
       dispatches: { include: { items: true } },
       clientPayments: true,

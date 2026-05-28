@@ -4,7 +4,17 @@ import { toBigIntMinor } from '@/helpers/money';
 export async function getQuoteGrandTotalMinor(projectId: string): Promise<bigint> {
   const p = await prisma.project.findUnique({
     where: { id: projectId },
-    include: { quote: { select: { metaJson: true, lines: { select: { lineTotalMinor: true } } } } },
+    include: {
+      quote: {
+        select: {
+          metaJson: true,
+          pgRate: true,
+          contingencyRate: true,
+          vatBps: true,
+          lines: { select: { lineTotalMinor: true } },
+        },
+      },
+    },
   });
   if (!p?.quote) throw new Error('Quote totals not found');
   try {
@@ -14,7 +24,14 @@ export async function getQuoteGrandTotalMinor(projectId: string): Promise<bigint
   } catch {
     // Fall back to line totals below.
   }
-  return p.quote.lines.reduce((sum, line) => sum + BigInt(line.lineTotalMinor ?? 0), 0n);
+  const totalMeasuredWorksMinor = p.quote.lines.reduce((sum, line) => sum + BigInt(line.lineTotalMinor ?? 0), 0n);
+  const pgAmount = BigInt(Math.round(Number(totalMeasuredWorksMinor) * (Number(p.quote.pgRate ?? 0) / 100)));
+  const contingencyAmount = BigInt(Math.round(Number(pgAmount) * (Number(p.quote.contingencyRate ?? 0) / 100)));
+  const subtotalBeforeVat = totalMeasuredWorksMinor + pgAmount + contingencyAmount;
+  const rawVat = Number(p.quote.vatBps ?? 0);
+  const effectiveBps = rawVat > 0 && rawVat < 100 ? rawVat * 100 : rawVat;
+  const vatAmount = BigInt(Math.round(Number(subtotalBeforeVat) * ((effectiveBps / 100) / 100)));
+  return subtotalBeforeVat + vatAmount;
 }
 
 export async function reconcilePaymentScheduleToGrandTotal(projectId: string) {

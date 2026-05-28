@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db';
 import { resolveOfficeForRole, ensureQuoteOffice } from '@/lib/office';
 import { calcLine } from '@/lib/formulas';
 import { money } from '@/lib/money';
+import { readQuoteGrandTotal } from '@/lib/accounting';
 import { fromBps, fromMinor, toMinor, toBigIntMinor } from '@/helpers/money';
 import { buildQuoteSnapshot, computeTotalsFromLines, createQuoteVersionTx, type SnapshotLine } from '@/lib/quoteSnapshot';
 import { TX_OPTS } from '@/lib/db-tx';
@@ -1117,24 +1118,16 @@ export async function endorseQuote(
       select: {
         id: true,
         metaJson: true,
+        pgRate: true,
+        contingencyRate: true,
+        vatBps: true,
         lines: { select: { lineTotalMinor: true } }
       },
     });
 
     if (!quoteForValidation) throw new Error('Quote not found');
 
-    // Calculate grand total from quote
-    let grandTotalMinor = 0n;
-    try {
-      const meta = typeof quoteForValidation.metaJson === 'string' ? JSON.parse(quoteForValidation.metaJson) : quoteForValidation.metaJson;
-      if (meta?.totals?.grandTotal) {
-        grandTotalMinor = BigInt(Math.round(meta.totals.grandTotal * 100));
-      } else {
-        grandTotalMinor = quoteForValidation.lines.reduce((sum, line) => sum + BigInt(line.lineTotalMinor ?? 0), 0n);
-      }
-    } catch {
-      grandTotalMinor = quoteForValidation.lines.reduce((sum, line) => sum + BigInt(line.lineTotalMinor ?? 0), 0n);
-    }
+    const grandTotalMinor = BigInt(Math.round(readQuoteGrandTotal(quoteForValidation as any) * 100));
 
     // Validation 3: Deposit must not be greater than grand total
     if (depositMinor > grandTotalMinor) {
@@ -1317,6 +1310,9 @@ export async function endorseQuoteToProject(
     select: {
       id: true,
       metaJson: true,
+      pgRate: true,
+      contingencyRate: true,
+      vatBps: true,
       lines: {
         select: {
           lineTotalMinor: true
@@ -1327,20 +1323,7 @@ export async function endorseQuoteToProject(
 
   if (!quoteForValidation) throw new Error('Quote not found');
 
-  // Calculate grand total from quote
-  let grandTotalMinor = 0n;
-  try {
-    const meta = typeof quoteForValidation.metaJson === 'string' ? JSON.parse(quoteForValidation.metaJson) : quoteForValidation.metaJson;
-    if (meta?.totals?.grandTotal) {
-      grandTotalMinor = BigInt(Math.round(meta.totals.grandTotal * 100));
-    } else {
-      // Fallback: sum line totals
-      grandTotalMinor = quoteForValidation.lines.reduce((sum, line) => sum + BigInt(line.lineTotalMinor ?? 0), 0n);
-    }
-  } catch {
-    // Fallback: sum line totals
-    grandTotalMinor = quoteForValidation.lines.reduce((sum, line) => sum + BigInt(line.lineTotalMinor ?? 0), 0n);
-  }
+  const grandTotalMinor = BigInt(Math.round(readQuoteGrandTotal(quoteForValidation as any) * 100));
 
   // Determine if fully paid by deposit (or effectively no balance)
   const isFullyPaid = depositMinor >= grandTotalMinor;

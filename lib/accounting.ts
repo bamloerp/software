@@ -13,6 +13,12 @@ export function toMinor(major: number): bigint {
  * Read grand total from quote meta snapshot if present, else sum lines if needed.
  * Expects quote.metaJson to include { totals: { grandTotal } } (as in your app).
  */
+function vatPercentFromBps(vatBps: bigint | number | null | undefined): number {
+  const raw = Number(vatBps ?? 0);
+  const effectiveBps = raw > 0 && raw < 100 ? raw * 100 : raw;
+  return effectiveBps / 100;
+}
+
 export function readQuoteGrandTotal(quote: Partial<Quote> & { lines?: Array<{ lineTotalMinor?: bigint | number | null }> }): number {
   try {
     const meta = quote.metaJson ? JSON.parse(quote.metaJson) : null;
@@ -20,9 +26,21 @@ export function readQuoteGrandTotal(quote: Partial<Quote> & { lines?: Array<{ li
     if (typeof grand === 'number' && Number.isFinite(grand)) return grand;
     if (typeof grand === 'string' && Number.isFinite(Number(grand))) return Number(grand);
   } catch {
-    // Fall through to line totals below.
+    // Fall through to calculated totals below.
   }
-  return (quote.lines ?? []).reduce((sum, line) => sum + fromMinor(line.lineTotalMinor as any), 0);
+
+  const totalMeasuredWorksMinor = (quote.lines ?? []).reduce(
+    (sum, line) => sum + BigInt(line.lineTotalMinor ?? 0),
+    0n,
+  );
+  const pgRate = Number(quote.pgRate ?? 0);
+  const contingencyRate = Number(quote.contingencyRate ?? 0);
+  const pgAmount = BigInt(Math.round(Number(totalMeasuredWorksMinor) * (pgRate / 100)));
+  const contingencyAmount = BigInt(Math.round(Number(pgAmount) * (contingencyRate / 100)));
+  const subtotalBeforeVat = totalMeasuredWorksMinor + pgAmount + contingencyAmount;
+  const vatPercent = vatPercentFromBps(quote.vatBps);
+  const vatAmount = BigInt(Math.round(Number(subtotalBeforeVat) * (vatPercent / 100)));
+  return fromMinor(subtotalBeforeVat + vatAmount);
 }
 
 /**
