@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import EmployeeAssignmentModal from './EmployeeAssignmentModal';
 import {
@@ -75,19 +75,6 @@ export default function ScheduleEditor({
   const [error, setError] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [checkingConflicts, setCheckingConflicts] = useState(false);
-  const employeeNameById = useMemo(() => {
-    return new Map(
-      employees.map((employee) => [
-        employee.id,
-        `${employee.givenName}${employee.surname ? ` ${employee.surname}` : ''}`,
-      ])
-    );
-  }, [employees]);
-
-  const workerLabel = (employeeIds: string[] = []) => {
-    const names = employeeIds.map((id) => employeeNameById.get(id)).filter(Boolean);
-    return names.length > 0 ? names.join(', ') : 'Select Team';
-  };
 
   // Auto-scheduling state
   const [projectStartDate, setProjectStartDate] = useState<string>(
@@ -661,7 +648,7 @@ export default function ScheduleEditor({
                           {it.employeeIds && it.employeeIds.length > 0 ? (
                             <>
                               <CheckCircleIcon className="h-3.5 w-3.5" />
-                              <span className="truncate">{workerLabel(it.employeeIds)}</span>
+                              {it.employeeIds.length} Assigned
                             </>
                           ) : (
                             'Select Team'
