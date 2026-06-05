@@ -3,14 +3,14 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Parser } from 'expr-eval';
 import { TAKEOFF_DEFAULTS, TAKEOFF_LAYOUT } from '@/lib/takeoffLayout';
-import { createQuote, upsertCustomer } from '@/app/(protected)/actions';
+import { createQuote, saveTakeoffQuoteDraft, upsertCustomer } from '@/app/(protected)/actions';
 import { QUOTE_LINE_MAP, ELECTRICAL_ITEMS_CATALOG, type ElectricalItem } from '@/lib/quoteMap';
 import { normalizeContext, missingVars, evalExpr } from '@/lib/expr';
 import { DEFAULT_NOTES } from '@/lib/quoteDefaults';
 import { manualRateCode, type ManualCatalogItem } from '@/lib/manualItemCatalogShared';
 import ClearableNumberInput from './ClearableNumberInput';
 import Money from '@/components/Money';
-import { UserIcon, EnvelopeIcon, PhoneIcon, BuildingOfficeIcon, MapPinIcon, WrenchScrewdriverIcon, BeakerIcon, ArrowDownTrayIcon, PlusIcon, TrashIcon, CheckCircleIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { UserIcon, EnvelopeIcon, PhoneIcon, BuildingOfficeIcon, MapPinIcon, WrenchScrewdriverIcon, BeakerIcon, ArrowDownTrayIcon, PlusIcon, TrashIcon, CheckCircleIcon, BoltIcon, BookmarkSquareIcon } from '@heroicons/react/24/outline';
 
 const parser = new Parser({ allowMemberAccess: false });
 
@@ -29,6 +29,78 @@ function varsFromExpr(expr: string): string[] {
 
 type RateOverrides = Record<string, number>; // code -> overridden rate
 type SystemSettings = { vatBps?: string; pgRate?: string; contingencyRate?: string };
+type TakeoffDraft = {
+  id?: string;
+  customer?: Partial<{ name: string; email: string; phone: string; city: string; address: string }>;
+  currency?: string;
+  vatRate?: number;
+  state?: {
+    vals?: Record<string, number | null>;
+    units?: UnitMap;
+    customItems?: Array<Partial<CustomItem>>;
+    notesText?: string;
+    includeTiles?: boolean;
+    includeElectricals?: boolean;
+    electricalItems?: Array<Partial<ElectricalItem>>;
+    constOverrides?: Record<string, Record<number, number>>;
+  };
+} | null;
+
+type CustomItem = {
+  catalogId?: string;
+  description: string;
+  unit: string;
+  qty: number;
+  rate: number;
+  section: string;
+  itemType?: 'MATERIAL' | 'LABOUR';
+};
+
+const BASE_TAKEOFF_VALUES = {
+  ...TAKEOFF_DEFAULTS,
+  A4: 0,
+  B4: 0,
+  D4: 0,
+  E4: 0,
+  G4: 0,
+};
+
+function restoreVals(draft?: TakeoffDraft): Record<string, number> {
+  const restored: Record<string, number> = { ...BASE_TAKEOFF_VALUES };
+  const vals = draft?.state?.vals ?? {};
+  for (const [code, value] of Object.entries(vals)) {
+    restored[code] = typeof value === 'number' && Number.isFinite(value) ? value : Number.NaN;
+  }
+  return restored;
+}
+
+function restoreCustomItems(draft?: TakeoffDraft): CustomItem[] {
+  const items = draft?.state?.customItems;
+  if (!Array.isArray(items) || items.length === 0) {
+    return [{ description: '', unit: '', qty: 0, rate: 0, section: 'FOUNDATIONS', itemType: 'MATERIAL' }];
+  }
+  return items.map((item) => ({
+    catalogId: item.catalogId,
+    description: item.description ?? '',
+    unit: item.unit ?? '',
+    qty: typeof item.qty === 'number' ? item.qty : 0,
+    rate: typeof item.rate === 'number' ? item.rate : 0,
+    section: item.section ?? 'FOUNDATIONS',
+    itemType: item.itemType === 'LABOUR' ? 'LABOUR' : 'MATERIAL',
+  }));
+}
+
+function sanitizeNumberMap(values: Record<string, number>): Record<string, number | null> {
+  return Object.fromEntries(
+    Object.entries(values).map(([key, value]) => [key, Number.isFinite(value) ? value : null]),
+  );
+}
+
+function attentionInputClass(needsAttention: boolean, className: string) {
+  return needsAttention
+    ? className.replace('border-gray-200', 'border-red-400').replace('dark:border-gray-600', 'dark:border-red-500') + ' bg-red-50 ring-2 ring-red-500/20 dark:bg-red-950/30'
+    : className;
+}
 
 function applyElectricalRateOverrides(rateOverrides: RateOverrides): ElectricalItem[] {
   return ELECTRICAL_ITEMS_CATALOG.map(item => ({
@@ -41,57 +113,64 @@ export default function TakeOffSheet({
   rateOverrides = {},
   systemSettings = {},
   manualCatalog = [],
+  initialDraft = null,
 }: {
   rateOverrides?: RateOverrides;
   systemSettings?: SystemSettings;
   manualCatalog?: ManualCatalogItem[];
+  initialDraft?: TakeoffDraft;
 } = {}) {
-  const [vals, setVals] = useState<Record<string, number>>({
-    ...TAKEOFF_DEFAULTS,
-    A4: 0,
-    B4: 0,
-    D4: 0,
-    E4: 0,
-    G4: 0,
-  });
+  const [draftId, setDraftId] = useState(initialDraft?.id ?? '');
+  const [vals, setVals] = useState<Record<string, number>>(() => restoreVals(initialDraft));
   const [tab, setTab] = useState<'materials' | 'labour'>('materials');
-  const [units, setUnits] = useState<UnitMap>({});
-  const [customer, setCustomer] = useState({ name: '', email: '', phone: '', city: '' });
-  const [customerAddress, setCustomerAddress] = useState('');
-  const [currency, setCurrency] = useState(process.env.NEXT_PUBLIC_CURRENCY || 'USD');
+  const [units, setUnits] = useState<UnitMap>(() => initialDraft?.state?.units ?? {});
+  const [customer, setCustomer] = useState({
+    name: initialDraft?.customer?.name ?? '',
+    email: initialDraft?.customer?.email ?? '',
+    phone: initialDraft?.customer?.phone ?? '',
+    city: initialDraft?.customer?.city ?? '',
+  });
+  const [customerAddress, setCustomerAddress] = useState(initialDraft?.customer?.address ?? '');
+  const [currency, setCurrency] = useState(initialDraft?.currency || process.env.NEXT_PUBLIC_CURRENCY || 'USD');
   const defaultVat = systemSettings.vatBps ? Number(systemSettings.vatBps) / 10000 : parseFloat(process.env.VAT_DEFAULT || '0.155');
-  const [vatRate, setVatRate] = useState<number>(defaultVat);
+  const [vatRate, setVatRate] = useState<number>(typeof initialDraft?.vatRate === 'number' ? initialDraft.vatRate : defaultVat);
   const pgPct = systemSettings.pgRate ? Number(systemSettings.pgRate) / 100 : 0.02;
   const contingencyPct = systemSettings.contingencyRate ? Number(systemSettings.contingencyRate) / 100 : 0.10;
   const [creating, setCreating] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftMessage, setDraftMessage] = useState<string | null>(initialDraft?.id ? 'Draft loaded. Continue editing or generate when ready.' : null);
+  const [showValidation, setShowValidation] = useState(false);
   const router = useRouter();
-  type CustomItem = {
-    catalogId?: string;
-    description: string;
-    unit: string;
-    qty: number;
-    rate: number;
-    section: string;
-    itemType?: 'MATERIAL' | 'LABOUR';
-  };
-  const [customItems, setCustomItems] = useState<CustomItem[]>([
-    { description: '', unit: '', qty: 0, rate: 0, section: 'FOUNDATIONS', itemType: 'MATERIAL' },
-  ]);
-  const [notesText, setNotesText] = useState(DEFAULT_NOTES);
+  const [customItems, setCustomItems] = useState<CustomItem[]>(() => restoreCustomItems(initialDraft));
+  const [notesText, setNotesText] = useState(initialDraft?.state?.notesText ?? DEFAULT_NOTES);
   const [formError, setFormError] = useState<string | null>(null);
 
   // Tiles toggle (the 'Concrete tiles Double Roman black' item under ROOF COVERINGS)
-  const [includeTiles, setIncludeTiles] = useState(true);
+  const [includeTiles, setIncludeTiles] = useState(initialDraft?.state?.includeTiles ?? true);
 
   // Electricals section
-  const [includeElectricals, setIncludeElectricals] = useState(false);
+  const [includeElectricals, setIncludeElectricals] = useState(initialDraft?.state?.includeElectricals ?? false);
   const [electricalItems, setElectricalItems] = useState<ElectricalItem[]>(
-    () => applyElectricalRateOverrides(rateOverrides)
+    () => {
+      const restored = initialDraft?.state?.electricalItems;
+      if (Array.isArray(restored) && restored.length > 0) {
+        return restored.map((item, idx) => ({
+          id: item.id ?? `elec-draft-${idx}`,
+          description: item.description ?? '',
+          unit: item.unit ?? 'no',
+          qty: typeof item.qty === 'number' ? item.qty : 0,
+          rate: typeof item.rate === 'number' ? item.rate : 0,
+          section: item.section ?? 'ELECTRICALS',
+          itemType: item.itemType === 'LABOUR' ? 'LABOUR' : 'MATERIAL',
+        }));
+      }
+      return applyElectricalRateOverrides(rateOverrides);
+    }
   );
 
 
   // Per-cell numeric literal overrides, by literal index
-  const [constOverrides, setConstOverrides] = useState<Record<string, Record<number, number>>>({});
+  const [constOverrides, setConstOverrides] = useState<Record<string, Record<number, number>>>(initialDraft?.state?.constOverrides ?? {});
   const [editConst, setEditConst] = useState<{ code: string; index: number; value: string } | null>(
     null
   );
@@ -387,9 +466,136 @@ export default function TakeOffSheet({
     electricalItemsComplete &&
     quoteLinesPreview.length > 0;
 
+  const missingTakeoffInputs = useMemo(() => {
+    const issues: Array<{ code: string; label: string }> = [];
+    for (const row of TAKEOFF_LAYOUT) {
+      if (row.type !== 'cells') continue;
+      for (const cell of row.cells) {
+        if (!cell || cell.kind !== 'input' || !cell.label.trim()) continue;
+        const value = vals[cell.code] ?? TAKEOFF_DEFAULTS[cell.code];
+        if (!Number.isFinite(value) || Number(value) <= 0) {
+          issues.push({ code: cell.code, label: cell.label });
+        }
+      }
+    }
+    return issues;
+  }, [vals]);
+
+  const touchedManualItem = useCallback((item: CustomItem) => (
+    Boolean(item.catalogId) ||
+    item.description.trim() !== '' ||
+    item.unit.trim() !== '' ||
+    (Number.isFinite(item.qty) && item.qty > 0) ||
+    (Number.isFinite(item.rate) && item.rate > 0)
+  ), []);
+
+  const incompleteManualRows = useMemo(() => customItems
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => touchedManualItem(item))
+    .filter(({ item }) => !(
+      item.description.trim() !== '' &&
+      item.unit.trim() !== '' &&
+      item.section.trim() !== '' &&
+      Number.isFinite(item.qty) && item.qty > 0 &&
+      Number.isFinite(item.rate) && item.rate >= 0
+    )), [customItems, touchedManualItem]);
+
+  const incompleteElectricalRows = useMemo(() => {
+    if (!includeElectricals) return [];
+    return electricalItems
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => !(
+        item.description.trim() !== '' &&
+        item.unit.trim() !== '' &&
+        Number.isFinite(item.qty) && item.qty > 0 &&
+        Number.isFinite(item.rate) && item.rate >= 0
+      ));
+  }, [electricalItems, includeElectricals]);
+
+  const validationIssues = useMemo(() => {
+    const issues: string[] = [];
+    if (!customer.name.trim()) issues.push('Customer full name is required.');
+    if (!customer.email.trim()) issues.push('Customer email address is required.');
+    if (!customer.phone.trim()) issues.push('Customer phone number is required.');
+    if (!customer.city.trim()) issues.push('Customer city or location is required.');
+    if (!customerAddress.trim()) issues.push('Customer physical address is required.');
+    missingTakeoffInputs.forEach((item) => issues.push(`${item.label} (${item.code}) must be greater than zero.`));
+    incompleteManualRows.forEach(({ index }) => issues.push(`Manual item row ${index + 1} is incomplete.`));
+    incompleteElectricalRows.forEach(({ index }) => issues.push(`Electrical item row ${index + 1} is incomplete.`));
+    if (quoteLinesPreview.length === 0) issues.push('At least one quote line must be produced before generation.');
+    return issues;
+  }, [customer, customerAddress, incompleteElectricalRows, incompleteManualRows, missingTakeoffInputs, quoteLinesPreview.length]);
+
+  const missingTakeoffCodeSet = useMemo(
+    () => new Set(missingTakeoffInputs.map((item) => item.code)),
+    [missingTakeoffInputs],
+  );
+
   useEffect(() => {
     setMissingByCode(missing);
   }, [missing]);
+
+  function buildDraftState() {
+    return {
+      vals: sanitizeNumberMap(vals),
+      units,
+      customItems: customItems.map((item) => ({
+        ...item,
+        qty: Number.isFinite(item.qty) ? item.qty : null,
+        rate: Number.isFinite(item.rate) ? item.rate : null,
+      })),
+      notesText,
+      includeTiles,
+      includeElectricals,
+      electricalItems: electricalItems.map((item) => ({
+        ...item,
+        qty: Number.isFinite(item.qty) ? item.qty : null,
+        rate: Number.isFinite(item.rate) ? item.rate : null,
+      })),
+      constOverrides,
+    };
+  }
+
+  async function onSaveDraft() {
+    setSavingDraft(true);
+    try {
+      setFormError(null);
+      setDraftMessage(null);
+      const res = await saveTakeoffQuoteDraft({
+        draftId: draftId || null,
+        customer: {
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          city: customer.city,
+          address: customerAddress,
+        },
+        currency,
+        vatRate,
+        pgRate: pgPct * 100,
+        contingencyRate: contingencyPct * 100,
+        state: buildDraftState(),
+        previewLines: quoteLinesPreview.map((line) => ({
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          unit: line.unit ?? null,
+          section: line.section ?? null,
+          itemType: line.itemType ?? null,
+          code: line.code ?? null,
+        })),
+      });
+      setDraftId(res.quoteId);
+      setDraftMessage('Draft saved. You can find it in My Quotes and continue later.');
+      router.replace(`/quotes/new?draftId=${res.quoteId}`, { scroll: false });
+      router.refresh();
+    } catch (err: any) {
+      console.error('Draft save failed:', err);
+      setFormError(err.message || 'Failed to save draft. Please try again.');
+    } finally {
+      setSavingDraft(false);
+    }
+  }
 
   function rowsForTab() {
     const idxLabour = TAKEOFF_LAYOUT.findIndex(
@@ -465,12 +671,13 @@ export default function TakeOffSheet({
   // Preview: count of items with qty > 0
 
   async function onCreateQuote() {
+    setShowValidation(true);
     setCreating(true);
     try {
       setFormError(null);
 
       if (!requiredFieldsFilled) {
-        setFormError('Fill in all customer details, takeoff input fields, and any enabled optional item fields before generating.');
+        setFormError('Some fields need attention before the quotation can be generated. Review the highlighted fields below.');
         return;
       }
 
@@ -504,6 +711,7 @@ export default function TakeOffSheet({
       }
 
       const res = await createQuote({
+        draftId: draftId || undefined,
         customerId,
         currency,
         vatRate,
@@ -558,7 +766,7 @@ export default function TakeOffSheet({
             <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Full Name</label>
             <div className="relative">
               <input
-                className="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400"
+                className={attentionInputClass(showValidation && !customer.name.trim(), "block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400")}
                 placeholder="John Doe"
                 value={customer.name}
                 onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
@@ -571,7 +779,7 @@ export default function TakeOffSheet({
             <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Email Address</label>
             <div className="relative">
               <input
-                className="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400"
+                className={attentionInputClass(showValidation && !customer.email.trim(), "block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400")}
                 placeholder="john@example.com"
                 value={customer.email}
                 onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
@@ -584,7 +792,7 @@ export default function TakeOffSheet({
             <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Phone Number</label>
             <div className="relative">
               <input
-                className="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400"
+                className={attentionInputClass(showValidation && !customer.phone.trim(), "block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400")}
                 placeholder="+1 (555) 000-0000"
                 value={customer.phone}
                 onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
@@ -597,7 +805,7 @@ export default function TakeOffSheet({
             <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">City / Location</label>
             <div className="relative">
               <input
-                className="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400"
+                className={attentionInputClass(showValidation && !customer.city.trim(), "block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400")}
                 placeholder="New York, NY"
                 value={customer.city}
                 onChange={(e) => setCustomer({ ...customer, city: e.target.value })}
@@ -610,7 +818,7 @@ export default function TakeOffSheet({
             <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Physical Address</label>
             <div className="relative">
               <textarea
-                className="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400"
+                className={attentionInputClass(showValidation && !customerAddress.trim(), "block w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400")}
                 placeholder="Enter full delivery or billing address..."
                 rows={2}
                 value={customerAddress}
@@ -626,6 +834,22 @@ export default function TakeOffSheet({
         {formError && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
             {formError}
+          </div>
+        )}
+        {draftMessage && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-300">
+            {draftMessage}
+          </div>
+        )}
+        {showValidation && validationIssues.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
+            <div className="font-semibold">Fields that need attention</div>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {validationIssues.slice(0, 12).map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+              {validationIssues.length > 12 && <li>{validationIssues.length - 12} more item(s) need attention.</li>}
+            </ul>
           </div>
         )}
         
@@ -716,10 +940,11 @@ export default function TakeOffSheet({
                   const value = isInput
                     ? (vals[cell!.code] ?? defaultVal)
                     : (context as any)[cell!.code];
+                  const inputNeedsAttention = showValidation && isInput && missingTakeoffCodeSet.has(cell!.code);
                   return (
                     <div
                       key={cIdx}
-                      className="group rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:shadow-md dark:bg-gray-800 dark:border-gray-700"
+                      className={`group rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md dark:bg-gray-800 ${inputNeedsAttention ? 'border-red-300 ring-2 ring-red-500/10 dark:border-red-500' : 'border-gray-100 dark:border-gray-700'}`}
                     >
                       <div className="mb-2 flex items-center justify-between">
                         <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -733,7 +958,7 @@ export default function TakeOffSheet({
                           cell!.code === 'A2' ? (
                             <select
                               aria-label="Select block size"
-                              className="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400"
+                              className={attentionInputClass(inputNeedsAttention, "block w-full rounded-lg border border-gray-200 bg-gray-50 py-2 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400")}
                               value={value ?? TAKEOFF_DEFAULTS.A2}
                               onChange={(e) =>
                                 setVals((v) => ({ ...v, [cell!.code]: Number(e.target.value) }))
@@ -749,7 +974,7 @@ export default function TakeOffSheet({
                             <ClearableNumberInput
                               type="number"
                               step={cell!.code === 'B2' || cell!.code === 'C2' ? 0.01 : 'any'}
-                              className="block w-full rounded-lg border border-gray-200 bg-gray-50 py-2 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400 placeholder:text-gray-400"
+                              className={attentionInputClass(inputNeedsAttention, "block w-full rounded-lg border border-gray-200 bg-gray-50 py-2 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:focus:border-blue-400 placeholder:text-gray-400")}
                               value={Number.isFinite(value) ? (value as number) : ''}
                               placeholder={String(TAKEOFF_DEFAULTS[cell!.code] ?? 0)}
                               onChange={(e) => {
@@ -767,6 +992,11 @@ export default function TakeOffSheet({
                           </div>
                         )}
                         
+                        {inputNeedsAttention && (
+                          <div className="mt-1 text-[10px] font-medium text-red-500">
+                            Required before generating
+                          </div>
+                        )}
                         {!isInput && !!missingByCode[cell!.code]?.length && (
                           <div className="mt-1 text-[10px] text-red-500">
                             Missing: {missingByCode[cell!.code].join(', ')}
@@ -841,11 +1071,11 @@ export default function TakeOffSheet({
 
           <div className="space-y-4">
             {electricalItems.map((ei, idx) => (
-              <div key={ei.id} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:bg-gray-900/50 dark:border-gray-700 md:flex-row md:items-start">
+              <div key={ei.id} className={`flex flex-col gap-3 rounded-xl border bg-gray-50 p-4 dark:bg-gray-900/50 md:flex-row md:items-start ${showValidation && incompleteElectricalRows.some((row) => row.index === idx) ? 'border-red-300 ring-2 ring-red-500/10 dark:border-red-500' : 'border-gray-100 dark:border-gray-700'}`}>
                 <div className="flex-1 space-y-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Description</label>
                   <input
-                    className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    className={attentionInputClass(showValidation && includeElectricals && !ei.description.trim(), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white")}
                     value={ei.description}
                     onChange={(e) =>
                       setElectricalItems((arr) =>
@@ -857,7 +1087,7 @@ export default function TakeOffSheet({
                 <div className="w-full md:w-24 space-y-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Unit</label>
                   <input
-                    className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    className={attentionInputClass(showValidation && includeElectricals && !ei.unit.trim(), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white")}
                     value={ei.unit}
                     onChange={(e) =>
                       setElectricalItems((arr) =>
@@ -869,7 +1099,7 @@ export default function TakeOffSheet({
                 <div className="w-full md:w-24 space-y-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Qty</label>
                   <ClearableNumberInput
-                    className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    className={attentionInputClass(showValidation && includeElectricals && (!Number.isFinite(ei.qty) || ei.qty <= 0), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white")}
                     value={Number.isFinite(ei.qty) ? ei.qty : ''}
                     onChange={(e) => {
                       const raw = e.currentTarget.value;
@@ -884,7 +1114,7 @@ export default function TakeOffSheet({
                 <div className="w-full md:w-24 space-y-1">
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Rate</label>
                   <ClearableNumberInput
-                    className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    className={attentionInputClass(showValidation && includeElectricals && (!Number.isFinite(ei.rate) || ei.rate < 0), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white")}
                     value={Number.isFinite(ei.rate) ? ei.rate : ''}
                     onChange={(e) => {
                       const raw = e.currentTarget.value;
@@ -939,7 +1169,7 @@ export default function TakeOffSheet({
 
         <div className="space-y-4">
           {customItems.map((ci, idx) => (
-            <div key={idx} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:bg-gray-900/50 dark:border-gray-700 md:flex-row md:items-start">
+            <div key={idx} className={`flex flex-col gap-3 rounded-xl border bg-gray-50 p-4 dark:bg-gray-900/50 md:flex-row md:items-start ${showValidation && incompleteManualRows.some((row) => row.index === idx) ? 'border-red-300 ring-2 ring-red-500/10 dark:border-red-500' : 'border-gray-100 dark:border-gray-700'}`}>
               <div className="w-full md:w-48 space-y-1">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Pick Saved Item</label>
                 <select
@@ -978,7 +1208,7 @@ export default function TakeOffSheet({
               <div className="flex-1 space-y-1">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Description</label>
                 <input
-                  className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  className={attentionInputClass(showValidation && touchedManualItem(ci) && !ci.description.trim(), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white")}
                   placeholder="Item description"
                   value={ci.description}
                   onChange={(e) =>
@@ -991,7 +1221,7 @@ export default function TakeOffSheet({
               <div className="w-full md:w-24 space-y-1">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Unit</label>
                 <input
-                  className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  className={attentionInputClass(showValidation && touchedManualItem(ci) && !ci.unit.trim(), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white")}
                   placeholder="ea"
                   value={ci.unit}
                   onChange={(e) =>
@@ -1004,7 +1234,7 @@ export default function TakeOffSheet({
               <div className="w-full md:w-24 space-y-1">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Qty</label>
                 <ClearableNumberInput
-                  className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  className={attentionInputClass(showValidation && touchedManualItem(ci) && (!Number.isFinite(ci.qty) || ci.qty <= 0), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white")}
                   value={Number.isFinite(ci.qty) ? ci.qty : ''}
                   onChange={(e) => {
                     const raw = e.currentTarget.value;
@@ -1019,7 +1249,7 @@ export default function TakeOffSheet({
               <div className="w-full md:w-24 space-y-1">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Rate</label>
                 <ClearableNumberInput
-                  className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  className={attentionInputClass(showValidation && touchedManualItem(ci) && (!Number.isFinite(ci.rate) || ci.rate < 0), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white")}
                   value={Number.isFinite(ci.rate) ? ci.rate : ''}
                   onChange={(e) => {
                     const raw = e.currentTarget.value;
@@ -1053,7 +1283,7 @@ export default function TakeOffSheet({
                   
                   {(!sections.includes((ci.section || '').toUpperCase()) || (ci.section || '').toUpperCase() === 'OTHER') && (
                     <input
-                      className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-xs text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white placeholder:italic"
+                      className={attentionInputClass(showValidation && touchedManualItem(ci) && !ci.section.trim(), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-xs text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white placeholder:italic")}
                       placeholder="Type custom section..."
                       value={ci.section === 'OTHER' ? '' : ci.section}
                       autoFocus={ci.section === 'OTHER'}
@@ -1110,25 +1340,37 @@ export default function TakeOffSheet({
 
 
       <div className="sticky bottom-6 z-10 mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white/90 p-4 shadow-lg backdrop-blur-sm dark:bg-gray-800/90 dark:border-gray-700">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
            <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
-             Ready to generate?
+             {requiredFieldsFilled ? 'Ready to generate?' : `${validationIssues.length} item(s) need attention before generating.`}
            </div>
-          <button
-            className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-green-700 hover:shadow-lg focus:ring-4 focus:ring-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={creating || !requiredFieldsFilled}
-            onClick={onCreateQuote}
-            title={requiredFieldsFilled ? 'Generate quotation' : 'Fill in all customer details, takeoff input fields, and enabled optional item fields first'}
-          >
-            {creating ? (
-              <>Generating...</>
-            ) : (
-              <>
-                <CheckCircleIcon className="h-5 w-5" />
-                Generate Quotation
-              </>
-            )}
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-5 py-2.5 text-sm font-bold text-blue-700 shadow-sm transition-all hover:bg-blue-50 focus:ring-4 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-900/60 dark:bg-gray-900 dark:text-blue-300 dark:hover:bg-blue-950/40"
+              disabled={savingDraft || creating}
+              onClick={onSaveDraft}
+              title="Save your current inputs as a draft so you can continue later"
+            >
+              <BookmarkSquareIcon className="h-5 w-5" />
+              {savingDraft ? 'Saving...' : 'Save to Draft'}
+            </button>
+            <button
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-green-700 hover:shadow-lg focus:ring-4 focus:ring-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={creating || savingDraft}
+              onClick={onCreateQuote}
+              title={requiredFieldsFilled ? 'Generate quotation' : 'Show fields that need attention'}
+            >
+              {creating ? (
+                <>Generating...</>
+              ) : (
+                <>
+                  <CheckCircleIcon className="h-5 w-5" />
+                  Generate Quotation
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

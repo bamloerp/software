@@ -21,6 +21,7 @@ export const QuoteLineInputSchema = z.object({
 });
 
 export const CreateQuoteSchema = z.object({
+  draftId: z.string().optional(),
   customerId: z.string(),
   currency: z.string().default('USD'),
   vatRate: z.number().min(0).max(1).default(parseFloat(process.env.VAT_DEFAULT || '0.15')),

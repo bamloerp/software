@@ -66,6 +66,175 @@ const parseVatEnvToPercent = (raw: string | undefined) => {
   return value <= 1 ? value * 100 : value;
 };
 
+type TakeoffQuoteDraftInput = {
+  draftId?: string | null;
+  customer?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    city?: string | null;
+    address?: string | null;
+  };
+  currency?: string;
+  vatRate?: number;
+  pgRate?: number;
+  contingencyRate?: number;
+  state: unknown;
+  previewLines?: Array<{
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    unit?: string | null;
+    section?: string | null;
+    itemType?: string | null;
+    code?: string | null;
+  }>;
+};
+
+function parseJsonObject(value: string | null): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function getActingUser() {
+  const sessionUser = await getCurrentUser();
+  if (!sessionUser?.id) throw new Error('Authentication required');
+  const actingUser = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
+    select: { id: true, role: true, office: true },
+  });
+  if (!actingUser) throw new Error('Authentication required');
+  return actingUser;
+}
+
+async function upsertDraftCustomer(input: TakeoffQuoteDraftInput['customer'] | undefined) {
+  const displayName = input?.name?.trim() || `Draft Quote ${new Date().toISOString().slice(0, 19)}`;
+  const city = input?.city?.trim() || null;
+  const existing = await prisma.customer.findFirst({
+    where: { displayName, city },
+    select: { id: true },
+  });
+  if (existing) {
+    return prisma.customer.update({
+      where: { id: existing.id },
+      data: {
+        email: input?.email?.trim() || null,
+        phone: input?.phone?.trim() || null,
+        addressJson: input?.address?.trim() ? JSON.stringify({ line1: input.address.trim() }) : Prisma.JsonNull,
+      },
+      select: { id: true },
+    });
+  }
+  return prisma.customer.create({
+    data: {
+      displayName,
+      city,
+      email: input?.email?.trim() || null,
+      phone: input?.phone?.trim() || null,
+      addressJson: input?.address?.trim() ? JSON.stringify({ line1: input.address.trim() }) : Prisma.JsonNull,
+    },
+    select: { id: true },
+  });
+}
+
+function buildTakeoffDraftMeta(input: TakeoffQuoteDraftInput, existingMeta: Record<string, unknown> = {}) {
+  return {
+    ...existingMeta,
+    takeoffDraft: {
+      savedAt: new Date().toISOString(),
+      customer: input.customer ?? {},
+      currency: input.currency || process.env.NEXT_PUBLIC_CURRENCY || 'USD',
+      vatRate: typeof input.vatRate === 'number' ? input.vatRate : parseFloat(process.env.VAT_DEFAULT || '0.155'),
+      pgRate: typeof input.pgRate === 'number' ? input.pgRate : 2,
+      contingencyRate: typeof input.contingencyRate === 'number' ? input.contingencyRate : 10,
+      state: input.state,
+      previewLines: Array.isArray(input.previewLines) ? input.previewLines : [],
+    },
+  };
+}
+
+export async function saveTakeoffQuoteDraft(input: TakeoffQuoteDraftInput) {
+  const actingUser = await getActingUser();
+  const userRole = coerceUserRole(actingUser.role);
+  if (userRole !== 'QS' && userRole !== 'SENIOR_QS' && userRole !== 'ADMIN') {
+    throw new Error('Only QS, Senior QS, or Admin users can save quote drafts');
+  }
+
+  const userOffice = resolveOfficeForRole(userRole, actingUser.office ?? null);
+  const customer = await upsertDraftCustomer(input.customer);
+  const currency = input.currency || process.env.NEXT_PUBLIC_CURRENCY || 'USD';
+  const vatRate = typeof input.vatRate === 'number' ? input.vatRate : parseFloat(process.env.VAT_DEFAULT || '0.155');
+  const pgRate = typeof input.pgRate === 'number' ? input.pgRate : 2;
+  const contingencyRate = typeof input.contingencyRate === 'number' ? input.contingencyRate : 10;
+
+  const saved = await prisma.$transaction(async (tx) => {
+    if (input.draftId) {
+      const existing = await tx.quote.findUnique({ where: { id: input.draftId }, include: quoteInclude });
+      if (!existing) throw new Error('Draft quote not found');
+      if (existing.status !== 'DRAFT') throw new Error('Only draft quotes can be updated from this screen');
+      if (existing.createdById !== actingUser.id && userRole !== 'ADMIN') {
+        throw new Error('You can only update your own draft quotes');
+      }
+
+      const updated = await tx.quote.update({
+        where: { id: existing.id },
+        data: {
+          customer: { connect: { id: customer.id } },
+          currency,
+          vatBps: toBps(vatRate),
+          discountPolicy: 'none',
+          metaJson: JSON.stringify(buildTakeoffDraftMeta(input, parseJsonObject(existing.metaJson))),
+          pgRate,
+          contingencyRate,
+          office: existing.office ?? userOffice,
+        },
+        include: quoteInclude,
+      });
+
+      await createQuoteVersionTx(tx, {
+        quote: updated,
+        label: 'Draft saved',
+        status: 'DRAFT',
+        byRole: userRole,
+      });
+
+      return updated;
+    }
+
+    const created = await tx.quote.create({
+      data: {
+        customer: { connect: { id: customer.id } },
+        createdBy: { connect: { id: actingUser.id } },
+        currency,
+        vatBps: toBps(vatRate),
+        discountPolicy: 'none',
+        metaJson: JSON.stringify(buildTakeoffDraftMeta(input)),
+        pgRate,
+        contingencyRate,
+        status: 'DRAFT',
+        office: userOffice,
+      },
+      include: quoteInclude,
+    });
+
+    await createQuoteVersionTx(tx, {
+      quote: created,
+      label: 'Draft saved',
+      status: 'DRAFT',
+      byRole: userRole,
+    });
+
+    return created;
+  }, TX_OPTS);
+
+  return { quoteId: saved.id };
+}
+
 export async function createQuote(input: unknown, currentUserId?: string) {
   try {
     console.log('createQuote input:', JSON.stringify(input, null, 2));
@@ -122,43 +291,73 @@ export async function createQuote(input: unknown, currentUserId?: string) {
       },
     };
 
+    const lineCreates = parsed.lines.map((line, idx) => {
+      const calc = linesCalced[idx];
+      return {
+        description: line.description,
+        quantity: line.quantity,
+        unit: line.unit ?? null,
+        section: line.section ?? null,
+        itemType: line.itemType ?? null,
+        product: line.productId ? { connect: { id: line.productId } } : undefined,
+        unitPriceMinor: toMinor(Number(line.unitPrice)),
+        lineSubtotalMinor: toMinor(Number(calc.lineSubtotal)),
+        lineDiscountMinor: toMinor(Number(calc.lineDiscount)),
+        lineTaxMinor: toMinor(Number(calc.lineTax)),
+        lineTotalMinor: toMinor(Number(calc.lineTotal)),
+        metaJson: line.metaJson ? JSON.stringify(line.metaJson) : null,
+      };
+    });
+
     const created = await prisma.$transaction(async (tx) => {
-      const q = await tx.quote.create({
-        data: {
-          currency: parsed.currency,
-          vatBps: toBps(parsed.vatRate),
-          discountPolicy: parsed.discountPolicy ?? null,
-          metaJson: JSON.stringify(meta),
-          pgRate: parsed.pgRate ?? 2.0,
-          contingencyRate: parsed.contingencyRate ?? 10.0,
-          assumptions: parsed.assumptions ?? null,
-          exclusions: parsed.exclusions ?? null,
-          status: 'SUBMITTED_REVIEW',
-          office: userOffice,
-          customer: { connect: { id: parsed.customerId } },
-          createdBy: { connect: { id: userId } },
-          lines: {
-            create: parsed.lines.map((line, idx) => {
-              const calc = linesCalced[idx];
-              return {
-                description: line.description,
-                quantity: line.quantity,
-                unit: line.unit ?? null,
-                section: line.section ?? null,
-                itemType: line.itemType ?? null,
-                product: line.productId ? { connect: { id: line.productId } } : undefined,
-                unitPriceMinor: toMinor(Number(line.unitPrice)),
-                lineSubtotalMinor: toMinor(Number(calc.lineSubtotal)),
-                lineDiscountMinor: toMinor(Number(calc.lineDiscount)),
-                lineTaxMinor: toMinor(Number(calc.lineTax)),
-                lineTotalMinor: toMinor(Number(calc.lineTotal)),
-                metaJson: line.metaJson ? JSON.stringify(line.metaJson) : null,
-              };
-            }),
+      let q;
+      if (parsed.draftId) {
+        const draft = await tx.quote.findUnique({ where: { id: parsed.draftId }, include: quoteInclude });
+        if (!draft) throw new Error('Draft quote not found');
+        if (draft.status !== 'DRAFT') throw new Error('Only draft quotes can be generated from this screen');
+        if (draft.createdById !== userId && userRole !== 'ADMIN') {
+          throw new Error('You can only generate your own draft quotes');
+        }
+
+        await tx.quoteLine.deleteMany({ where: { quoteId: draft.id } });
+        q = await tx.quote.update({
+          where: { id: draft.id },
+          data: {
+            currency: parsed.currency,
+            vatBps: toBps(parsed.vatRate),
+            discountPolicy: parsed.discountPolicy ?? null,
+            metaJson: JSON.stringify({ ...parseJsonObject(draft.metaJson), ...meta }),
+            pgRate: parsed.pgRate ?? 2.0,
+            contingencyRate: parsed.contingencyRate ?? 10.0,
+            assumptions: parsed.assumptions ?? null,
+            exclusions: parsed.exclusions ?? null,
+            status: 'SUBMITTED_REVIEW',
+            office: draft.office ?? userOffice,
+            customer: { connect: { id: parsed.customerId } },
+            lines: { create: lineCreates },
           },
-        },
-        include: quoteInclude,
-      });
+          include: quoteInclude,
+        });
+      } else {
+        q = await tx.quote.create({
+          data: {
+            currency: parsed.currency,
+            vatBps: toBps(parsed.vatRate),
+            discountPolicy: parsed.discountPolicy ?? null,
+            metaJson: JSON.stringify(meta),
+            pgRate: parsed.pgRate ?? 2.0,
+            contingencyRate: parsed.contingencyRate ?? 10.0,
+            assumptions: parsed.assumptions ?? null,
+            exclusions: parsed.exclusions ?? null,
+            status: 'SUBMITTED_REVIEW',
+            office: userOffice,
+            customer: { connect: { id: parsed.customerId } },
+            createdBy: { connect: { id: userId } },
+            lines: { create: lineCreates },
+          },
+          include: quoteInclude,
+        });
+      }
 
       // Keep version creation minimal inside tx
       await createQuoteVersionTx(tx, {
