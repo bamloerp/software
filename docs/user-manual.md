@@ -149,11 +149,19 @@ The following roles were verified from the system navigation and, where credenti
 - Senior Procurement
 - Security
 - Driver
+- General Manager
 - Managing Director
-- Administrator functions in the codebase
-- Accounts and accounting roles in the codebase
-- Foreman in the codebase
-- Client, Viewer, PM Clerk, and Human Resource roles in the codebase
+- Administrator
+- Accounts
+- Accounting Clerk
+- Accounting Officer
+- Accounting Auditor
+- Cashier
+- Foreman
+- PM Clerk
+- Human Resource
+- Client
+- Viewer
 
 Roles that exist in the codebase but were not supplied with working screenshot credentials are still described in this manual, but their screenshots are intentionally not included.
 
@@ -975,35 +983,142 @@ How:
 2. Review the information presented.
 3. Use the findings to guide operational follow-up.
 
-## 17. Accounts and Accounting Roles
+## 17. Finance Roles Guide
 
-The codebase includes `ACCOUNTS`, `ACCOUNTING_CLERK`, `ACCOUNTING_OFFICER`, `ACCOUNTING_AUDITOR`, and `CASHIER` roles. These roles were identified from the protected navigation and workflow rules, but live screenshots were not captured because credentials were not provided.
+The codebase includes `ACCOUNTS`, `ACCOUNTING_CLERK`, `ACCOUNTING_OFFICER`, `ACCOUNTING_AUDITOR`, and `CASHIER` roles. These roles were identified from the protected navigation, funding actions, purchase-order controls, payment pages, and project finance views. Live screenshots were not captured because credentials were not provided for these accounts.
 
-### 17.1 What these roles do
+### 17.1 Accounts role purpose
 
-- review funding requests
-- approve or reject funding
-- review payment history
-- review profit and loss views
-- access payments and finance-related operational pages
+The Accounts role is the main finance-control role for outgoing approvals, receipts verification, and finance review across projects.
 
-### 17.2 Why these tasks matter
+### 17.2 Task: Review and decide funding requests
 
-- Finance control protects cashflow, procurement discipline, and project reporting accuracy.
+What:
 
-### 17.3 When these tasks happen
+- Review funding requests raised from procurement and decide whether they should be approved, rejected, or postponed.
 
-- when procurement requests funding
-- when client payments are received
-- during daily finance review
-- during end-of-period reporting
+Why:
 
-### 17.4 How these users normally work
+- Funding approval is the main finance gate before procurement can continue.
 
-1. Open the finance module relevant to the task.
-2. Review the underlying project or funding record.
-3. Confirm the financial details.
-4. Approve, reject, or record the financial outcome according to policy.
+When:
+
+- When procurement submits a funding request.
+- During finance review meetings and daily approval cycles.
+
+How:
+
+1. Open **Funds** or the Accounts funding dashboard.
+2. Review the requisition, project, requested amount, and supporting reason.
+3. Approve, reject, or postpone the funding request according to company policy.
+4. Confirm the funding status has updated for the procurement workflow.
+
+### 17.3 Task: Review purchase orders and goods receiving
+
+What:
+
+- Review purchase orders from a finance-control perspective and verify goods-received entries where required.
+
+Why:
+
+- Purchase-order approval and goods-receipt verification help control spend and confirm that received items match what was expected.
+
+When:
+
+- When a purchase order reaches the finance approval stage.
+- When a goods-received note is awaiting verification.
+
+How:
+
+1. Open **Purchase Orders** or the Accounts goods-receiving view.
+2. Review the order amount, project, vendor, and receipt details.
+3. Approve or reject the purchase order where permitted.
+4. Verify the goods-received quantities and save the outcome.
+
+### 17.4 Task: Review payment history and project financial position
+
+What:
+
+- Use finance reporting views to review what has been paid, what remains outstanding, and how projects are performing financially.
+
+Why:
+
+- Finance oversight depends on accurate visibility into receipts, profitability, and project-level financial exposure.
+
+When:
+
+- During daily finance review.
+- During month-end, audit preparation, or management reporting.
+
+How:
+
+1. Open **Payments**, **Payment History**, or **Profit and Loss**.
+2. Select the relevant project or report view.
+3. Review paid-to-date values, outstanding balances, and profit position.
+4. Use the findings for follow-up, approval, or escalation.
+
+### 17.5 Accounting Officer and Accounting Clerk role focus
+
+What:
+
+- Support the Accounts workflow by reviewing funding requests, handling purchase-order decisions, checking goods receipts, and monitoring finance reports.
+
+Why:
+
+- These roles extend day-to-day finance processing capacity while preserving controlled approval steps.
+
+When:
+
+- During normal finance operations.
+- When funding, purchase-order, or receipt queues need action.
+
+How:
+
+1. Open the assigned finance queue such as **Funds**, **Purchase Orders**, or receipt verification.
+2. Review the supporting details for the request or receipt.
+3. Apply the permitted decision or verification step according to internal approval rules.
+4. Use report pages such as **Payment History** and **Profit and Loss** for monitoring and follow-up.
+
+### 17.6 Accounting Auditor role focus
+
+What:
+
+- Review finance-facing project information and financial reports without being the primary day-to-day processing role.
+
+Why:
+
+- Audit-oriented visibility helps confirm that finance activity is traceable and consistent.
+
+When:
+
+- During audit review, exception review, and financial oversight cycles.
+
+How:
+
+1. Open project, payment-history, or profit-and-loss views available to the role.
+2. Review the supporting financial records.
+3. Identify exceptions or items requiring follow-up.
+
+### 17.7 Cashier role focus
+
+What:
+
+- Support finance operations where direct payment or disbursement recording is assigned.
+
+Why:
+
+- Cash handling and payment entry need controlled system posting.
+
+When:
+
+- When a payment or approved disbursement must be recorded in the system.
+
+How:
+
+1. Open the assigned project or finance page.
+2. Review the amount, reference, and payment context.
+3. Record the financial entry where the workflow allows cashier action.
+4. Confirm the updated payment or disbursement position.
 
 ## 18. Administrator Guide
 
@@ -1069,18 +1184,131 @@ How:
 2. Review the deleted quotation list.
 3. Restore or inspect the required record according to policy.
 
-## 19. Roles with Limited Confirmed Surface
+## 19. Additional Confirmed Roles
 
-The following roles exist in the codebase but do not currently have enough confirmed live surface in this documentation set to support screenshot-backed step-by-step instructions:
+The following roles are confirmed in the codebase and have identifiable tasks or route access, even though live screenshots were not captured for them in this documentation pass.
 
-- Client
-- Viewer
-- PM Clerk
-- Human Resource
-- Foreman
-- General Manager
+### 19.1 General Manager role focus
 
-Where these roles are visible in the codebase, their likely purpose is reflected by the route names and access rules. However, this manual avoids inventing unsupported task detail.
+What:
+
+- Review project position, active requisitions, and management-level approval views.
+
+Why:
+
+- The role supports senior operational oversight without relying on the day-to-day specialist queues.
+
+When:
+
+- During management review, escalation handling, and cross-department coordination.
+
+How:
+
+1. Open **Projects** to review the live project portfolio.
+2. Review project-linked requisitions and operational status where needed.
+3. Access senior approval views that are also available to management, such as procurement approval flows, when a management decision is required.
+
+### 19.2 Foreman role focus
+
+What:
+
+- Monitor deliveries arriving for site work and review active assigned project reporting surfaces.
+
+Why:
+
+- Site-facing supervision depends on clear visibility into what is arriving and what work is active on the ground.
+
+When:
+
+- Before receiving deliveries and during active site execution.
+
+How:
+
+1. Open **Awaiting Delivery**.
+2. Review the incoming delivery or dispatch details.
+3. Confirm the relevant project context and follow the delivery through the site-facing process.
+
+### 19.3 Human Resource role focus
+
+What:
+
+- Manage employee records and add new employees.
+
+Why:
+
+- Employee administration supports staffing control and user-account setup for the business.
+
+When:
+
+- When employees join, change status, or need record maintenance.
+
+How:
+
+1. Open **Employees** to review the employee list.
+2. Use the employee filters and list view to find the required record.
+3. Open **Add Employee** when a new employee must be created.
+4. Complete the employee details and save the record.
+
+### 19.4 PM Clerk role focus
+
+What:
+
+- Support project teams through daily-task monitoring, progress-tracking views, and end-of-day reporting surfaces.
+
+Why:
+
+- The role helps keep project reporting and task follow-up organized.
+
+When:
+
+- During daily coordination and project reporting cycles.
+
+How:
+
+1. Open the daily-tasks or reporting view assigned to the role.
+2. Review the project work items requiring update.
+3. Use the available project and report views to support task follow-up and reporting.
+
+### 19.5 Client role focus
+
+What:
+
+- View the client quotation in the client portal and respond during negotiation when the quote is in a negotiation stage.
+
+Why:
+
+- The client-facing quote view supports controlled commercial communication without exposing internal operational pages.
+
+When:
+
+- When a quotation is shared for client review.
+- During negotiation rounds.
+
+How:
+
+1. Open the client quotation link or client quote page.
+2. Review the quotation lines, totals, and negotiation history.
+3. Submit a negotiation proposal when the quote is in an open negotiation state.
+
+### 19.6 Viewer role focus
+
+What:
+
+- Use read-only project visibility without operational editing responsibilities.
+
+Why:
+
+- Some users need oversight access without being allowed to change live operational records.
+
+When:
+
+- During monitoring, observation, or management-support review.
+
+How:
+
+1. Open the permitted project view.
+2. Review the project status, customer, and operational information.
+3. Escalate changes to the operational owner when action is required.
 
 ## 20. Common Questions
 
