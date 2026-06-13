@@ -106,7 +106,8 @@ function buildLineGroups(lines: any[], negotiationByLine: Map<string, any>, vatR
   lines.forEach((line) => {
     const meta = parseJson<Record<string, unknown>>(line.metaJson);
     const section =
-      typeof meta?.section === 'string' && meta.section.trim().length > 0 ? meta.section : 'Items';
+      line.section ||
+      (typeof meta?.section === 'string' && meta.section.trim().length > 0 ? meta.section : 'Items');
 
     if (!groups.has(section)) {
       groups.set(section, { section, rows: [] });

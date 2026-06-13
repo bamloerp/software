@@ -81,7 +81,7 @@ export class PuppeteerRenderer implements PdfRenderer {
         meta = JSON.parse(line.metaJson ?? "{}");
       } catch { }
 
-      const section = meta.section?.trim() || "Items";
+      const section = String(line.section ?? '').trim() || String(meta.section ?? '').trim() || "Items";
       if (!groups[section]) {
         groups[section] = { section, rows: [], subtotal: 0 };
         groupOrder.push(section);
@@ -118,12 +118,12 @@ export class PuppeteerRenderer implements PdfRenderer {
         });
         const groupKey = `${section}:${summaryCategory.key}`;
         if (itemType === 'LABOUR') {
-          if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section, label: summaryCategory.detailLabel, isLabour: true, rows: [], subtotal: 0, summaryCategory });
+          if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section, label: section, isLabour: true, rows: [], subtotal: 0, summaryCategory });
           const lg = labGroups.get(groupKey)!;
           lg.rows.push(row);
           lg.subtotal += (row as any).amt;
         } else {
-          if (!matGroups.has(groupKey)) matGroups.set(groupKey, { section, label: summaryCategory.detailLabel, isLabour: false, rows: [], subtotal: 0, summaryCategory });
+          if (!matGroups.has(groupKey)) matGroups.set(groupKey, { section, label: section, isLabour: false, rows: [], subtotal: 0, summaryCategory });
           const mg = matGroups.get(groupKey)!;
           mg.rows.push(row);
           mg.subtotal += (row as any).amt;
@@ -139,7 +139,7 @@ export class PuppeteerRenderer implements PdfRenderer {
     // Enforce intra-section ordering: SUPERSTRUCTURE TO RING BEAM must have Brickwork above Door Frame Fittings.
     const rowPriority = (section: string, description: string): number => {
       const d = (description || '').toLowerCase();
-      if (section === 'SUPERSTRUCTURE TO RING BEAM') {
+      if (section === 'SUPERSTRUCTURE TO RING BEAM' || section === 'SUPERSTRUCTURE BRICKWORK') {
         if (d.startsWith('brickwork')) return 0;
         if (d.includes('door frame')) return 1;
       }

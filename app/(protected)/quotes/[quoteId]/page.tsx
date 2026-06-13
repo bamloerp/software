@@ -337,7 +337,7 @@ function buildLineGroups(
       targetMap.set(groupKey, {
         key: groupKey,
         section,
-        label: isLabour ? `LABOUR - ${summaryCategory.detailLabel}` : summaryCategory.detailLabel,
+        label: isLabour ? `LABOUR - ${section}` : section,
         summaryCategory,
         isLabour,
         rows: [],
@@ -374,7 +374,7 @@ function buildLineGroups(
   // SUPERSTRUCTURE TO RING BEAM must always have Brickwork above Door Frame Fittings.
   const sectionRowPriority = (section: string, description: string): number => {
     const desc = (description || '').toLowerCase();
-    if (section === 'SUPERSTRUCTURE TO RING BEAM') {
+    if (section === 'SUPERSTRUCTURE TO RING BEAM' || section === 'SUPERSTRUCTURE BRICKWORK') {
       if (desc.startsWith('brickwork')) return 0;
       if (desc.includes('door frame')) return 1;
     }

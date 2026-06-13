@@ -135,12 +135,12 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
       });
       const groupKey = `${g.section}:${summaryCategory.key}`;
       if (itemType === 'LABOUR') {
-        if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section: g.section, label: summaryCategory.detailLabel, isLabour: true, lines: [], subtotal: 0, summaryCategory });
+        if (!labGroups.has(groupKey)) labGroups.set(groupKey, { section: g.section, label: g.section, isLabour: true, lines: [], subtotal: 0, summaryCategory });
         const lg = labGroups.get(groupKey)!;
         lg.lines.push(line);
         lg.subtotal += line.lineTotalMinor;
       } else {
-        if (!matGroups.has(groupKey)) matGroups.set(groupKey, { section: g.section, label: summaryCategory.detailLabel, isLabour: false, lines: [], subtotal: 0, summaryCategory });
+        if (!matGroups.has(groupKey)) matGroups.set(groupKey, { section: g.section, label: g.section, isLabour: false, lines: [], subtotal: 0, summaryCategory });
         const mg = matGroups.get(groupKey)!;
         mg.lines.push(line);
         mg.subtotal += line.lineTotalMinor;
@@ -156,7 +156,7 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
   // Enforce intra-section ordering: SUPERSTRUCTURE TO RING BEAM must have Brickwork above Door Frame Fittings.
   const rowPriority = (section: string, description: string): number => {
     const d = (description || '').toLowerCase();
-    if (section === 'SUPERSTRUCTURE TO RING BEAM') {
+    if (section === 'SUPERSTRUCTURE TO RING BEAM' || section === 'SUPERSTRUCTURE BRICKWORK') {
       if (d.startsWith('brickwork')) return 0;
       if (d.includes('door frame')) return 1;
     }

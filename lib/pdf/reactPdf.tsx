@@ -23,6 +23,16 @@ function asNumber(x: unknown, fallback = 0): number {
 
 /** Safe, flat line DTO for PDF (numbers only). */
 function toPdfLine(l: any) {
+  let metaSection = '';
+  if (typeof l.metaJson === 'string' && l.metaJson.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(l.metaJson) as { section?: string };
+      metaSection = typeof parsed.section === 'string' ? parsed.section.trim() : '';
+    } catch {
+      metaSection = '';
+    }
+  }
+
   return {
     id: String(l.id),
     description: String(l.description ?? ''),
@@ -35,7 +45,7 @@ function toPdfLine(l: any) {
     lineTotalMinor: asNumber(l.lineTotalMinor, 0),
     // stringify meta to avoid objects inside <Text>
     meta: l.metaJson ? String(l.metaJson) : '',
-    section: String(l.section || 'Items'),
+    section: String(l.section ?? '').trim() || metaSection || 'Items',
     itemType: String(l.itemType || 'MATERIAL'),
   };
 }
