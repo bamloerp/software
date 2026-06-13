@@ -135,6 +135,14 @@ export const TAKEOFF_LAYOUT: SheetRow[] = [
       { code: 'E22', label: 'Inter Plastering', kind: 'calc', expr: 'F25 / 7' },
       { code: 'F22', label: 'Ext Plastering', kind: 'calc', expr: 'E25 / 8' },
       { code: 'G22', label: 'Ring Beam', kind: 'calc', expr: 'A4 * 0.23 * 0.23 * 4' },
+      {code: 'Z1', label: 'Pit sand to Ring Beam', kind: 'calc', expr: 'D22*3/11' },
+      {code: 'Z2', label: 'Cement above ring beam', kind: 'calc', expr: '(A36/250) + G22' },
+      {code: 'Z3', label: 'Pitsand above ring beam', kind: 'calc', expr: '(A36/250) * 3/11' },
+      {code: 'Z4', label: 'Brickforce (230mm) to ring beam', kind: 'calc', expr: '(A4/15) * 6' },
+      {code: 'Z5', label: 'Brickforce (115mm) to ring beam', kind: 'calc', expr: '(B4/15) * 6' },
+      {code: 'Z6', label: 'Brickforce (230mm) above ring beam', kind: 'calc', expr: '(A4/15) * 3' },
+      {code: 'Z7', label: 'Brickforce (115mm) above ring beam', kind: 'calc', expr: '(B4/15) * 3' },
+
     ],
   },
   {
