@@ -43,7 +43,7 @@ function fallbackCategory(section: string): ConstructionSummaryCategory {
   const label = section || 'ITEMS';
   return {
     key: `OTHER:${label}`,
-    label,
+    label: `${label} MATERIALS AND LABOUR`,
     detailLabel: label,
     order: 100,
   };

@@ -56,6 +56,29 @@ type CustomItem = {
   itemType?: 'MATERIAL' | 'LABOUR';
 };
 
+type ManualItemType = 'MATERIAL' | 'LABOUR';
+
+const ADDITIONAL_MANUAL_SECTIONS = [
+  'TILING',
+  'ELECTRICAL WIRING AND CONNECTONS',
+  'CEILING',
+  'SKIMING',
+  'STEEL WINDOW FRAME AND GLAZING',
+  'PAINTING',
+  'JOINERY AND IRON MONGARY',
+  'PLUMBING',
+  'GUTTER',
+  'ALUMINIUM WINDOW FRAME',
+];
+
+function normalizeSectionName(section?: string | null): string {
+  return (section ?? '').trim().toUpperCase();
+}
+
+function normalizeManualItemType(itemType?: string | null): ManualItemType {
+  return itemType === 'LABOUR' ? 'LABOUR' : 'MATERIAL';
+}
+
 const BASE_TAKEOFF_VALUES = {
   ...TAKEOFF_DEFAULTS,
   A4: 0,
@@ -85,8 +108,8 @@ function restoreCustomItems(draft?: TakeoffDraft): CustomItem[] {
     unit: item.unit ?? '',
     qty: typeof item.qty === 'number' ? item.qty : 0,
     rate: typeof item.rate === 'number' ? item.rate : 0,
-    section: item.section ?? 'FOUNDATIONS',
-    itemType: item.itemType === 'LABOUR' ? 'LABOUR' : 'MATERIAL',
+    section: normalizeSectionName(item.section) || 'FOUNDATIONS',
+    itemType: normalizeManualItemType(item.itemType),
   }));
 }
 
@@ -305,11 +328,14 @@ export default function TakeOffSheet({
   const sections = useMemo(() => {
     const s = new Set<string>();
     QUOTE_LINE_MAP.forEach(m => {
-      if (m.section) s.add(m.section.toUpperCase());
+      const section = normalizeSectionName(m.section);
+      if (section) s.add(section);
     });
     manualCatalog.forEach((item) => {
-      if (item.section) s.add(item.section.toUpperCase());
+      const section = normalizeSectionName(item.section);
+      if (section) s.add(section);
     });
+    ADDITIONAL_MANUAL_SECTIONS.forEach((section) => s.add(section));
     // Add common fallback ones if not present
     s.add('PRELIMINARIES');
     s.add('LABOUR');
@@ -320,10 +346,12 @@ export default function TakeOffSheet({
   const catalogBySection = useMemo(() => {
     const map = new Map<string, ManualCatalogItem[]>();
     manualCatalog.forEach((item) => {
-      const section = (item.section || 'OTHER').toUpperCase();
+      const section = normalizeSectionName(item.section) || 'OTHER';
       if (!map.has(section)) map.set(section, []);
       map.get(section)!.push({
         ...item,
+        section,
+        itemType: normalizeManualItemType(item.itemType),
         rate: rateOverrides[manualRateCode(item.id)] ?? item.rate,
       });
     });
@@ -350,8 +378,8 @@ export default function TakeOffSheet({
         description: m.description,
         quantity: Math.ceil(Number(qty)),
         unitPrice: rate,
-        section: m.section,
-        itemType: m.itemType || 'MATERIAL',
+        section: normalizeSectionName(m.section) || 'PRELIMINARIES',
+        itemType: normalizeManualItemType(m.itemType),
         lineTotalMinor: BigInt(Math.round(Math.ceil(Number(qty)) * rate * 100)),
         unit: m.unit,
         code: m.code,
@@ -368,8 +396,8 @@ export default function TakeOffSheet({
           description: ei.description,
           quantity: Math.ceil(Number(ei.qty)),
           unitPrice: rate,
-          section: ei.section || 'ELECTRICALS',
-          itemType: ei.itemType || 'MATERIAL',
+          section: normalizeSectionName(ei.section) || 'ELECTRICALS',
+          itemType: normalizeManualItemType(ei.itemType),
           lineTotalMinor: BigInt(Math.round(Math.ceil(Number(ei.qty)) * rate * 100)),
           unit: ei.unit,
           code: ei.id,
@@ -380,18 +408,15 @@ export default function TakeOffSheet({
     // 3) custom items
     for (const ci of customItems) {
       if (!ci.description || !(Number.isFinite(ci.qty) && ci.qty > 0)) continue;
-      
-      // Or if the section is 'LABOUR'
-      const isLabour = ci.itemType === 'LABOUR' || ci.description.toLowerCase().includes('labour') ||
-                       ci.description.toLowerCase().includes('labor') ||
-                       (ci.section || '').toUpperCase().includes('LABOUR');
+      const section = normalizeSectionName(ci.section) || 'PRELIMINARIES';
+      const itemType = normalizeManualItemType(ci.itemType);
 
       lines.push({
         description: ci.description,
         quantity: Math.ceil(Number(ci.qty)),
         unitPrice: Number(ci.rate || 0),
-        section: ci.section || 'PRELIMINARIES',
-        itemType: isLabour ? 'LABOUR' : 'MATERIAL',
+        section,
+        itemType,
         lineTotalMinor: BigInt(Math.round(Math.ceil(Number(ci.qty)) * Number(ci.rate || 0) * 100)),
         unit: ci.unit,
         code: ci.catalogId ? manualRateCode(ci.catalogId) : 'MANUAL',
@@ -541,6 +566,8 @@ export default function TakeOffSheet({
       units,
       customItems: customItems.map((item) => ({
         ...item,
+        section: normalizeSectionName(item.section),
+        itemType: normalizeManualItemType(item.itemType),
         qty: Number.isFinite(item.qty) ? item.qty : null,
         rate: Number.isFinite(item.rate) ? item.rate : null,
       })),
@@ -1178,7 +1205,8 @@ export default function TakeOffSheet({
                   value={ci.catalogId ?? ''}
                   onChange={(e) => {
                     const catalogId = e.target.value;
-                    const item = catalogBySection.get((ci.section || '').toUpperCase())?.find((entry) => entry.id === catalogId);
+                    const currentSection = normalizeSectionName(ci.section);
+                    const item = catalogBySection.get(currentSection)?.find((entry) => entry.id === catalogId);
                     setCustomItems((arr) =>
                       arr.map((x, i) =>
                         i === idx && item
@@ -1189,8 +1217,8 @@ export default function TakeOffSheet({
                               unit: item.unit,
                               qty: item.quantity,
                               rate: item.rate,
-                              section: item.section,
-                              itemType: item.itemType,
+                              section: normalizeSectionName(item.section),
+                              itemType: normalizeManualItemType(item.itemType),
                             }
                           : i === idx
                             ? { ...x, catalogId: undefined }
@@ -1200,7 +1228,7 @@ export default function TakeOffSheet({
                   }}
                 >
                   <option value="">Type manually</option>
-                  {(catalogBySection.get((ci.section || '').toUpperCase()) ?? []).map((item) => (
+                  {(catalogBySection.get(normalizeSectionName(ci.section)) ?? []).map((item) => (
                     <option key={item.id} value={item.id}>{item.description}</option>
                   ))}
                 </select>
@@ -1261,17 +1289,34 @@ export default function TakeOffSheet({
                   }}
                 />
               </div>
-              <div className="w-full md:w-32 space-y-1">
+              <div className="w-full md:w-36 space-y-1">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Type</label>
+                <select
+                  aria-label="Manual item type"
+                  className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  value={normalizeManualItemType(ci.itemType)}
+                  onChange={(e) => {
+                    const itemType = normalizeManualItemType(e.target.value);
+                    setCustomItems((arr) =>
+                      arr.map((x, i) => (i === idx ? { ...x, itemType } : x))
+                    );
+                  }}
+                >
+                  <option value="MATERIAL">Material</option>
+                  <option value="LABOUR">Labour</option>
+                </select>
+              </div>
+              <div className="w-full md:w-40 space-y-1">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Section</label>
                 <div className="space-y-1.5">
                   <select
                     aria-label="Section"
                     className="block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-sm text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                    value={sections.includes((ci.section || '').toUpperCase()) ? (ci.section || '').toUpperCase() : 'OTHER'}
+                    value={sections.includes(normalizeSectionName(ci.section)) ? normalizeSectionName(ci.section) : 'OTHER'}
                     onChange={(e) => {
                       const val = e.target.value;
                       setCustomItems((arr) =>
-                        arr.map((x, i) => (i === idx ? { ...x, catalogId: undefined, section: val } : x))
+                        arr.map((x, i) => (i === idx ? { ...x, catalogId: undefined, section: normalizeSectionName(val) || 'OTHER' } : x))
                       );
                     }}
                   >
@@ -1281,7 +1326,7 @@ export default function TakeOffSheet({
                     <option value="OTHER">OTHER (TYPE BELOW)</option>
                   </select>
                   
-                  {(!sections.includes((ci.section || '').toUpperCase()) || (ci.section || '').toUpperCase() === 'OTHER') && (
+                  {(!sections.includes(normalizeSectionName(ci.section)) || normalizeSectionName(ci.section) === 'OTHER') && (
                     <input
                       className={attentionInputClass(showValidation && touchedManualItem(ci) && !ci.section.trim(), "block w-full rounded-lg border border-gray-200 bg-white py-1.5 px-3 text-xs text-gray-900 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white placeholder:italic")}
                       placeholder="Type custom section..."
@@ -1289,7 +1334,7 @@ export default function TakeOffSheet({
                       autoFocus={ci.section === 'OTHER'}
                       onChange={(e) =>
                         setCustomItems((arr) =>
-                          arr.map((x, i) => (i === idx ? { ...x, section: e.target.value.toUpperCase() } : x))
+                          arr.map((x, i) => (i === idx ? { ...x, section: normalizeSectionName(e.target.value) } : x))
                         )
                       }
                     />
