@@ -1025,7 +1025,13 @@ export async function acceptNegotiationStageDeletion(
 
       const proposedSnapshot = JSON.parse(negotiation.proposedVersion.snapshotJson) as Parameters<typeof readNegotiationSelections>[0];
       const linesToDelete = negotiation.items
-        .filter((item) => item.quoteLine?.section === section)
+        .filter((item) => {
+          const meta = parseLineMeta(item.quoteLine?.metaJson ?? null);
+          const lineSection = item.quoteLine?.section?.trim() ||
+            (typeof meta?.section === 'string' ? meta.section.trim() : '') ||
+            'Items';
+          return lineSection === section;
+        })
         .filter((item) => !isLineIncludedInNegotiation(proposedSnapshot, item.quoteLineId, true))
         .map((item) => item.quoteLineId);
 

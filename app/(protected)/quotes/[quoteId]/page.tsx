@@ -54,10 +54,12 @@ import { fromMinor } from '@/helpers/money';
 import { QuoteStatus, QUOTE_STATUSES, USER_ROLES, UserRole, nextStatusesFor } from '@/lib/workflow';
 
 import { parseQuoteSnapshot, type QuoteSnapshot } from '@/lib/quoteSnapshot';
+import { isLineIncludedInNegotiation } from '@/lib/negotiationSelections';
 
 import type { QuoteLine, QuoteNegotiation, QuoteNegotiationItem } from '@prisma/client';
 
 import { NegotiationActionPair } from '@/components/NegotiationActionPair';
+import NegotiationStageDeleteButton from '@/components/NegotiationStageDeleteButton';
 
 import LineRateEditor from '@/components/LineRateEditor';
 import { ensureQuoteOffice } from '@/lib/office';
@@ -168,6 +170,8 @@ type LineNegotiationInfo = {
   proposedTotal: number;
 
   proposedRate: number;
+
+  deleteRequested: boolean;
 
   itemId: string;
 
@@ -791,6 +795,9 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
         : false;
 
   const latestNegotiation = quote.negotiations[0] ?? null;
+  const latestProposedSnapshot = latestNegotiation
+    ? parseQuoteSnapshot(latestNegotiation.proposedVersion.snapshotJson)
+    : null;
 
   const vatRate = quote.vatBps / 10000;
 
@@ -807,6 +814,7 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
       const statusRaw = item.status === 'REVIEWED' ? 'FINAL' : item.status;
 
       const status = statusRaw as LineNegotiationInfo['status'];
+      const deleteRequested = !isLineIncludedInNegotiation(latestProposedSnapshot, item.quoteLineId, true);
 
       negotiationByLine.set(item.quoteLineId, {
         status,
@@ -814,6 +822,8 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
         proposedTotal,
 
         proposedRate,
+
+        deleteRequested,
 
         itemId: item.id,
 
@@ -1346,7 +1356,13 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
                         {group.label}
                       </h3>
                     </div>
-                    {isReviewer && status === 'SUBMITTED_REVIEW' && (
+                    {isReviewer && status === 'NEGOTIATION_REVIEW' && latestNegotiation?.status === 'OPEN' && group.rows.some((row) => row.negotiation?.status === 'PENDING' && row.negotiation.deleteRequested) ? (
+                      <NegotiationStageDeleteButton
+                        negotiationId={latestNegotiation.id}
+                        section={group.section}
+                        count={group.rows.filter((row) => row.negotiation?.status === 'PENDING' && row.negotiation.deleteRequested).length}
+                      />
+                    ) : isReviewer && status === 'SUBMITTED_REVIEW' && (
                       <DeleteSectionButton
                         quoteId={quote.id}
                         section={group.section}
@@ -1444,10 +1460,14 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
                                   <span
                                     className={clsx(
                                       'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold',
-                                      NEGOTIATION_BADGE_CLASSES[row.negotiation.status]
+                                      row.negotiation.deleteRequested && row.negotiation.status === 'PENDING'
+                                        ? 'bg-red-100 text-red-700'
+                                        : NEGOTIATION_BADGE_CLASSES[row.negotiation.status]
                                     )}
                                   >
-                                    {formatDecisionLabel(row.negotiation.status)}
+                                    {row.negotiation.deleteRequested && row.negotiation.status === 'PENDING'
+                                      ? 'Delete Request'
+                                      : formatDecisionLabel(row.negotiation.status)}
                                     {row.negotiation.status !== 'PENDING' &&
                                       row.negotiation.reviewerName &&
                                       ` by ${row.negotiation.reviewerName}`}
@@ -1464,7 +1484,13 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
                             <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-white">
                               {allowEdit ? (
                                 <div className="flex justify-end">
-                                  {allowEdit &&
+                                  {row.negotiation?.status === 'PENDING' && row.negotiation.deleteRequested ? (
+                                    <NegotiationActionPair
+                                      itemId={row.negotiation.itemId}
+                                      initialRate={row.rate}
+                                      mode="delete"
+                                    />
+                                  ) : allowEdit &&
                                   (quote.status !== 'NEGOTIATION_REVIEW' ||
                                     row.negotiation?.status === 'PENDING') ? (
                                     <LineRateEditor
@@ -1483,7 +1509,11 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
                               )}
                             </td>
                             <td className="px-4 py-3 text-right text-sm font-bold text-gray-900 dark:text-white">
-                              <Money value={row.amount} />
+                              {row.negotiation?.status === 'PENDING' && row.negotiation.deleteRequested ? (
+                                <span className="text-red-600 dark:text-red-400">Delete</span>
+                              ) : (
+                                <Money value={row.amount} />
+                              )}
                             </td>
                             {isReviewer && status === 'SUBMITTED_REVIEW' && (
                               <td className="px-4 py-3 text-center">
