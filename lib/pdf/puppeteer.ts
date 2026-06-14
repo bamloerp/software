@@ -774,6 +774,163 @@ export async function renderProjectSchedulePdf(projectId: string): Promise<PdfRe
   return { buffer, filename: `Work-Schedule-${projectRef}.pdf` };
 }
 
+export async function renderProjectPaymentSchedulePdf(projectId: string): Promise<PdfResult> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      quote: { include: { customer: true } },
+      paymentSchedules: { orderBy: { seq: 'asc' } },
+      clientPayments: true,
+    },
+  });
+  if (!project) throw new Error('Project not found');
+
+  const quote = project.quote;
+  const customer = quote?.customer;
+  const addressJson = customer?.addressJson as { line1?: string; city?: string } | null;
+  const contractValueMinor = quote ? BigInt(Math.round(readQuoteGrandTotal(quote as any) * 100)) : 0n;
+  const totalPaidMinor = project.clientPayments.reduce((sum, payment) => sum + BigInt(payment.amountMinor), 0n);
+  const balanceMinor = contractValueMinor - totalPaidMinor;
+  const logoBase64 = loadLogo();
+  const projectRef = project.projectNumber || project.name || project.id.slice(0, 10);
+
+  const rows = project.paymentSchedules
+    .map((schedule) => {
+      const amountMinor = BigInt(schedule.amountMinor);
+      const paidMinor = BigInt(schedule.paidMinor ?? 0);
+      const balanceDueMinor = amountMinor - paidMinor;
+      return `<tr class="tbl-row">
+        <td>${esc(schedule.label)}</td>
+        <td class="text-center">${formatDate(schedule.dueOn)}</td>
+        <td class="text-right">${money(Number(amountMinor), quote?.currency ?? 'USD')}</td>
+        <td class="text-right">${money(Number(paidMinor), quote?.currency ?? 'USD')}</td>
+        <td class="text-right">${money(Number(balanceDueMinor), quote?.currency ?? 'USD')}</td>
+        <td class="text-center">${esc(schedule.status)}</td>
+      </tr>`;
+    })
+    .join('');
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><style>${BASE_STYLES}</style></head><body>
+    ${companyHeader(logoBase64, 'Payment Schedule')}
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-box-header">Customer Info</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Name:</span><span class="info-value">${esc(customer?.displayName)}</span></div>
+          <div class="info-row"><span class="info-label">Address:</span><span class="info-value">${esc(customer?.city || addressJson?.city || addressJson?.line1 || 'N/A')}</span></div>
+          <div class="info-row"><span class="info-label">Phone:</span><span class="info-value">${esc(customer?.phone || customer?.email || 'N/A')}</span></div>
+          <div class="info-row"><span class="info-label">Project:</span><span class="info-value">${esc(project.name || projectRef)}</span></div>
+        </div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-header">Payment Summary</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Quote #:</span><span class="info-value">${esc(quote?.number || quote?.id?.slice(0, 8))}</span></div>
+          <div class="info-row"><span class="info-label">Contract Value:</span><span class="info-value">${money(Number(contractValueMinor), quote?.currency ?? 'USD')}</span></div>
+          <div class="info-row"><span class="info-label">Total Paid:</span><span class="info-value">${money(Number(totalPaidMinor), quote?.currency ?? 'USD')}</span></div>
+          <div class="info-row"><span class="info-label">Balance Due:</span><span class="info-value">${money(Number(balanceMinor), quote?.currency ?? 'USD')}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead class="tbl-header"><tr>
+        <th style="text-align:left;padding:5px 6px">Description</th>
+        <th style="text-align:center;padding:5px 6px;width:90px">Due Date</th>
+        <th style="text-align:right;padding:5px 6px;width:90px">Amount</th>
+        <th style="text-align:right;padding:5px 6px;width:90px">Paid</th>
+        <th style="text-align:right;padding:5px 6px;width:90px">Balance</th>
+        <th style="text-align:center;padding:5px 6px;width:90px">Status</th>
+      </tr></thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+
+    ${project.paymentSchedules.length === 0 ? '<div style="padding:20px;text-align:center;color:#6b7280;font-size:11px">No payment schedule items found.</div>' : ''}
+    <div class="footer">Payment Schedule Ref: ${esc(projectRef)} | Generated ${formatDate(new Date())}</div>
+  </body></html>`;
+
+  const buffer = await htmlToPdf(html);
+  return { buffer, filename: `Payment-Schedule-${projectRef}.pdf` };
+}
+
+export async function renderProjectPaymentHistoryPdf(projectId: string): Promise<PdfResult> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      quote: { include: { customer: true } },
+      paymentSchedules: { orderBy: { seq: 'asc' } },
+      clientPayments: { orderBy: { receivedAt: 'desc' } },
+    },
+  });
+  if (!project) throw new Error('Project not found');
+
+  const quote = project.quote;
+  const customer = quote?.customer;
+  const addressJson = customer?.addressJson as { line1?: string; city?: string } | null;
+  const contractValueMinor = quote ? BigInt(Math.round(readQuoteGrandTotal(quote as any) * 100)) : 0n;
+  const totalPaidMinor = project.clientPayments.reduce((sum, payment) => sum + BigInt(payment.amountMinor), 0n);
+  const balanceMinor = contractValueMinor - totalPaidMinor;
+  const logoBase64 = loadLogo();
+  const projectRef = project.projectNumber || project.name || project.id.slice(0, 10);
+
+  const rows = project.clientPayments
+    .map((payment) => `<tr class="tbl-row">
+      <td>${esc(payment.receiptNo || '-')}</td>
+      <td class="text-center">${formatDate(payment.receivedAt)}</td>
+      <td>${esc(payment.method)}</td>
+      <td>${esc(payment.type)}</td>
+      <td>${esc(payment.description || '-')}</td>
+      <td class="text-right">${money(Number(payment.amountMinor), quote?.currency ?? 'USD')}</td>
+    </tr>`)
+    .join('');
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><style>${BASE_STYLES}</style></head><body>
+    ${companyHeader(logoBase64, 'Payment History')}
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-box-header">Customer Info</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Name:</span><span class="info-value">${esc(customer?.displayName)}</span></div>
+          <div class="info-row"><span class="info-label">Address:</span><span class="info-value">${esc(customer?.city || addressJson?.city || addressJson?.line1 || 'N/A')}</span></div>
+          <div class="info-row"><span class="info-label">Phone:</span><span class="info-value">${esc(customer?.phone || customer?.email || 'N/A')}</span></div>
+          <div class="info-row"><span class="info-label">Project:</span><span class="info-value">${esc(project.name || projectRef)}</span></div>
+        </div>
+      </div>
+      <div class="info-box">
+        <div class="info-box-header">Payment Summary</div>
+        <div style="padding:6px">
+          <div class="info-row"><span class="info-label">Quote #:</span><span class="info-value">${esc(quote?.number || quote?.id?.slice(0, 8))}</span></div>
+          <div class="info-row"><span class="info-label">Contract Value:</span><span class="info-value">${money(Number(contractValueMinor), quote?.currency ?? 'USD')}</span></div>
+          <div class="info-row"><span class="info-label">Total Paid:</span><span class="info-value">${money(Number(totalPaidMinor), quote?.currency ?? 'USD')}</span></div>
+          <div class="info-row"><span class="info-label">Balance Due:</span><span class="info-value">${money(Number(balanceMinor), quote?.currency ?? 'USD')}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead class="tbl-header"><tr>
+        <th style="text-align:left;padding:5px 6px">Receipt #</th>
+        <th style="text-align:center;padding:5px 6px;width:90px">Date</th>
+        <th style="text-align:left;padding:5px 6px;width:90px">Method</th>
+        <th style="text-align:left;padding:5px 6px;width:90px">Type</th>
+        <th style="text-align:left;padding:5px 6px">Description</th>
+        <th style="text-align:right;padding:5px 6px;width:90px">Amount</th>
+      </tr></thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+
+    ${project.clientPayments.length === 0 ? '<div style="padding:20px;text-align:center;color:#6b7280;font-size:11px">No payments recorded yet.</div>' : ''}
+    <div class="footer">Payment History Ref: ${esc(projectRef)} | Generated ${formatDate(new Date())}</div>
+  </body></html>`;
+
+  const buffer = await htmlToPdf(html);
+  return { buffer, filename: `Payment-History-${projectRef}.pdf` };
+}
+
 /* ── Requisition PDF ── */
 
 export async function renderRequisitionPdf(requisitionId: string): Promise<PdfResult> {

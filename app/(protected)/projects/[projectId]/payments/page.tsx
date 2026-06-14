@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import PaymentForms from './PaymentForms';
+import DownloadPdfButton from '@/components/DownloadPdfButton';
+import { generatePaymentHistoryPdf, generatePaymentSchedulePdf } from './actions';
 import { ArrowLeftIcon, ClockIcon, CheckCircleIcon, BanknotesIcon } from '@heroicons/react/24/outline';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -83,6 +85,20 @@ export default async function ProjectPaymentsPage({
                   </div>
                </div>
                <div className="flex items-center gap-3">
+                           <DownloadPdfButton
+                              quoteId={projectId}
+                              generatePdf={generatePaymentSchedulePdf}
+                              className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-600"
+                              label="Payment Schedule PDF"
+                              loadingLabel="Generating schedule..."
+                           />
+                           <DownloadPdfButton
+                              quoteId={projectId}
+                              generatePdf={generatePaymentHistoryPdf}
+                              className="bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-600"
+                              label="Payment History PDF"
+                              loadingLabel="Generating history..."
+                           />
                   <div className="text-right hidden sm:block">
                      <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Balance Due</p>
                      <p className="text-lg font-bold text-gray-900">{formatMoney(balance)}</p>
@@ -133,6 +149,9 @@ export default async function ProjectPaymentsPage({
            </TabsList>
 
            <TabsContent value="schedule" className="mt-6 space-y-6">
+                     <div className="flex justify-end">
+                        <div className="text-xs text-gray-500">Schedule PDF excludes the Action column.</div>
+                     </div>
               
               {/* Schedule Filters */}
               <div className="flex items-center gap-2 mb-4">

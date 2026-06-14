@@ -30,15 +30,4 @@ export const DEFAULT_NOTES = `1) This Works Quotation and Schedule of Materials 
    11. Ceiling
    12. Internal Wall Skimming
 
-6) Sources of Prices
-   Material prices from notable suppliers as below
-   1 Barmlo investments
-   2 PG Timbers
-   3 Plumbcare
-   4 Electricare
-   5 Coventry Road Plasterers
-   6 Chifen engineering Stone Quaries
-   7 Davies Granite
-   8 Union hardware
-
 NB Labour rates are based on current/prevailing NEC rates.`;

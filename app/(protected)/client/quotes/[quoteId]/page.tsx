@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import clsx from 'clsx';
 import Money from '@/components/Money';
+import NegotiationProposalFields from '@/components/NegotiationProposalFields';
 import { proposeNegotiationAmountOnly } from '@/app/(protected)/quotes/[quoteId]/actions';
 import { prisma } from '@/lib/db';
 import type { QuoteLine, QuoteNegotiationItem } from '@prisma/client';
@@ -11,6 +12,7 @@ import { setFlashMessage } from '@/lib/flash.server';
 import { getErrorMessage } from '@/lib/errors';
 import { fromMinor } from '@/helpers/money';
 import SubmitButton from '@/components/SubmitButton';
+import { isLineIncludedInNegotiation } from '@/lib/negotiationSelections';
 import Image from 'next/image';
 import { PhoneIcon, HomeIcon, EnvelopeIcon, GlobeAltIcon } from '@heroicons/react/24/solid';
 import { 
@@ -190,6 +192,9 @@ export default async function ClientQuotePage({ params }: ClientQuotePageParams)
   console.log(quote);
 
   const latestNegotiation = quote.negotiations[0] ?? null;
+  const latestProposalSnapshot = latestNegotiation?.proposedVersion?.snapshotJson
+    ? parseJson<any>(latestNegotiation.proposedVersion.snapshotJson)
+    : null;
   console.log('Latest negotiation:', latestNegotiation);
   const allResolved =
     !!latestNegotiation &&
@@ -227,19 +232,23 @@ export default async function ClientQuotePage({ params }: ClientQuotePageParams)
       const payload = quote.lines
         .filter((line) => (line.cycle ?? 0) === activeCycle)
         .map((line) => {
+          const included = formData.get(`line-${line.id}-included`) === 'on';
           const key = `line-${line.id}-rate`;
           const raw = formData.get(key);
-          if (raw == null || raw === '') return null;
-          const rate = Number(raw);
+          const rate = raw == null || raw === '' ? fromMinor(line.unitPriceMinor) : Number(raw);
           if (!Number.isFinite(rate) || rate < 0) {
             throw new Error(`Invalid rate for line ${(line as QuoteLine).description}`);
           }
-          return { lineId: line.id, rate };
+          return { lineId: line.id, rate, included };
         })
-        .filter(Boolean) as { lineId: string; rate: number }[];
+        .filter(Boolean) as { lineId: string; rate: number; included: boolean }[];
 
       if (payload.length === 0) {
-        throw new Error('Provide at least one rate to propose.');
+        throw new Error('Provide at least one stage to review.');
+      }
+
+      if (!payload.some((entry) => entry.included)) {
+        throw new Error('At least one stage must remain selected for quotation review.');
       }
 
       const result = await proposeNegotiationAmountOnly(quote.id, payload);
@@ -395,6 +404,11 @@ export default async function ClientQuotePage({ params }: ClientQuotePageParams)
                   </div>
                 </th>
                 {quote.status === 'NEGOTIATION' && (
+                  <th className="px-3 py-2 text-center">
+                    <span>Stage</span>
+                  </th>
+                )}
+                {quote.status === 'NEGOTIATION' && (
                   <th className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <PencilSquareIcon className="h-4 w-4 text-gray-500" />
@@ -409,7 +423,7 @@ export default async function ClientQuotePage({ params }: ClientQuotePageParams)
                 <React.Fragment key={group.section}>
                   <tr className="bg-gray-50">
                     <td
-                      colSpan={quote.status === 'NEGOTIATION' ? 6 : 5}
+                      colSpan={quote.status === 'NEGOTIATION' ? 7 : 5}
                       className="px-3 py-2 font-bold text-gray-700 border-y"
                     >
                       {group.section}
@@ -423,6 +437,7 @@ export default async function ClientQuotePage({ params }: ClientQuotePageParams)
                     const quantity = line.quantity;
                     const statusRaw = negotiationItem?.status ?? null;
                     const status = statusRaw === 'REVIEWED' ? 'FINAL' : statusRaw;
+                    const isIncluded = isLineIncludedInNegotiation(latestProposalSnapshot, line.id, true);
                     const proposedRate = negotiationItem
                       ? deriveRateFromMinor(negotiationItem.proposedTotalMinor, quantity, vatRate)
                       : rate;
@@ -492,22 +507,24 @@ export default async function ClientQuotePage({ params }: ClientQuotePageParams)
                           )}
                         </td>
                         {quote.status === 'NEGOTIATION' && (
-                          <td className="px-3 py-2 text-right">
+                          <>
                             {isEditable ? (
-                              <input
-                                type="number"
-                                name={`line-${line.id}-rate`}
-                                defaultValue={displayValue.toFixed(2)}
-                                min="0"
-                                step="0.01"
-                                className={clsx(
-                                  'w-28 rounded border border-gray-300 px-2 py-1 text-right shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
-                                )}
+                              <NegotiationProposalFields
+                                lineId={line.id}
+                                defaultIncluded={isIncluded}
+                                defaultRate={displayValue}
                               />
                             ) : (
-                              <Money value={displayValue} />
+                              <>
+                                <td className="px-3 py-2 text-center text-xs text-gray-500">
+                                  {isCurrentCycle ? (isIncluded ? 'Keep' : 'Delete') : 'Locked'}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <Money value={displayValue} />
+                                </td>
+                              </>
                             )}
-                          </td>
+                          </>
                         )}
                       </tr>
                     );

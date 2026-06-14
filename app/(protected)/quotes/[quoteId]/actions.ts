@@ -14,6 +14,7 @@ import { fromBps, fromMinor, toMinor, toBigIntMinor } from '@/helpers/money';
 import { buildQuoteSnapshot, computeTotalsFromLines, createQuoteVersionTx, type SnapshotLine } from '@/lib/quoteSnapshot';
 import { TX_OPTS } from '@/lib/db-tx';
 import { rememberManualLine } from '@/lib/manualLineTemplates';
+import { isLineIncludedInNegotiation, readNegotiationSelections, type NegotiationSelectionMap } from '@/lib/negotiationSelections';
 import { QUOTE_STATUSES, USER_ROLES, type QuoteStatus, type UserRole } from '@/lib/workflow';
 import { getErrorMessage } from '@/lib/errors';
 import { generatePaymentSchedule } from '../../projects/actions';
@@ -350,7 +351,7 @@ async function createInlineQuoteVersion(
 
 export async function proposeNegotiationAmountOnly(
   quoteId: string,
-  proposals: { lineId: string; rate: number }[],
+  proposals: { lineId: string; rate: number; included?: boolean }[],
 ): Promise<ActionResult> {
   return runAction('proposeNegotiationAmountOnly', async () => {
     const user = await getCurrentUser();
@@ -367,12 +368,12 @@ export async function proposeNegotiationAmountOnly(
     }
 
     // Normalize/validate inputs
-    const normalized = new Map<string, number>();
+    const normalized = new Map<string, { rate: number; included: boolean }>();
     for (const p of proposals) {
       if (!p || typeof p.lineId !== 'string') continue;
       const rate = Number(p.rate);
       if (!Number.isFinite(rate) || rate < 0) throw new Error('Proposal rates must be non-negative numbers');
-      normalized.set(p.lineId, rate);
+      normalized.set(p.lineId, { rate, included: p.included !== false });
     }
     if (normalized.size === 0) throw new Error('Provide at least one valid line rate to propose');
 
@@ -392,18 +393,22 @@ export async function proposeNegotiationAmountOnly(
 
     const negotiationCycle = quote.negotiationCycle ?? 0;
     const vatRate = fromBps(quote.vatBps);
+    const selectionMap: NegotiationSelectionMap = {};
 
     // Build snapshot + items
     const snapshotLines: SnapshotLine[] = [];
     const itemInputs: { quoteLineId: string; proposedTotalMinor: bigint; status: 'PENDING' | 'OK' }[] = [];
     const seenLineIds = new Set<string>();
     let negotiableCount = 0;
+    let includedCount = 0;
 
     for (const line of quote.lines) {
       seenLineIds.add(line.id);
       const meta = parseLineMeta(line.metaJson ?? null);
       const currentRate = fromMinor(line.unitPriceMinor);
-      const proposedRate = normalized.has(line.id) ? normalized.get(line.id)! : currentRate;
+      const proposal = normalized.get(line.id);
+      const proposedRate = proposal?.rate ?? currentRate;
+      const included = proposal?.included ?? true;
 
       // Lines outside the current cycle must not change
       if (line.cycle !== negotiationCycle) {
@@ -431,8 +436,23 @@ export async function proposeNegotiationAmountOnly(
         continue;
       }
 
+      selectionMap[line.id] = { included };
+      if (included) {
+        includedCount += 1;
+      }
+
       if (!Number.isFinite(proposedRate) || proposedRate < 0) {
         throw new Error(`Invalid rate for line ${line.description}`);
+      }
+
+      if (!included) {
+        itemInputs.push({
+          quoteLineId: line.id,
+          proposedTotalMinor: 0n,
+          status: 'PENDING',
+        });
+        negotiableCount += 1;
+        continue;
       }
 
       const proposedUnitMinor = toBigIntMinor(proposedRate);
@@ -479,6 +499,10 @@ export async function proposeNegotiationAmountOnly(
       negotiableCount += 1;
     }
 
+    if (includedCount === 0) {
+      throw new Error('At least one stage must remain selected for quotation review');
+    }
+
     for (const lineId of normalized.keys()) {
       if (!seenLineIds.has(lineId)) throw new Error(`Unknown quote line: ${lineId}`);
     }
@@ -488,7 +512,7 @@ export async function proposeNegotiationAmountOnly(
     const totals = computeTotalsFromLines(snapshotLines);
     const snapshot = buildQuoteSnapshot({ quote, linesOverride: snapshotLines, totalsOverride: totals });
     snapshot.quote.status = 'NEGOTIATION';
-    snapshot.meta = { ...(snapshot.meta ?? {}), totals };
+    snapshot.meta = { ...(snapshot.meta ?? {}), totals, negotiationSelections: selectionMap };
 
     const latestVersionBefore = quote.versions[0] ?? null;
 
@@ -859,6 +883,7 @@ export async function acceptNegotiationItem(negotiationItemId: string): Promise<
           negotiation: {
             include: {
               items: { select: { status: true } },
+              proposedVersion: { select: { snapshotJson: true } },
               quote: { include: quoteInclude },
             },
           },
@@ -871,32 +896,43 @@ export async function acceptNegotiationItem(negotiationItemId: string): Promise<
       const negotiation = item.negotiation;
       const quote = negotiation.quote;
       const ensuredOffice = ensureQuoteOffice(quote.office ?? null, role, userOffice);
+      const proposedSnapshot = JSON.parse(negotiation.proposedVersion.snapshotJson) as Parameters<typeof readNegotiationSelections>[0];
+      const deleteRequested = !isLineIncludedInNegotiation(proposedSnapshot, item.quoteLineId, true);
 
-      const vatRate = fromBps(quote.vatBps);
-      const quantity = Number(item.quoteLine.quantity);
-      const proposedTotal = fromMinor(item.proposedTotalMinor);
-      const proposedRate = deriveUnitRateFromTotal(proposedTotal, quantity, vatRate);
-      const breakdown = computeLineAmounts(quantity, proposedRate, vatRate);
+      if (deleteRequested) {
+        await tx.quoteNegotiationItem.deleteMany({ where: { quoteLineId: item.quoteLineId } });
+        await tx.quoteLineExtraRequest.deleteMany({ where: { quoteLineId: item.quoteLineId } }).catch(() => undefined);
+        await tx.scheduleItem.deleteMany({ where: { quoteLineId: item.quoteLineId } }).catch(() => undefined);
+        await tx.procurementRequisitionItem.deleteMany({ where: { quoteLineId: item.quoteLineId } }).catch(() => undefined);
+        await tx.purchaseOrderItem.deleteMany({ where: { quoteLineId: item.quoteLineId } }).catch(() => undefined);
+        await tx.quoteLine.delete({ where: { id: item.quoteLineId } });
+      } else {
+        const vatRate = fromBps(quote.vatBps);
+        const quantity = Number(item.quoteLine.quantity);
+        const proposedTotal = fromMinor(item.proposedTotalMinor);
+        const proposedRate = deriveUnitRateFromTotal(proposedTotal, quantity, vatRate);
+        const breakdown = computeLineAmounts(quantity, proposedRate, vatRate);
 
-      await tx.quoteLine.update({
-        where: { id: item.quoteLineId },
-        data: {
-          unitPriceMinor: breakdown.unitPriceMinor,
-          lineSubtotalMinor: breakdown.lineSubtotalMinor,
-          lineDiscountMinor: breakdown.lineDiscountMinor,
-          lineTaxMinor: breakdown.lineTaxMinor,
-          lineTotalMinor: breakdown.lineTotalMinor,
-        },
-      });
+        await tx.quoteLine.update({
+          where: { id: item.quoteLineId },
+          data: {
+            unitPriceMinor: breakdown.unitPriceMinor,
+            lineSubtotalMinor: breakdown.lineSubtotalMinor,
+            lineDiscountMinor: breakdown.lineDiscountMinor,
+            lineTaxMinor: breakdown.lineTaxMinor,
+            lineTotalMinor: breakdown.lineTotalMinor,
+          },
+        });
 
-      await tx.quoteNegotiationItem.update({
-        where: { id: negotiationItemId },
-        data: {
-          status: 'ACCEPTED',
-          reviewedBy: { connect: { id: user.id } },
-          reviewedAt: new Date(),
-        },
-      });
+        await tx.quoteNegotiationItem.update({
+          where: { id: negotiationItemId },
+          data: {
+            status: 'ACCEPTED',
+            reviewedBy: { connect: { id: user.id } },
+            reviewedAt: new Date(),
+          },
+        });
+      }
 
       const refreshedQuote = await tx.quote.findUniqueOrThrow({
         where: { id: quote.id },
@@ -943,7 +979,9 @@ export async function acceptNegotiationItem(negotiationItemId: string): Promise<
       await createInlineQuoteVersion(
         tx,
         updatedQuote,
-        `Negotiation item accepted (${item.quoteLine.description})`,
+        deleteRequested
+          ? `Negotiation line deleted (${item.quoteLine.description})`
+          : `Negotiation item accepted (${item.quoteLine.description})`,
         role,
       );
 
@@ -958,7 +996,7 @@ export async function acceptNegotiationItem(negotiationItemId: string): Promise<
 
 export async function rejectNegotiationItem(
   negotiationItemId: string,
-  counterRate: number,
+  counterRate?: number,
 ): Promise<ActionResult<{ quoteId: string }>> {
   return runAction('rejectNegotiationItem', async () => {
     const user = await getCurrentUser();
@@ -968,10 +1006,6 @@ export async function rejectNegotiationItem(
     if (role !== 'SENIOR_QS' && role !== 'ADMIN') {
       throw new Error('You do not have permission to reject negotiation items');
     }
-    if (!Number.isFinite(counterRate) || counterRate < 0) {
-      throw new Error('Provide a non-negative counter rate');
-    }
-
     const { quoteId } = await prisma.$transaction(async (tx) => {
       const item = await tx.quoteNegotiationItem.findUnique({
         where: { id: negotiationItemId },
@@ -980,6 +1014,7 @@ export async function rejectNegotiationItem(
           negotiation: {
             include: {
               items: { select: { status: true } },
+              proposedVersion: { select: { snapshotJson: true } },
               quote: { include: quoteInclude },
             },
           },
@@ -991,20 +1026,28 @@ export async function rejectNegotiationItem(
       const { quoteLine: line, negotiation } = item;
       const quote = negotiation.quote;
       const ensuredOffice = ensureQuoteOffice(quote.office ?? null, role, userOffice);
+      const proposedSnapshot = JSON.parse(negotiation.proposedVersion.snapshotJson) as Parameters<typeof readNegotiationSelections>[0];
+      const deleteRequested = !isLineIncludedInNegotiation(proposedSnapshot, item.quoteLineId, true);
 
-      const vatRate = fromBps(quote.vatBps);
-      const breakdown = computeLineAmounts(Number(line.quantity), counterRate, vatRate);
+      if (!deleteRequested) {
+        if (!Number.isFinite(counterRate) || (counterRate ?? 0) < 0) {
+          throw new Error('Provide a non-negative counter rate');
+        }
 
-      await tx.quoteLine.update({
-        where: { id: line.id },
-        data: {
-          unitPriceMinor: breakdown.unitPriceMinor,
-          lineSubtotalMinor: breakdown.lineSubtotalMinor,
-          lineDiscountMinor: breakdown.lineDiscountMinor,
-          lineTaxMinor: breakdown.lineTaxMinor,
-          lineTotalMinor: breakdown.lineTotalMinor,
-        },
-      });
+        const vatRate = fromBps(quote.vatBps);
+        const breakdown = computeLineAmounts(Number(line.quantity), counterRate!, vatRate);
+
+        await tx.quoteLine.update({
+          where: { id: line.id },
+          data: {
+            unitPriceMinor: breakdown.unitPriceMinor,
+            lineSubtotalMinor: breakdown.lineSubtotalMinor,
+            lineDiscountMinor: breakdown.lineDiscountMinor,
+            lineTaxMinor: breakdown.lineTaxMinor,
+            lineTotalMinor: breakdown.lineTotalMinor,
+          },
+        });
+      }
 
       await tx.quoteNegotiationItem.update({
         where: { id: negotiationItemId },
@@ -1058,7 +1101,9 @@ export async function rejectNegotiationItem(
       await createInlineQuoteVersion(
         tx,
         updatedQuote,
-        `Negotiation item finalized with counter rate (${line.description})`,
+        deleteRequested
+          ? `Negotiation delete request rejected (${line.description})`
+          : `Negotiation item finalized with counter rate (${line.description})`,
         role,
       );
 

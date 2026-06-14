@@ -15,9 +15,18 @@ interface DownloadPdfButtonProps {
   quoteId: string;
   generatePdf: (quoteId: string) => Promise<ActionResult<{ base64: string; filename: string }>>;
   size?: 'default' | 'xs';
+  label?: string;
+  loadingLabel?: string;
 }
 
-export default function DownloadPdfButton({ className, quoteId, generatePdf, size = 'default' }: DownloadPdfButtonProps) {
+export default function DownloadPdfButton({
+  className,
+  quoteId,
+  generatePdf,
+  size = 'default',
+  label,
+  loadingLabel,
+}: DownloadPdfButtonProps) {
   const [loading, setLoading] = useState(false);
 
   const handleDownload = async () => {
@@ -73,7 +82,9 @@ export default function DownloadPdfButton({ className, quoteId, generatePdf, siz
       ) : (
         <ArrowDownTrayIcon className={size === 'xs' ? 'h-3.5 w-3.5' : 'h-5 w-5'} />
       )}
-      {loading ? (size === 'xs' ? '...' : 'Generating...') : (size === 'xs' ? 'PDF' : 'Download PDF')}
+      {loading
+        ? (loadingLabel ?? (size === 'xs' ? '...' : 'Generating...'))
+        : (label ?? (size === 'xs' ? 'PDF' : 'Download PDF'))}
     </button>
   );
 }

@@ -35,7 +35,15 @@ function SubmitButton({
   );
 }
 
-export function NegotiationActionPair({ itemId, initialRate }: { itemId: string; initialRate?: number }) {
+export function NegotiationActionPair({
+  itemId,
+  initialRate,
+  mode = 'rate',
+}: {
+  itemId: string;
+  initialRate?: number;
+  mode?: 'rate' | 'delete';
+}) {
   const [busy, setBusy] = useState<'accept' | 'reject' | null>(null);
   const [counterRate, setCounterRate] = useState(initialRate !== undefined ? initialRate.toFixed(2) : '');
   const [error, setError] = useState<string | null>(null);
@@ -62,19 +70,21 @@ export function NegotiationActionPair({ itemId, initialRate }: { itemId: string;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <input
-          type="number"
-          name="counterRate"
-          value={counterRate}
-          onChange={(e) => {
-            setCounterRate(e.target.value);
-            setError(null);
-          }}
-          step="0.01"
-          min="0"
-          placeholder="New rate"
-          className="w-24 rounded border px-2 py-1 text-right"
-        />
+        {mode === 'rate' && (
+          <input
+            type="number"
+            name="counterRate"
+            value={counterRate}
+            onChange={(e) => {
+              setCounterRate(e.target.value);
+              setError(null);
+            }}
+            step="0.01"
+            min="0"
+            placeholder="New rate"
+            className="w-24 rounded border px-2 py-1 text-right"
+          />
+        )}
 
         <form
           action={async () => {
@@ -95,11 +105,14 @@ export function NegotiationActionPair({ itemId, initialRate }: { itemId: string;
           }}
         >
           <SubmitButton
-            className="bg-emerald-600 shadow-sm transition hover:bg-emerald-700"
-            loadingText="Accepting..."
+            className={clsx(
+              'shadow-sm transition',
+              mode === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700',
+            )}
+            loadingText={mode === 'delete' ? 'Deleting...' : 'Accepting...'}
             disabled={disableAll}
           >
-            Accept
+            {mode === 'delete' ? 'Delete' : 'Accept'}
           </SubmitButton>
         </form>
 
@@ -109,30 +122,35 @@ export function NegotiationActionPair({ itemId, initialRate }: { itemId: string;
             setError(null);
             try {
               const rateValue = Number(counterRate);
-              if (!Number.isFinite(rateValue) || rateValue < 0) {
+              if (mode === 'rate' && (!Number.isFinite(rateValue) || rateValue < 0)) {
                 handleError('Enter a valid counter rate');
                 return;
               }
-              const result = await rejectNegotiationItem(itemId, rateValue);
+              const result = await rejectNegotiationItem(itemId, mode === 'delete' ? undefined : rateValue);
               if (!result?.ok) {
-                handleError(result?.error ?? 'Failed to finalize line');
+                handleError(result?.error ?? (mode === 'delete' ? 'Failed to keep line' : 'Failed to finalize line'));
               } else {
-                handleSuccess('Final rate applied');
-                setCounterRate(rateValue.toFixed(2));
+                handleSuccess(mode === 'delete' ? 'Line kept' : 'Final rate applied');
+                if (mode === 'rate') {
+                  setCounterRate(rateValue.toFixed(2));
+                }
               }
             } catch (err) {
-              handleError(err instanceof Error ? err.message : 'Failed to finalize line');
+              handleError(err instanceof Error ? err.message : mode === 'delete' ? 'Failed to keep line' : 'Failed to finalize line');
             } finally {
               setBusy(null);
             }
           }}
         >
           <SubmitButton
-            className="bg-red-600 shadow-sm transition hover:bg-red-700"
-            loadingText="Finalizing..."
-            disabled={disableAll || counterRate.trim() === ''}
+            className={clsx(
+              'shadow-sm transition',
+              mode === 'delete' ? 'bg-slate-600 hover:bg-slate-700' : 'bg-red-600 hover:bg-red-700',
+            )}
+            loadingText={mode === 'delete' ? 'Keeping...' : 'Finalizing...'}
+            disabled={disableAll || (mode === 'rate' && counterRate.trim() === '')}
           >
-            Finalize
+            {mode === 'delete' ? 'Keep' : 'Finalize'}
           </SubmitButton>
         </form>
       </div>

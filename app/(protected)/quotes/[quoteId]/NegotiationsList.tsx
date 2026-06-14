@@ -12,6 +12,7 @@ import {
 import Money from '@/components/Money';
 import { NegotiationActionPair } from '@/components/NegotiationActionPair';
 import { type QuoteSnapshot } from '@/lib/quoteSnapshot';
+import { isLineIncludedInNegotiation } from '@/lib/negotiationSelections';
 import { type QuoteLine, type QuoteNegotiation, type QuoteNegotiationItem } from '@prisma/client';
 import { fromMinor } from '@/helpers/money';
 import SubmitButton from '@/components/SubmitButton';
@@ -185,6 +186,7 @@ export default function NegotiationsList({
                             
                             const proposedTotal = fromMinor(item.proposedTotalMinor);
                             const proposedRate = deriveRateFromTotal(proposedTotal, quantity, vatRate);
+                            const deleteRequested = !isLineIncludedInNegotiation(proposedSnapshot, item.quoteLineId, true);
                             
                             const displayStatus = item.status === 'REVIEWED' ? 'FINAL' : item.status;
                             const reviewer = item.reviewedBy?.name ?? item.reviewedBy?.email;
@@ -223,18 +225,26 @@ export default function NegotiationsList({
                                         )}
                                       </div>
                                     )}
+                                    {deleteRequested && (
+                                      <span className="inline-flex w-fit items-center rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                                        Delete Request
+                                      </span>
+                                    )}
                                   </div>
                                 </td>
                                 <td className="px-4 py-3 text-center text-sm text-gray-500 dark:text-gray-400">{item.quoteLine?.unit ?? '-'}</td>
                                 <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-white">{quantity.toLocaleString()}</td>
                                 <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-white"><Money value={currentRate} /></td>
-                                <td className="px-4 py-3 text-right text-sm font-bold text-blue-600 dark:text-blue-400"><Money value={proposedRate} /></td>
+                                <td className="px-4 py-3 text-right text-sm font-bold text-blue-600 dark:text-blue-400">
+                                  {deleteRequested ? 'Delete stage' : <Money value={proposedRate} />}
+                                </td>
                                 <td className="px-4 py-3 text-center">
                                   <div className="flex justify-center">
                                     {canAct ? (
                                       <NegotiationActionPair
                                         itemId={item.id}
                                         initialRate={currentRate}
+                                        mode={deleteRequested ? 'delete' : 'rate'}
                                       />
                                     ) : (
                                       <span className="text-[10px] text-gray-400 italic">

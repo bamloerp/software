@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { getCurrentUser } from '@/lib/auth';
 import { getManualCatalog } from '@/lib/manualItemCatalog';
+import { ADDITIONAL_MANUAL_SECTIONS, normalizeSectionName } from '@/lib/manualSections';
 import { QUOTE_LINE_MAP } from '@/lib/quoteMap';
 import ManualItemsClient from './ManualItemsClient';
 
@@ -12,8 +13,9 @@ export default async function ManualItemsPage() {
 
   const catalog = await getManualCatalog();
   const sections = Array.from(new Set([
-    ...QUOTE_LINE_MAP.map((item) => item.section || 'OTHER'),
-    ...catalog.map((item) => item.section),
+    ...QUOTE_LINE_MAP.map((item) => normalizeSectionName(item.section) || 'OTHER'),
+    ...catalog.map((item) => normalizeSectionName(item.section)),
+    ...ADDITIONAL_MANUAL_SECTIONS,
     'FOUNDATIONS',
     'PRELIMINARIES',
     'LABOUR',

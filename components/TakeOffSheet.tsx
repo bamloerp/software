@@ -8,6 +8,7 @@ import { QUOTE_LINE_MAP, ELECTRICAL_ITEMS_CATALOG, type ElectricalItem } from '@
 import { normalizeContext, missingVars, evalExpr } from '@/lib/expr';
 import { DEFAULT_NOTES } from '@/lib/quoteDefaults';
 import { manualRateCode, type ManualCatalogItem } from '@/lib/manualItemCatalogShared';
+import { ADDITIONAL_MANUAL_SECTIONS, normalizeSectionName } from '@/lib/manualSections';
 import ClearableNumberInput from './ClearableNumberInput';
 import Money from '@/components/Money';
 import { UserIcon, EnvelopeIcon, PhoneIcon, BuildingOfficeIcon, MapPinIcon, WrenchScrewdriverIcon, BeakerIcon, ArrowDownTrayIcon, PlusIcon, TrashIcon, CheckCircleIcon, BoltIcon, BookmarkSquareIcon } from '@heroicons/react/24/outline';
@@ -57,23 +58,6 @@ type CustomItem = {
 };
 
 type ManualItemType = 'MATERIAL' | 'LABOUR';
-
-const ADDITIONAL_MANUAL_SECTIONS = [
-  'TILING',
-  'ELECTRICAL WIRING AND CONNECTONS',
-  'CEILING',
-  'SKIMING',
-  'STEEL WINDOW FRAME AND GLAZING',
-  'PAINTING',
-  'JOINERY AND IRON MONGARY',
-  'PLUMBING',
-  'GUTTER',
-  'ALUMINIUM WINDOW FRAME',
-];
-
-function normalizeSectionName(section?: string | null): string {
-  return (section ?? '').trim().toUpperCase();
-}
 
 function normalizeManualItemType(itemType?: string | null): ManualItemType {
   return itemType === 'LABOUR' ? 'LABOUR' : 'MATERIAL';
