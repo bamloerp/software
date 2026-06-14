@@ -1,18 +1,32 @@
 'use client';
 
 import clsx from 'clsx';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function NegotiationProposalFields({
   lineId,
+  stageKey,
   defaultIncluded,
   defaultRate,
 }: {
   lineId: string;
+  stageKey: string;
   defaultIncluded: boolean;
   defaultRate: number;
 }) {
   const [included, setIncluded] = useState(defaultIncluded);
+
+  useEffect(() => {
+    function handleStageKeepChange(event: Event) {
+      const detail = (event as CustomEvent<{ stageKey: string; included: boolean }>).detail;
+      if (detail?.stageKey === stageKey) {
+        setIncluded(detail.included);
+      }
+    }
+
+    window.addEventListener('negotiation-stage-keep-change', handleStageKeepChange);
+    return () => window.removeEventListener('negotiation-stage-keep-change', handleStageKeepChange);
+  }, [stageKey]);
 
   return (
     <>
@@ -21,7 +35,7 @@ export default function NegotiationProposalFields({
           <input
             type="checkbox"
             name={`line-${lineId}-included`}
-            defaultChecked={defaultIncluded}
+            checked={included}
             onChange={(event) => setIncluded(event.target.checked)}
             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />

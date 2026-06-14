@@ -994,6 +994,109 @@ export async function acceptNegotiationItem(negotiationItemId: string): Promise<
   });
 }
 
+export async function acceptNegotiationStageDeletion(
+  negotiationId: string,
+  section: string,
+): Promise<ActionResult<{ quoteId: string; deletedCount: number }>> {
+  return runAction('acceptNegotiationStageDeletion', async () => {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    const role = assertRole(user.role);
+    const userOffice = resolveOfficeForRole(role, user.office ?? null);
+    if (role !== 'SENIOR_QS' && role !== 'ADMIN') {
+      throw new Error('You do not have permission to delete negotiation stages');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const negotiation = await tx.quoteNegotiation.findUnique({
+        where: { id: negotiationId },
+        include: {
+          proposedVersion: { select: { snapshotJson: true } },
+          quote: { include: quoteInclude },
+          items: {
+            where: { status: 'PENDING' },
+            include: { quoteLine: true },
+          },
+        },
+      });
+
+      if (!negotiation) throw new Error('Negotiation not found');
+      if (negotiation.status !== 'OPEN') throw new Error('Negotiation is not open');
+
+      const proposedSnapshot = JSON.parse(negotiation.proposedVersion.snapshotJson) as Parameters<typeof readNegotiationSelections>[0];
+      const linesToDelete = negotiation.items
+        .filter((item) => item.quoteLine?.section === section)
+        .filter((item) => !isLineIncludedInNegotiation(proposedSnapshot, item.quoteLineId, true))
+        .map((item) => item.quoteLineId);
+
+      if (linesToDelete.length === 0) {
+        throw new Error('No delete requests found for this stage');
+      }
+
+      await tx.quoteLineExtraRequest.deleteMany({ where: { quoteLineId: { in: linesToDelete } } }).catch(() => undefined);
+      await tx.scheduleItem.deleteMany({ where: { quoteLineId: { in: linesToDelete } } }).catch(() => undefined);
+      await tx.procurementRequisitionItem.deleteMany({ where: { quoteLineId: { in: linesToDelete } } }).catch(() => undefined);
+      await tx.purchaseOrderItem.deleteMany({ where: { quoteLineId: { in: linesToDelete } } }).catch(() => undefined);
+      await tx.quoteNegotiationItem.deleteMany({ where: { quoteLineId: { in: linesToDelete } } });
+      await tx.quoteLine.deleteMany({ where: { id: { in: linesToDelete } } });
+
+      const refreshedQuote = await tx.quote.findUniqueOrThrow({
+        where: { id: negotiation.quoteId },
+        include: quoteInclude,
+      });
+      const ensuredOffice = ensureQuoteOffice(refreshedQuote.office ?? null, role, userOffice);
+      const snapshot = buildQuoteSnapshot({ quote: refreshedQuote });
+      const totals = snapshot.totals;
+
+      const statuses = await tx.quoteNegotiationItem.findMany({
+        where: { negotiationId: negotiation.id },
+        select: { status: true },
+      });
+      const resolvedStatus = resolveNegotiationStatus(statuses.map((entry) => entry.status));
+
+      if (resolvedStatus !== negotiation.status) {
+        await tx.quoteNegotiation.update({
+          where: { id: negotiation.id },
+          data: { status: resolvedStatus },
+        });
+      }
+
+      const quoteUpdate: Prisma.QuoteUpdateInput = {
+        metaJson: JSON.stringify({ ...(snapshot.meta ?? {}), totals }),
+      };
+
+      if (!refreshedQuote.office && ensuredOffice) {
+        quoteUpdate.office = ensuredOffice;
+      }
+
+      if (resolvedStatus === 'AGREED') {
+        quoteUpdate.status = 'REVIEWED';
+        quoteUpdate.reviewer = { connect: { id: user.id } };
+      }
+
+      const updatedQuote = await tx.quote.update({
+        where: { id: negotiation.quoteId },
+        data: quoteUpdate,
+        include: quoteInclude,
+      });
+
+      await createInlineQuoteVersion(
+        tx,
+        updatedQuote,
+        `Negotiation stage deleted (${section})`,
+        role,
+      );
+
+      return { quoteId: negotiation.quoteId, deletedCount: linesToDelete.length };
+    }, TX_OPTS);
+
+    revalidatePath(`/quotes/${result.quoteId}`);
+    revalidatePath(`/client/quotes/${result.quoteId}`);
+    revalidatePath('/quotes');
+    return result;
+  });
+}
+
 export async function rejectNegotiationItem(
   negotiationItemId: string,
   counterRate?: number,

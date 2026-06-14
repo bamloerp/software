@@ -61,7 +61,7 @@ export default function DownloadPdfButton({
       document.body.removeChild(link);
     } catch (error) {
       console.error('Download error:', error);
-      alert('Failed to download PDF. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to download PDF. Please try again.');
     } finally {
       setLoading(false);
     }

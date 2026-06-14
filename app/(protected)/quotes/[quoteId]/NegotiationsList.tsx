@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Money from '@/components/Money';
 import { NegotiationActionPair } from '@/components/NegotiationActionPair';
+import NegotiationStageDeleteButton from '@/components/NegotiationStageDeleteButton';
 import { type QuoteSnapshot } from '@/lib/quoteSnapshot';
 import { isLineIncludedInNegotiation } from '@/lib/negotiationSelections';
 import { type QuoteLine, type QuoteNegotiation, type QuoteNegotiationItem } from '@prisma/client';
@@ -118,6 +119,13 @@ export default function NegotiationsList({
 
                 const totalDelta =
                   (proposedSnapshot?.totals.grandTotal ?? 0) - (originalSnapshot?.totals.grandTotal ?? 0);
+                const stageDeleteRequests = new Map<string, number>();
+                negotiation.items.forEach((item) => {
+                  if (item.status !== 'PENDING') return;
+                  if (isLineIncludedInNegotiation(proposedSnapshot, item.quoteLineId, true)) return;
+                  const section = item.quoteLine?.section?.trim() || 'Items';
+                  stageDeleteRequests.set(section, (stageDeleteRequests.get(section) ?? 0) + 1);
+                });
 
                 return (
                   <div
@@ -152,6 +160,24 @@ export default function NegotiationsList({
 
                       </div>
                     </div>
+
+                    {isReviewer && isLatest && negotiation.status === 'OPEN' && stageDeleteRequests.size > 0 && (
+                      <div className="mb-3 rounded-lg border border-red-100 bg-red-50 p-3 dark:border-red-900/40 dark:bg-red-900/10">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-red-700 dark:text-red-300">
+                          Stage delete requests
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {[...stageDeleteRequests.entries()].map(([section, count]) => (
+                            <NegotiationStageDeleteButton
+                              key={section}
+                              negotiationId={negotiation.id}
+                              section={section}
+                              count={count}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm dark:border-gray-700">
                       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import clsx from 'clsx';
 import Money from '@/components/Money';
 import NegotiationProposalFields from '@/components/NegotiationProposalFields';
+import NegotiationStageKeepToggle from '@/components/NegotiationStageKeepToggle';
 import { proposeNegotiationAmountOnly } from '@/app/(protected)/quotes/[quoteId]/actions';
 import { prisma } from '@/lib/db';
 import type { QuoteLine, QuoteNegotiationItem } from '@prisma/client';
@@ -101,6 +102,10 @@ type LineGroup = {
   section: string;
   rows: any[];
 };
+
+function stageKeyForSection(section: string): string {
+  return section.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
 
 function buildLineGroups(lines: any[], negotiationByLine: Map<string, any>, vatRate: number): LineGroup[] {
   const groups = new Map<string, LineGroup>();
@@ -423,11 +428,21 @@ export default async function ClientQuotePage({ params }: ClientQuotePageParams)
                 <React.Fragment key={group.section}>
                   <tr className="bg-gray-50">
                     <td
-                      colSpan={quote.status === 'NEGOTIATION' ? 7 : 5}
+                      colSpan={quote.status === 'NEGOTIATION' ? 5 : 5}
                       className="px-3 py-2 font-bold text-gray-700 border-y"
                     >
                       {group.section}
                     </td>
+                    {quote.status === 'NEGOTIATION' && (
+                      <td colSpan={2} className="border-y px-3 py-2 text-center">
+                        <NegotiationStageKeepToggle
+                          stageKey={stageKeyForSection(group.section)}
+                          defaultIncluded={group.rows.every((line) =>
+                            isLineIncludedInNegotiation(latestProposalSnapshot, line.id, true),
+                          )}
+                        />
+                      </td>
+                    )}
                   </tr>
                   {group.rows.map((line) => {
                     const rate = line.rate;
@@ -511,6 +526,7 @@ export default async function ClientQuotePage({ params }: ClientQuotePageParams)
                             {isEditable ? (
                               <NegotiationProposalFields
                                 lineId={line.id}
+                                stageKey={stageKeyForSection(group.section)}
                                 defaultIncluded={isIncluded}
                                 defaultRate={displayValue}
                               />

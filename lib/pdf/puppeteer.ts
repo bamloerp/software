@@ -4,6 +4,7 @@ import puppeteer from "puppeteer-core";
 import type { PdfRenderer, PdfRequest, PdfResult } from "./index";
 import { BARMLO_LOGO_BASE64 } from "./logo";
 import { prisma } from "@/lib/db";
+import { readQuoteGrandTotal } from "@/lib/accounting";
 import fs from "fs";
 import path from "path";
 import {
@@ -14,6 +15,10 @@ import {
 
 function money(minor: number, cur = "USD") {
   return `${cur === "USD" ? "US$" : ""}${(Number(minor || 0) / 100).toFixed(2)}`;
+}
+
+function safeFilenamePart(value: string): string {
+  return value.replace(/[^a-z0-9\-_]+/gi, '_').replace(/^_+|_+$/g, '') || 'document';
 }
 
 function getLocalBrowserPath(): string | undefined {
@@ -778,7 +783,7 @@ export async function renderProjectPaymentSchedulePdf(projectId: string): Promis
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      quote: { include: { customer: true } },
+      quote: { include: { customer: true, lines: true } },
       paymentSchedules: { orderBy: { seq: 'asc' } },
       clientPayments: true,
     },
@@ -793,6 +798,7 @@ export async function renderProjectPaymentSchedulePdf(projectId: string): Promis
   const balanceMinor = contractValueMinor - totalPaidMinor;
   const logoBase64 = loadLogo();
   const projectRef = project.projectNumber || project.name || project.id.slice(0, 10);
+  const filenameRef = safeFilenamePart(projectRef);
 
   const rows = project.paymentSchedules
     .map((schedule) => {
@@ -852,14 +858,14 @@ export async function renderProjectPaymentSchedulePdf(projectId: string): Promis
   </body></html>`;
 
   const buffer = await htmlToPdf(html);
-  return { buffer, filename: `Payment-Schedule-${projectRef}.pdf` };
+  return { buffer, filename: `Payment-Schedule-${filenameRef}.pdf` };
 }
 
 export async function renderProjectPaymentHistoryPdf(projectId: string): Promise<PdfResult> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      quote: { include: { customer: true } },
+      quote: { include: { customer: true, lines: true } },
       paymentSchedules: { orderBy: { seq: 'asc' } },
       clientPayments: { orderBy: { receivedAt: 'desc' } },
     },
@@ -874,6 +880,7 @@ export async function renderProjectPaymentHistoryPdf(projectId: string): Promise
   const balanceMinor = contractValueMinor - totalPaidMinor;
   const logoBase64 = loadLogo();
   const projectRef = project.projectNumber || project.name || project.id.slice(0, 10);
+  const filenameRef = safeFilenamePart(projectRef);
 
   const rows = project.clientPayments
     .map((payment) => `<tr class="tbl-row">
@@ -928,7 +935,7 @@ export async function renderProjectPaymentHistoryPdf(projectId: string): Promise
   </body></html>`;
 
   const buffer = await htmlToPdf(html);
-  return { buffer, filename: `Payment-History-${projectRef}.pdf` };
+  return { buffer, filename: `Payment-History-${filenameRef}.pdf` };
 }
 
 /* ── Requisition PDF ── */
