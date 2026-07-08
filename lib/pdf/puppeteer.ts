@@ -171,7 +171,7 @@ export class PuppeteerRenderer implements PdfRenderer {
       compareConstructionSummaryCategories(a.category, b.category)
     );
     const pricing = computeQuotePricing({
-      lines: lines.map((line) => ({ lineTotalMinor: line.lineTotalMinor })),
+      lines: quote.lines.map((line) => ({ lineTotalMinor: line.lineTotalMinor })),
       pgRate: quote.pgRate,
       contingencyRate: quote.contingencyRate,
       vatBps: quote.vatBps,
