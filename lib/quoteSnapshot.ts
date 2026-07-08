@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { fromMinor } from '@/helpers/money';
 import { QuoteStatus, UserRole } from './workflow';
+import { computeQuotePricing } from './quotePricing';
 
 const ZERO = BigInt(0);
 
@@ -74,7 +75,25 @@ function parseJson(value: unknown): Record<string, unknown> | null {
   }
 }
 
-export function computeTotalsFromLines(lines: SnapshotLine[]): SnapshotTotals {
+export function computeTotalsFromLines(
+  lines: SnapshotLine[],
+  options?: {
+    pgRate?: bigint | number | null;
+    contingencyRate?: bigint | number | null;
+    vatBps?: bigint | number | null;
+    metaJson?: string | Record<string, unknown> | null;
+  },
+): SnapshotTotals {
+  if (options) {
+    return computeQuotePricing({
+      lines,
+      pgRate: options.pgRate,
+      contingencyRate: options.contingencyRate,
+      vatBps: options.vatBps,
+      metaJson: options.metaJson ?? null,
+    }).totals;
+  }
+
   const subtotalMinor = lines.reduce((acc, l) => acc + BigInt(Math.round(l.lineSubtotalMinor)), ZERO);
   const discountMinor = lines.reduce((acc, l) => acc + BigInt(Math.round(l.lineDiscountMinor)), ZERO);
   const taxMinor = lines.reduce((acc, l) => acc + BigInt(Math.round(l.lineTaxMinor)), ZERO);
@@ -130,7 +149,14 @@ export function buildQuoteSnapshot(params: {
       };
     });
 
-  const totals = params.totalsOverride ?? computeTotalsFromLines(lines);
+  const totals =
+    params.totalsOverride ??
+    computeTotalsFromLines(lines, {
+      pgRate: quote.pgRate,
+      contingencyRate: quote.contingencyRate,
+      vatBps: quote.vatBps,
+      metaJson: params.metaOverride ?? quote.metaJson,
+    });
   const meta = params.metaOverride ?? parseJson(quote.metaJson ?? null);
 
   return {

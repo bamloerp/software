@@ -74,13 +74,17 @@ export default function RequisitionPickerClient({
       for (const ln of lines) {
         const defaultQty = ln.remaining > 0 ? ln.remaining : 0;
         const isInit = initialSelected.has(ln.id);
-        sel[ln.id] = selected[ln.id] ?? isInit;
+        const restoredQty = isInit
+          ? Math.min(
+              defaultQty,
+              Math.max(0, initiallySelected.find((row) => row.quoteLineId === ln.id)?.qty ?? defaultQty),
+            )
+          : defaultQty;
+        sel[ln.id] = selected[ln.id] ?? (isInit && restoredQty > 0);
         q[ln.id] =
           ln.id in qtys
             ? qtys[ln.id]
-            : isInit
-              ? Math.max(0, initiallySelected.find((row) => row.quoteLineId === ln.id)?.qty ?? defaultQty)
-              : defaultQty;
+            : restoredQty;
       }
     }
     setSelected(sel);

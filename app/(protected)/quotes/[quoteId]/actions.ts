@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getQuoteGrandTotalMinor, addMonths } from '@/app/lib/payments'
+import { reconcilePaymentScheduleToGrandTotal } from '@/app/lib/payments';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { resolveOfficeForRole, ensureQuoteOffice } from '@/lib/office';
@@ -12,11 +13,13 @@ import { money } from '@/lib/money';
 import { readQuoteGrandTotal } from '@/lib/accounting';
 import { fromBps, fromMinor, toMinor, toBigIntMinor } from '@/helpers/money';
 import { buildQuoteSnapshot, computeTotalsFromLines, createQuoteVersionTx, type SnapshotLine } from '@/lib/quoteSnapshot';
+import { computeQuotePricing, serializeQuoteMeta, validateQuoteDiscountInput } from '@/lib/quotePricing';
 import { TX_OPTS } from '@/lib/db-tx';
 import { rememberManualLine } from '@/lib/manualLineTemplates';
 import { isLineIncludedInNegotiation, readNegotiationSelections, type NegotiationSelectionMap } from '@/lib/negotiationSelections';
 import { QUOTE_STATUSES, USER_ROLES, type QuoteStatus, type UserRole } from '@/lib/workflow';
 import { getErrorMessage } from '@/lib/errors';
+import { setFlashMessage } from '@/lib/flash.server';
 import { generatePaymentSchedule } from '../../projects/actions';
 import { generateProjectNumberInTransaction } from '@/lib/project-number';
 import { getPdfRenderer } from '@/lib/pdf';
@@ -292,6 +295,95 @@ function computeLineAmounts(quantity: number, unitRate: number, vatRate: number)
   };
 }
 
+export async function applyQuoteDiscount(quoteId: string, formData: FormData) {
+  const user = await getCurrentUser();
+  if (!user) {
+    setFlashMessage({ type: 'error', message: 'Authentication required.' });
+    redirect(`/quotes/${quoteId}`);
+  }
+
+  if (user.role !== 'ADMIN') {
+    setFlashMessage({ type: 'error', message: 'Only an admin can update quotation discounts.' });
+    redirect(`/quotes/${quoteId}`);
+  }
+
+  const mode = String(formData.get('mode') ?? 'percent');
+  const rawValue = formData.get('value');
+
+  try {
+    const projectId = await prisma.$transaction(async (tx) => {
+      const quote = await tx.quote.findUnique({
+        where: { id: quoteId },
+        include: quoteInclude,
+      });
+      if (!quote) {
+        throw new Error('Quote not found');
+      }
+
+      const pricing = computeQuotePricing({
+        lines: quote.lines,
+        pgRate: quote.pgRate,
+        contingencyRate: quote.contingencyRate,
+        vatBps: quote.vatBps,
+        metaJson: quote.metaJson ?? null,
+      });
+
+      const quoteDiscount = validateQuoteDiscountInput(mode, rawValue, pricing.preDiscountTotal);
+      const metaJson = serializeQuoteMeta({
+        metaJson: quote.metaJson ?? null,
+        quoteDiscount,
+      });
+
+      const updated = await tx.quote.update({
+        where: { id: quoteId },
+        data: { metaJson },
+        include: quoteInclude,
+      });
+
+      const snapshot = buildQuoteSnapshot({ quote: updated });
+
+      await tx.quote.update({
+        where: { id: quoteId },
+        data: {
+          metaJson: serializeQuoteMeta({
+            metaJson: updated.metaJson ?? null,
+            quoteDiscount,
+            totals: snapshot.totals,
+          }),
+        },
+      });
+
+      await createQuoteVersionTx(tx, {
+        quote: updated,
+        label: quoteDiscount ? 'Admin discount updated' : 'Admin discount cleared',
+        status: normalizeQuoteStatus(updated.status),
+        byRole: 'ADMIN',
+        snapshot,
+      });
+
+      const project = await tx.project.findFirst({ where: { quoteId }, select: { id: true } });
+      return project?.id ?? null;
+    }, TX_OPTS);
+
+    if (projectId) {
+      await reconcilePaymentScheduleToGrandTotal(projectId);
+      revalidatePath(`/projects/${projectId}`);
+      revalidatePath(`/projects/${projectId}/payments`);
+      revalidatePath(`/reports/payment-history/${projectId}`);
+    }
+
+    revalidatePath(`/quotes/${quoteId}`);
+    revalidatePath(`/client/quotes/${quoteId}`);
+    revalidatePath('/quotes');
+    revalidatePath('/accounts/payments');
+    setFlashMessage({ type: 'success', message: 'Quotation discount updated.' });
+  } catch (error) {
+    setFlashMessage({ type: 'error', message: getErrorMessage(error) });
+  }
+
+  redirect(`/quotes/${quoteId}`);
+}
+
 function deriveUnitRateFromTotal(totalAmount: number, quantity: number, vatRate: number) {
   if (!(quantity > 0)) {
     throw new Error('Line quantity must be greater than zero');
@@ -509,7 +601,12 @@ export async function proposeNegotiationAmountOnly(
     if (negotiableCount === 0) throw new Error('No negotiable lines available in the current cycle');
 
     // Build snapshot & totals
-    const totals = computeTotalsFromLines(snapshotLines);
+    const totals = computeTotalsFromLines(snapshotLines, {
+      pgRate: quote.pgRate,
+      contingencyRate: quote.contingencyRate,
+      vatBps: quote.vatBps,
+      metaJson: quote.metaJson,
+    });
     const snapshot = buildQuoteSnapshot({ quote, linesOverride: snapshotLines, totalsOverride: totals });
     snapshot.quote.status = 'NEGOTIATION';
     snapshot.meta = { ...(snapshot.meta ?? {}), totals, negotiationSelections: selectionMap };
@@ -784,7 +881,12 @@ export async function proposeNegotiationAmountOnly(
       throw new Error('No negotiable lines available in the current cycle');
     }
 
-    const totals = computeTotalsFromLines(snapshotLines);
+    const totals = computeTotalsFromLines(snapshotLines, {
+      pgRate: quote.pgRate,
+      contingencyRate: quote.contingencyRate,
+      vatBps: quote.vatBps,
+      metaJson: quote.metaJson,
+    });
     const snapshot = buildQuoteSnapshot({ quote, linesOverride: snapshotLines, totalsOverride: totals });
     snapshot.quote.status = 'NEGOTIATION';
     snapshot.meta = { ...(snapshot.meta ?? {}), totals };

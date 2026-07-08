@@ -1977,6 +1977,7 @@ export async function createRequisitionFromQuotePicks(formData: FormData) {
   if (!user) throw new Error('Auth required');
 
   const projectId = String(formData.get('projectId') || '');
+  const draftRequisitionId = String(formData.get('draftRequisitionId') || '');
   if (!projectId) throw new Error('Missing projectId');
 
   type PickRow = {
@@ -2045,16 +2046,47 @@ export async function createRequisitionFromQuotePicks(formData: FormData) {
     };
   });
 
-  const req = await prisma.procurementRequisition.create({
-    data: {
-      projectId,
-      status: 'DRAFT',
-      items: {
-        create: itemsToCreate,
+  const req = await prisma.$transaction(async (tx) => {
+    if (draftRequisitionId) {
+      const existingDraft = await tx.procurementRequisition.findUnique({
+        where: { id: draftRequisitionId },
+        select: { id: true, projectId: true, status: true },
+      });
+
+      if (!existingDraft || existingDraft.projectId !== projectId) {
+        throw new Error('Draft requisition not found.');
+      }
+
+      if (existingDraft.status !== 'DRAFT') {
+        throw new Error('Only draft requisitions can be edited.');
+      }
+
+      await tx.procurementRequisitionItem.deleteMany({
+        where: { requisitionId: existingDraft.id },
+      });
+
+      return tx.procurementRequisition.update({
+        where: { id: existingDraft.id },
+        data: {
+          items: {
+            create: itemsToCreate,
+          },
+        },
+        include: { items: true },
+      });
+    }
+
+    return tx.procurementRequisition.create({
+      data: {
+        projectId,
+        status: 'DRAFT',
+        items: {
+          create: itemsToCreate,
+        },
       },
-    },
-    include: { items: true },
-  });
+      include: { items: true },
+    });
+  }, TX_OPTS);
 
   revalidatePath(`/projects/${projectId}`);
   redirect(`/projects/${projectId}/requisitions/${req.id}`);

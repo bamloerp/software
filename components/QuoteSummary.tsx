@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import Money from '@/components/Money';
+import { computeQuotePricing, describeQuoteDiscount } from '@/lib/quotePricing';
 import {
   compareConstructionSummaryCategories,
   getConstructionSummaryCategory,
@@ -19,6 +20,7 @@ type QuoteSummaryProps = {
   contingencyRate: number;
   vatBps?: bigint | number | null;
   currency: string;
+  metaJson?: string | null;
 };
 
 function formatPercentRate(value: number): string {
@@ -36,7 +38,7 @@ function vatPercentFromBps(vatBps: bigint | number | null | undefined): number {
   return effectiveBps / 100;
 }
 
-export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, currency }: QuoteSummaryProps) {
+export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, currency, metaJson }: QuoteSummaryProps) {
   const totals = useMemo(() => {
     const sectionTotals = new Map<
       string,
@@ -57,27 +59,20 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, c
     const orderedSections = Array.from(sectionTotals.values()).sort((a, b) =>
       compareConstructionSummaryCategories(a.category, b.category)
     );
-    const totalMeasuredWorks = orderedSections.reduce((total, section) => total + section.amount, 0n);
-    
-    const pgAmount = BigInt(Math.round(Number(totalMeasuredWorks) * (pgRate / 100)));
-    const subtotalWithPg = totalMeasuredWorks + pgAmount;
-    const contingencyAmount = BigInt(Math.round(Number(pgAmount) * (contingencyRate / 100)));
-    const subtotalBeforeVat = subtotalWithPg + contingencyAmount;
-    const vatPercent = vatPercentFromBps(vatBps);
-    const vatAmount = BigInt(Math.round(Number(subtotalBeforeVat) * (vatPercent / 100)));
-    
-    const grandTotal = subtotalBeforeVat + vatAmount;
+    const pricing = computeQuotePricing({ lines, pgRate, contingencyRate, vatBps, metaJson: metaJson ?? null });
 
     return {
-      totalMeasuredWorks,
+      totalMeasuredWorks: BigInt(pricing.measuredWorksMinor),
       sectionTotals: orderedSections,
-      pgAmount,
-      contingencyAmount,
-      vatPercent,
-      vatAmount,
-      grandTotal
+      pgAmount: BigInt(pricing.pgAmountMinor),
+      contingencyAmount: BigInt(pricing.contingencyAmountMinor),
+      vatPercent: pricing.vatPercent,
+      vatAmount: BigInt(pricing.vatAmountMinor),
+      discount: BigInt(pricing.totals.discountMinor),
+      discountLabel: describeQuoteDiscount(pricing.quoteDiscount),
+      grandTotal: BigInt(pricing.totals.grandTotalMinor),
     };
-  }, [lines, pgRate, contingencyRate, vatBps]);
+  }, [lines, pgRate, contingencyRate, vatBps, metaJson]);
 
   return (
     <div className="mt-8 overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
@@ -140,6 +135,17 @@ export default function QuoteSummary({ lines, pgRate, contingencyRate, vatBps, c
             <Money minor={totals.vatAmount} currency={currency} />
           </div>
         </div>
+        {totals.discount > 0n && (
+          <div className="grid grid-cols-[3rem_1fr_10rem] border-b border-gray-300 text-sm">
+            <div className="border-r border-gray-300 px-3 py-2" />
+            <div className="border-r border-gray-300 px-3 py-2">
+              {totals.discountLabel ?? 'Quotation Discount'}
+            </div>
+            <div className="bg-blue-50 px-3 py-2 text-right font-semibold">
+              -<Money minor={totals.discount} currency={currency} />
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-[3rem_1fr_10rem] bg-gray-50 text-base font-bold uppercase text-gray-900">
           <div className="border-r border-gray-300 px-3 py-2" />
           <div className="border-r border-gray-300 px-3 py-2">Grand Total</div>

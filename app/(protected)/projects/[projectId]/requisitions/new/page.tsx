@@ -22,10 +22,13 @@ type LineRow = {
 
 export default async function NewRequisitionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ draftId?: string }>;
 }) {
   const { projectId } = await params;
+  const { draftId } = await searchParams;
   const currentUser = await getCurrentUser();
 
   // load quote lines for the project's quote
@@ -38,6 +41,24 @@ export default async function NewRequisitionPage({
     },
   });
   if (!quote) return notFound();
+
+  const draftRequisition = draftId
+    ? await prisma.procurementRequisition.findUnique({
+        where: { id: draftId },
+        include: {
+          items: {
+            select: {
+              quoteLineId: true,
+              qtyRequested: true,
+            },
+          },
+        },
+      })
+    : null;
+
+  if (draftId && (!draftRequisition || draftRequisition.projectId !== projectId || draftRequisition.status !== 'DRAFT')) {
+    return notFound();
+  }
 
   const lineIds = quote.lines.map((l) => l.id);
 
@@ -85,7 +106,10 @@ export default async function NewRequisitionPage({
   // qty already requested on requisitions (by quoteLineId)
   const requestedAgg = await prisma.procurementRequisitionItem.groupBy({
     by: ['quoteLineId'],
-    where: { quoteLineId: { in: lineIds } },
+    where: {
+      quoteLineId: { in: lineIds },
+      requisitionId: draftRequisition ? { not: draftRequisition.id } : undefined,
+    },
     _sum: { qtyRequested: true },
   });
   const requestedByLine = new Map<string, number>();
@@ -162,8 +186,19 @@ export default async function NewRequisitionPage({
         <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden p-6 mt-6">
           <form action={createRequisitionFromQuotePicks} className="space-y-6">
             <input type="hidden" name="projectId" value={projectId} />
+            {draftRequisition && (
+              <input type="hidden" name="draftRequisitionId" value={draftRequisition.id} />
+            )}
             <RequisitionPickerClient
               clientGrouped={grouped}
+              initiallySelected={
+                draftRequisition?.items
+                  .filter((item) => typeof item.quoteLineId === 'string' && item.quoteLineId.length > 0)
+                  .map((item) => ({
+                    quoteLineId: item.quoteLineId as string,
+                    qty: Number(item.qtyRequested ?? 0),
+                  })) ?? []
+              }
               projectId={projectId}
               currentRole={currentUser?.role ?? null}
               requestsByLine={requestsByLine}

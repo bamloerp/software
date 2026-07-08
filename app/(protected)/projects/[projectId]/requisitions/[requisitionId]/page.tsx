@@ -226,17 +226,25 @@ export default async function ProjectRequisitionDetailPage({
                       </div>
                     </div>
                     {canSubmit ? (
-                      <form
-                        action={submitRequisitionToProcurement.bind(null, requisitionId)}
-                        className="w-full sm:w-auto"
-                      >
-                        <SubmitButton
-                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-green-700 hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                          loadingText="Submitting..."
+                      <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                        <Link
+                          href={`/projects/${projectId}/requisitions/new?draftId=${requisitionId}`}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 sm:w-auto"
                         >
-                          Submit Requisition
-                        </SubmitButton>
-                      </form>
+                          Cancel
+                        </Link>
+                        <form
+                          action={submitRequisitionToProcurement.bind(null, requisitionId)}
+                          className="w-full sm:w-auto"
+                        >
+                          <SubmitButton
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-green-700 hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                            loadingText="Submitting..."
+                          >
+                            Submit Requisition
+                          </SubmitButton>
+                        </form>
+                      </div>
                     ) : (
                       <div className="px-4 py-2 bg-white/60 rounded-lg text-sm text-blue-800 font-medium border border-blue-200 shadow-sm backdrop-blur-sm">
                         Waiting for Project Manager approval

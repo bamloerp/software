@@ -73,12 +73,13 @@ import SalesEndorsementForm from './SalesEndorsementForm';
 import NegotiationsList from './NegotiationsList';
 import QuoteSummary from '@/components/QuoteSummary';
 import QuoteNotes from '@/components/QuoteNotes';
-import { updateQuoteNotes } from './actions';
+import { applyQuoteDiscount, updateQuoteNotes } from './actions';
 import {
   compareConstructionSummaryCategories,
   getConstructionSummaryCategory,
   type ConstructionSummaryCategory,
 } from '@/lib/constructionSummary';
+import { computeQuotePricing, describeQuoteDiscount } from '@/lib/quotePricing';
 
 const USER_ROLE_SET = new Set<UserRole>(USER_ROLES as unknown as UserRole[]);
 
@@ -419,28 +420,20 @@ function buildLineGroups(
   return [...sortedMat, ...sortedLab];
 }
 
-function computeLineTotals(lines: QuoteLine[]): QuoteTotals {
-  const subtotalMinor = lines.reduce((acc, line) => acc + BigInt(line.lineSubtotalMinor), 0n);
-
-  const discountMinor = lines.reduce((acc, line) => acc + BigInt(line.lineDiscountMinor), 0n);
-
-  const taxMinor = lines.reduce((acc, line) => acc + BigInt(line.lineTaxMinor), 0n);
-
-  const totalMinor = lines.reduce((acc, line) => acc + BigInt(line.lineTotalMinor), 0n);
-
-  const netMinor = subtotalMinor - discountMinor;
-
-  return {
-    subtotal: fromMinor(subtotalMinor),
-
-    discount: fromMinor(discountMinor),
-
-    net: fromMinor(netMinor),
-
-    tax: fromMinor(taxMinor),
-
-    grandTotal: fromMinor(totalMinor),
-  };
+function computeLineTotals(quote: {
+  lines: QuoteLine[];
+  pgRate: number;
+  contingencyRate: number;
+  vatBps: number;
+  metaJson: string | null;
+}): QuoteTotals {
+  return computeQuotePricing({
+    lines: quote.lines,
+    pgRate: quote.pgRate,
+    contingencyRate: quote.contingencyRate,
+    vatBps: quote.vatBps,
+    metaJson: quote.metaJson,
+  }).totals;
 }
 
 function buildVersionDiff(current: QuoteSnapshot, previous?: QuoteSnapshot): VersionDiff {
@@ -855,23 +848,15 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
 
   const groups = buildLineGroups(quote.lines, negotiationByLine, versionNumberById, activeCycle);
 
-  const metaTotals = parseJson<{ totals?: QuoteTotals }>(quote.metaJson ?? null)?.totals;
+  const pricing = computeQuotePricing({
+    lines: quote.lines,
+    pgRate: quote.pgRate,
+    contingencyRate: quote.contingencyRate,
+    vatBps: quote.vatBps,
+    metaJson: quote.metaJson,
+  });
 
-  const computedTotals = computeLineTotals(quote.lines);
-
-  const totals: QuoteTotals = metaTotals
-    ? {
-        subtotal: metaTotals.subtotal ?? computedTotals.subtotal,
-
-        discount: metaTotals.discount ?? computedTotals.discount,
-
-        net: metaTotals.net ?? computedTotals.net,
-
-        tax: metaTotals.tax ?? computedTotals.tax,
-
-        grandTotal: metaTotals.grandTotal ?? computedTotals.grandTotal,
-      }
-    : computedTotals;
+  const totals: QuoteTotals = computeLineTotals(quote);
 
   const vatPercent = vatPercentFromBps(quote.vatBps);
 
@@ -1719,6 +1704,88 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
             />
           )}
 
+          {isAdmin && (
+            <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm no-print">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Quotation Discount
+                  </h3>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-300">
+                    Apply a quote-level discount to the current contract total. The discounted grand total becomes the amount used for payments, reports, and future quote output.
+                  </p>
+                  {pricing.quoteDiscount && (
+                    <p className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                      Active: {describeQuoteDiscount(pricing.quoteDiscount)}
+                      {pricing.quoteDiscount.mode === 'amount'
+                        ? ` ${quote.currency ?? 'USD'} ${pricing.quoteDiscount.value.toFixed(2)}`
+                        : ''}
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700">
+                  <div>
+                    Before discount: <span className="font-semibold"><Money value={pricing.preDiscountTotal} /></span>
+                  </div>
+                  <div>
+                    Effective total: <span className="font-semibold"><Money value={totals.grandTotal} /></span>
+                  </div>
+                </div>
+              </div>
+
+              <form action={applyQuoteDiscount.bind(null, quote.id)} className="mt-6 grid gap-4 lg:grid-cols-[1fr_220px_auto] lg:items-end">
+                <fieldset>
+                  <legend className="text-sm font-medium text-gray-700 dark:text-gray-200">Discount type</legend>
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                      <input
+                        type="radio"
+                        name="mode"
+                        value="percent"
+                        defaultChecked={!pricing.quoteDiscount || pricing.quoteDiscount.mode === 'percent'}
+                        className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-600"
+                      />
+                      Percentage
+                    </label>
+                    <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-200">
+                      <input
+                        type="radio"
+                        name="mode"
+                        value="amount"
+                        defaultChecked={pricing.quoteDiscount?.mode === 'amount'}
+                        className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-600"
+                      />
+                      Fixed amount
+                    </label>
+                  </div>
+                </fieldset>
+
+                <label className="block text-sm text-gray-700 dark:text-gray-200">
+                  <span className="font-medium">Discount value</span>
+                  <input
+                    name="value"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    defaultValue={pricing.quoteDiscount?.value ?? ''}
+                    className="mt-2 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                    placeholder="0.00"
+                  />
+                  <span className="mt-2 block text-xs text-gray-500 dark:text-gray-400">
+                    Leave blank or enter 0 to clear the discount.
+                  </span>
+                </label>
+
+                <SubmitButton
+                  className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+                  loadingText="Saving..."
+                >
+                  Save Discount
+                </SubmitButton>
+              </form>
+            </section>
+          )}
+
           <QuoteSummary
             lines={quote.lines.map((line) => ({
               lineTotalMinor: line.lineTotalMinor,
@@ -1730,6 +1797,7 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
             contingencyRate={quote.contingencyRate}
             vatBps={quote.vatBps}
             currency={quote.currency ?? 'USD'}
+            metaJson={quote.metaJson}
           />
 
           {/* Quote Notes (Barmlo Template) */}

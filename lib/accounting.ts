@@ -1,4 +1,5 @@
 import { type Quote, type FundingRequest } from '@prisma/client';
+import { computeQuotePricing, parseQuoteMeta } from '@/lib/quotePricing';
 
 export function fromMinor(n: bigint | number | null | undefined): number {
   if (n == null) return 0;
@@ -20,29 +21,27 @@ function vatPercentFromBps(vatBps: bigint | number | null | undefined): number {
 }
 
 export function readQuoteGrandTotal(quote: Partial<Quote> & { lines?: Array<{ lineTotalMinor?: bigint | number | null }> }): number {
-  let storedGrandTotal: number | null = null;
-  try {
-    const meta = quote.metaJson ? JSON.parse(quote.metaJson) : null;
-    const grand = meta?.totals?.grandTotal;
-    if (typeof grand === 'number' && Number.isFinite(grand)) storedGrandTotal = grand;
-    if (typeof grand === 'string' && Number.isFinite(Number(grand))) storedGrandTotal = Number(grand);
-  } catch {
-    // Fall through to calculated totals below.
+  const pricing = computeQuotePricing({
+    lines: quote.lines,
+    pgRate: quote.pgRate,
+    contingencyRate: quote.contingencyRate,
+    vatBps: quote.vatBps,
+    metaJson: quote.metaJson ?? null,
+  });
+
+  if ((quote.lines?.length ?? 0) > 0) {
+    return pricing.totals.grandTotal;
   }
 
-  const totalMeasuredWorksMinor = (quote.lines ?? []).reduce(
-    (sum, line) => sum + BigInt(line.lineTotalMinor ?? 0),
-    0n,
-  );
-  const pgRate = Number(quote.pgRate ?? 0);
-  const contingencyRate = Number(quote.contingencyRate ?? 0);
-  const pgAmount = BigInt(Math.round(Number(totalMeasuredWorksMinor) * (pgRate / 100)));
-  const contingencyAmount = BigInt(Math.round(Number(pgAmount) * (contingencyRate / 100)));
-  const subtotalBeforeVat = totalMeasuredWorksMinor + pgAmount + contingencyAmount;
-  const vatPercent = vatPercentFromBps(quote.vatBps);
-  const vatAmount = BigInt(Math.round(Number(subtotalBeforeVat) * (vatPercent / 100)));
-  const calculatedGrandTotal = fromMinor(subtotalBeforeVat + vatAmount);
-  return Math.max(storedGrandTotal ?? 0, calculatedGrandTotal);
+  const storedGrandTotal = (() => {
+    const meta = parseQuoteMeta(quote.metaJson ?? null);
+    const grand = (meta.totals as Record<string, unknown> | undefined)?.grandTotal;
+    if (typeof grand === 'number' && Number.isFinite(grand)) return grand;
+    if (typeof grand === 'string' && Number.isFinite(Number(grand))) return Number(grand);
+    return null;
+  })();
+
+  return storedGrandTotal ?? pricing.totals.grandTotal;
 }
 
 /**

@@ -5,6 +5,7 @@ import type { PdfRenderer, PdfRequest, PdfResult } from "./index";
 import { BARMLO_LOGO_BASE64 } from "./logo";
 import { prisma } from "@/lib/db";
 import { readQuoteGrandTotal } from "@/lib/accounting";
+import { computeQuotePricing, describeQuoteDiscount } from "@/lib/quotePricing";
 import fs from "fs";
 import path from "path";
 import {
@@ -169,15 +170,21 @@ export class PuppeteerRenderer implements PdfRenderer {
     const summaryRows = [...summaryGroups.values()].sort((a, b) =>
       compareConstructionSummaryCategories(a.category, b.category)
     );
-    const totalMeasuredWorks = summaryRows.reduce((total, row) => total + row.subtotal, 0);
-    const pgAmount = (totalMeasuredWorks * (Number(quote.pgRate) || 0)) / 100;
-    const contingencyAmount = (pgAmount * (Number(quote.contingencyRate) || 0)) / 100;
-    const subtotalBeforeVat = totalMeasuredWorks + pgAmount + contingencyAmount;
-    const rawVatBps = Number(quote.vatBps || 0);
-    const effectiveVatBps = rawVatBps > 0 && rawVatBps < 100 ? rawVatBps * 100 : rawVatBps;
-    const vatPercent = effectiveVatBps / 100;
-    const vatAmount = subtotalBeforeVat * (vatPercent / 100);
-    const grandTotal = subtotalBeforeVat + vatAmount;
+    const pricing = computeQuotePricing({
+      lines: lines.map((line) => ({ lineTotalMinor: line.lineTotalMinor })),
+      pgRate: quote.pgRate,
+      contingencyRate: quote.contingencyRate,
+      vatBps: quote.vatBps,
+      metaJson: quote.metaJson ?? null,
+    });
+    const totalMeasuredWorks = pricing.measuredWorksMinor;
+    const pgAmount = pricing.pgAmountMinor;
+    const contingencyAmount = pricing.contingencyAmountMinor;
+    const vatPercent = pricing.vatPercent;
+    const vatAmount = pricing.vatAmountMinor;
+    const discountAmount = pricing.totals.discountMinor;
+    const discountLabel = describeQuoteDiscount(pricing.quoteDiscount);
+    const grandTotal = pricing.totals.grandTotalMinor;
     const totalFixAndSupply = totalMaterials + totalLabour;
 
     const html = `<!doctype html>
@@ -479,6 +486,13 @@ export class PuppeteerRenderer implements PdfRenderer {
               <td class="px-3 py-2 border-r border-gray-300">${vatPercent > 0 ? `ADD VAT (${vatPercent}%)` : 'VAT MISSING'}</td>
               <td class="px-3 py-2 text-right font-semibold" style="background:#eff6ff;">${money(vatAmount, currency)}</td>
             </tr>
+            ${discountAmount > 0 ? `
+            <tr class="border-b border-gray-300">
+              <td class="px-3 py-2 border-r border-gray-300"></td>
+              <td class="px-3 py-2 border-r border-gray-300">${discountLabel ?? 'QUOTATION DISCOUNT'}</td>
+              <td class="px-3 py-2 text-right font-semibold" style="background:#eff6ff;">-${money(discountAmount, currency)}</td>
+            </tr>
+            ` : ''}
             <tr class="font-bold text-white" style="background:#1e3a8a;">
               <td class="px-3 py-2 border-r border-blue-800"></td>
               <td class="px-3 py-2 border-r border-blue-800 uppercase">GRAND TOTAL</td>

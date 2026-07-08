@@ -1,6 +1,7 @@
 // lib/pdf/QuoteDoc.tsx
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Image, Svg, Path, Font } from '@react-pdf/renderer';
+import { computeQuotePricing, describeQuoteDiscount } from '@/lib/quotePricing';
 import {
   compareConstructionSummaryCategories,
   getConstructionSummaryCategory,
@@ -87,6 +88,7 @@ type PdfQuote = {
   status: string;
   pgRate: number;
   contingencyRate: number;
+  metaJson?: string | null;
   assumptions: string;
   exclusions: string;
   customer: { displayName: string } | null;
@@ -179,14 +181,21 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
   const summaryRows = [...summaryGroups.values()].sort((a, b) =>
     compareConstructionSummaryCategories(a.category, b.category)
   );
-  const totalMeasuredWorks = summaryRows.reduce((total, row) => total + row.subtotal, 0);
-  const pgAmount = (totalMeasuredWorks * quote.pgRate) / 100;
-  const contingencyAmount = (pgAmount * quote.contingencyRate) / 100;
-  const subtotalBeforeVat = totalMeasuredWorks + pgAmount + contingencyAmount;
-  const effectiveVatBps = quote.vatBps > 0 && quote.vatBps < 100 ? quote.vatBps * 100 : quote.vatBps;
-  const vatPercent = effectiveVatBps / 100;
-  const vatAmount = subtotalBeforeVat * (vatPercent / 100);
-  const grandTotal = subtotalBeforeVat + vatAmount;
+  const pricing = computeQuotePricing({
+    lines: lines.map((line) => ({ lineTotalMinor: line.lineTotalMinor })),
+    pgRate: quote.pgRate,
+    contingencyRate: quote.contingencyRate,
+    vatBps: quote.vatBps,
+    metaJson: quote.metaJson ?? null,
+  });
+  const totalMeasuredWorks = pricing.measuredWorksMinor;
+  const pgAmount = pricing.pgAmountMinor;
+  const contingencyAmount = pricing.contingencyAmountMinor;
+  const vatPercent = pricing.vatPercent;
+  const vatAmount = pricing.vatAmountMinor;
+  const discountAmount = pricing.totals.discountMinor;
+  const discountLabel = describeQuoteDiscount(pricing.quoteDiscount);
+  const grandTotal = pricing.totals.grandTotalMinor;
 
   const assumptions = quote.assumptions ? JSON.parse(quote.assumptions) as string[] : [];
   const exclusions = quote.exclusions ? JSON.parse(quote.exclusions) as string[] : [];
@@ -337,6 +346,13 @@ export default function QuoteDoc({ quote, lines, logoData }: { quote: PdfQuote; 
             <Text style={{ flex: 1, padding: 6, fontSize: 8, borderRightWidth: 1, borderRightColor: '#d1d5db' }}>{vatPercent > 0 ? `Add VAT (${vatPercent}%)` : 'VAT Missing'}</Text>
             <Text style={{ width: 90, padding: 6, fontSize: 8, textAlign: 'right', backgroundColor: '#eff6ff' }}>{currencySymbol} {formatMoney(vatAmount, currency)}</Text>
           </View>
+          {discountAmount > 0 && (
+            <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#d1d5db' }}>
+              <Text style={{ width: 30, padding: 6, borderRightWidth: 1, borderRightColor: '#d1d5db' }} />
+              <Text style={{ flex: 1, padding: 6, fontSize: 8, borderRightWidth: 1, borderRightColor: '#d1d5db' }}>{discountLabel ?? 'Quotation Discount'}</Text>
+              <Text style={{ width: 90, padding: 6, fontSize: 8, textAlign: 'right', backgroundColor: '#eff6ff' }}>- {currencySymbol} {formatMoney(discountAmount, currency)}</Text>
+            </View>
+          )}
           <View style={{ flexDirection: 'row', backgroundColor: '#1e3a8a' }}>
             <Text style={{ width: 30, padding: 6, borderRightWidth: 1, borderRightColor: '#1e40af' }} />
             <Text style={{ flex: 1, padding: 6, fontSize: 9, fontWeight: 'bold', color: '#ffffff', textTransform: 'uppercase', borderRightWidth: 1, borderRightColor: '#1e40af' }}>Grand Total</Text>
