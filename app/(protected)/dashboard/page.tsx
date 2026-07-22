@@ -870,6 +870,59 @@ async function PendingTasks({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedItems = allTasks.slice(startIndex, startIndex + itemsPerPage);
 
+  if (filter === 'due_reports') {
+    return (
+      <div className="mx-auto w-full max-w-5xl space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Due Reports</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Projects with active scheduled work that has not been reported today.
+            </p>
+          </div>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+          >
+            Back to Dashboard
+          </Link>
+        </div>
+
+        {dueReportsProjects.length > 0 ? (
+          <div className="space-y-3">
+            {dueReportsProjects.map((project) => (
+              <div
+                key={project.id}
+                className="flex flex-col gap-4 rounded-xl border border-l-4 border-gray-200 border-l-orange-400 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    {project.quote?.customer?.displayName || 'Customer not specified'}
+                  </p>
+                  <p className="mt-1 text-sm text-gray-500">Project: {project.projectNumber}</p>
+                  <span className="mt-2 inline-flex rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800">
+                    Report due today
+                  </span>
+                </div>
+                <Link
+                  href={`/projects/${project.id}/daily-tasks`}
+                  className="inline-flex items-center justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                >
+                  Open Report
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900">No due reports</h3>
+            <p className="mt-2 text-sm text-gray-500">All reports due today have been submitted.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // For Project Manager, strictly show only the buttons
   if (role === 'PROJECT_OPERATIONS_OFFICER' && filter !== 'due_reports') {
     return (
