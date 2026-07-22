@@ -928,7 +928,7 @@ async function PendingTasks({
              </span>
            </Link>
            <Link
-            href="/projects/daily-tasks"
+            href="/dashboard?filter=due_reports"
             className="inline-flex w-full justify-center items-center gap-4 rounded-2xl bg-green-500 px-8 py-10 text-xl font-bold text-white shadow-lg transition-all hover:bg-green-600 hover:shadow-xl hover:-translate-y-1"
           >
             <svg
