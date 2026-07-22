@@ -105,6 +105,15 @@ export default async function AddEmployeePage() {
             </div>
           </div>
 
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Next of Kin</label>
+            <input name="nextOfKin" className="block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm" placeholder="Full name" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Next of Kin Contact</label>
+            <input name="nextOfKinContact" className="block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm" placeholder="Phone number" />
+          </div>
+
           <div className="space-y-2 md:col-span-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Office Location</label>
             <div className="relative">

@@ -7,6 +7,7 @@ export type AuthenticatedUser = {
   email: string | null;
   name: string | null;
   role: string | undefined;
+  actualRole: string | undefined;
   office: string | null | undefined;
 };
 
@@ -25,7 +26,8 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
         id: dbUser.id,
         email: dbUser.email,
         name: dbUser.name,
-        role: dbUser.role,
+        role: dbUser.role === 'DEPUTY_ADMIN' ? 'ADMIN' : dbUser.role,
+        actualRole: dbUser.role,
         office: dbUser.office,
       };
     }
@@ -34,7 +36,8 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
     id: sessionId,
     email: session.user.email ?? null,
     name: session.user.name ?? null,
-    role: sessionUser.role as string | undefined,
+    role: sessionUser.role === 'DEPUTY_ADMIN' ? 'ADMIN' : sessionUser.role as string | undefined,
+    actualRole: sessionUser.role as string | undefined,
     office: sessionUser.office as string | null | undefined,
   };
 }

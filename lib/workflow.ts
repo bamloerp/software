@@ -4,6 +4,7 @@ export const USER_ROLES = [
   'SALES',
   'SALES_ACCOUNTS',
   'ADMIN',
+  'DEPUTY_ADMIN',
   'CLIENT',
   'VIEWER',
   'PROJECT_OPERATIONS_OFFICER',

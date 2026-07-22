@@ -19,11 +19,13 @@ async function PendingTasks({
   role,
   endDate,
   currentPage = 1,
+  filter,
 }: {
   userId: string;
   role: string;
   endDate?: string;
   currentPage?: number;
+  filter?: string;
 }) {
   // Parse date or use default (today)
   const end = endDate ? new Date(endDate) : new Date();
@@ -858,7 +860,8 @@ async function PendingTasks({
       data: p,
       date: new Date(),
     })),
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  ].filter((item) => filter !== 'due_reports' || item.type === 'DUE_DAILY_REPORT')
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // Pagination logic
   const itemsPerPage = 5;
@@ -868,7 +871,7 @@ async function PendingTasks({
   const paginatedItems = allTasks.slice(startIndex, startIndex + itemsPerPage);
 
   // For Project Manager, strictly show only the buttons
-  if (role === 'PROJECT_OPERATIONS_OFFICER') {
+  if (role === 'PROJECT_OPERATIONS_OFFICER' && filter !== 'due_reports') {
     return (
       <div className="flex flex-col items-center justify-center py-6 mb-8">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-6xl">
@@ -1812,12 +1815,13 @@ async function RecentProjects() {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ endDate?: string; page?: string }>;
+  searchParams: Promise<{ endDate?: string; page?: string; filter?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user?.id || !user?.role) {
     return <div className="p-6">Please log in.</div>;
   }
+  const { endDate, page, filter } = await searchParams;
 
   // Simplified Project Operations Officer Dashboard
   if (user.role === 'PROJECT_OPERATIONS_OFFICER') {
@@ -1833,6 +1837,7 @@ export default async function DashboardPage({
             <PendingTasks
                 userId={user.id}
                 role={user.role}
+                filter={filter}
                 currentPage={1}
             />
         </div>
@@ -2097,7 +2102,6 @@ export default async function DashboardPage({
     );
   }
 
-  const { endDate, page } = await searchParams;
   const currentPage = Number(page) || 1;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -2148,6 +2152,7 @@ export default async function DashboardPage({
             role={user.role}
             endDate={endDate}
             currentPage={currentPage}
+            filter={filter}
           />
         </div>
       ),
@@ -2181,6 +2186,7 @@ export default async function DashboardPage({
             role={user.role}
             endDate={endDate}
             currentPage={currentPage}
+            filter={filter}
           />
         </div>
       ),
@@ -2250,6 +2256,7 @@ export default async function DashboardPage({
             role={user.role}
             endDate={endDate}
             currentPage={currentPage}
+            filter={filter}
           />
         </Suspense>
       </div>

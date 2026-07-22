@@ -303,7 +303,7 @@ export default async function QuotesPage(props: { searchParams?: Promise<{ [key:
                                 </>
                             )}
                         </Link>
-                        {role === 'ADMIN' && (
+                        {role === 'ADMIN' && me.actualRole === 'ADMIN' && (
                           <DeleteQuoteButton
                             quoteId={q.id}
                             quoteNumber={q.number}

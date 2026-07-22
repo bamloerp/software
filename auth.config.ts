@@ -40,7 +40,8 @@ export const authConfig = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string | undefined;
-        (session.user as any).role = token.role as string | undefined;
+        (session.user as any).actualRole = token.role as string | undefined;
+        (session.user as any).role = token.role === 'DEPUTY_ADMIN' ? 'ADMIN' : token.role as string | undefined;
         (session.user as any).office = (token.office as string | null | undefined) ?? null;
         (session.user as any).mustChangePassword = Boolean(token.mustChangePassword);
       }

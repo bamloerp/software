@@ -700,6 +700,8 @@ model Employee {
   ecNumber      String?        @unique
   role          String
   phone         String?
+  nextOfKin     String?
+  nextOfKinContact String?
   email         String?        @unique
   createdBy     String?
   createdAt     DateTime       @default(now())

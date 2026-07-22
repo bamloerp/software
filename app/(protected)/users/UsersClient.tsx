@@ -291,9 +291,10 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
     const matchesRole = !roleFilter || u.role === roleFilter;
     const isLocked = u.lockedUntil && new Date(u.lockedUntil) > new Date();
     let matchesStatus = true;
-    if (statusFilter === 'active') matchesStatus = !u.disabled && !isLocked;
+    if (!statusFilter) matchesStatus = !u.disabled;
+    else if (statusFilter === 'active') matchesStatus = !u.disabled && !isLocked;
     else if (statusFilter === 'disabled') matchesStatus = u.disabled;
-    else if (statusFilter === 'locked') matchesStatus = !!isLocked;
+    else if (statusFilter === 'locked') matchesStatus = !u.disabled && !!isLocked;
     return matchesSearch && matchesRole && matchesStatus;
   });
 

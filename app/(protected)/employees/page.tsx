@@ -14,7 +14,7 @@ export default async function EmployeesPage({
   searchParams: Promise<{ q?: string; status?: string; page?: string; pageSize?: string }>;
 }) {
   const user = await getCurrentUser();
-  if (!user || (user.role !== 'HUMAN_RESOURCE' && user.role !== 'ADMIN')) {
+  if (!user || !['HUMAN_RESOURCE', 'ADMIN', 'PROJECT_COORDINATOR', 'PROJECT_OPERATIONS_OFFICER'].includes(user.role || '')) {
     redirect('/dashboard');
   }
 
@@ -43,7 +43,7 @@ export default async function EmployeesPage({
       
       <div className="bg-white p-4 rounded-lg shadow border border-gray-200 mb-6">
          <EmployeeTableToolbar />
-         <ClientEmployeeList employees={employees} />
+         <ClientEmployeeList employees={employees} canManage={['HUMAN_RESOURCE', 'ADMIN'].includes(user.role || '')} />
          <div className="mt-4 border-t pt-4">
             <TablePagination total={total} currentPage={page} pageSize={pageSize} />
          </div>

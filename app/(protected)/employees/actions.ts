@@ -15,6 +15,10 @@ export async function addEmployee(formData: FormData) {
   const ecNumber = formData.get('ecNumber') as string;
   const role = formData.get('role') as string;
   const email = formData.get('email') as string;
+  const phone = formData.get('phone') as string;
+  const office = formData.get('office') as string;
+  const nextOfKin = formData.get('nextOfKin') as string;
+  const nextOfKinContact = formData.get('nextOfKinContact') as string;
 
   if (!givenName || !role) {
     return { ok: false, error: 'Name and Role are required' };
@@ -35,6 +39,10 @@ export async function addEmployee(formData: FormData) {
         ecNumber,
         role,
         email,
+        phone,
+        office,
+        nextOfKin,
+        nextOfKinContact,
         createdBy: user.id,
         status: 'ACTIVE',
       },

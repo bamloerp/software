@@ -273,7 +273,7 @@ const PAGE_DEFS: PageDef[] = [
     icon: 'desktop',
     roles: ['ADMIN', 'MANAGING_DIRECTOR', 'PROJECT_COORDINATOR'],
   },
-  { label: 'Employees', href: '/employees', icon: 'users', roles: ['ADMIN', 'MANAGING_DIRECTOR'] },
+  { label: 'Employees', href: '/employees', icon: 'users', roles: ['ADMIN', 'MANAGING_DIRECTOR', 'PROJECT_COORDINATOR', 'PROJECT_OPERATIONS_OFFICER'] },
   {
     label: 'Awaiting Delivery',
     href: '/dispatches?status=ARRIVED',

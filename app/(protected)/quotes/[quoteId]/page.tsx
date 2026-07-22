@@ -762,6 +762,7 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
   };
   const status = normalizeStatus(quote.status);
   const isAdmin = role === 'ADMIN';
+  const canGiveDiscount = currentUser.actualRole === 'ADMIN';
   const isSales = role === 'SALES';
 
   // Redirect SALES users to client view if in NEGOTIATION
@@ -1704,7 +1705,7 @@ export default async function QuoteDetailPage({ params }: QuotePageParams) {
             />
           )}
 
-          {isAdmin && (
+          {canGiveDiscount && (
             <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm no-print">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>

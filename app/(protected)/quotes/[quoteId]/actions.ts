@@ -302,7 +302,7 @@ export async function applyQuoteDiscount(quoteId: string, formData: FormData) {
     redirect(`/quotes/${quoteId}`);
   }
 
-  if (user.role !== 'ADMIN') {
+  if (user.actualRole !== 'ADMIN') {
     setFlashMessage({ type: 'error', message: 'Only an admin can update quotation discounts.' });
     redirect(`/quotes/${quoteId}`);
   }
@@ -2374,7 +2374,7 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
     const user = await getCurrentUser();
     if (!user) throw new Error('Authentication required');
     const role = assertRole(user.role);
-    if (role !== 'ADMIN') {
+    if (role !== 'ADMIN' || user.actualRole !== 'ADMIN') {
       throw new Error('Only an admin can delete a quotation');
     }
 
