@@ -1,20 +1,29 @@
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import ScheduleEditor from './ScheduleEditor.client';
-import { getProductivitySettings } from '../../actions';
+import { createScheduleFromQuote, getProductivitySettings } from '../../actions';
 import PrintHeader from '@/components/PrintHeader';
 import QuoteHeader from '@/components/QuoteHeader';
 import DownloadPdfButton from '@/components/DownloadPdfButton';
 import { generateSchedulePdf } from './actions';
+import { redirect } from 'next/navigation';
 
 export default async function ProjectSchedulePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const me = await getCurrentUser();
+  if (!me || !['ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'HUMAN_RESOURCE'].includes(me.role || '')) {
+    redirect('/dashboard');
+  }
+  if (me.role !== 'HUMAN_RESOURCE') {
+    await createScheduleFromQuote(projectId).catch((error) => {
+      console.error('[schedule-sync-from-quote]', error);
+    });
+  }
 
   const [schedule, employees, productivity, project] = await Promise.all([
     prisma.schedule.findFirst({
       where: { projectId },
-      include: { items: { orderBy: { createdAt: 'asc' }, include: { assignees: true } } },
+      include: { items: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], include: { assignees: true } } },
     }),
     prisma.employee.findMany({
       orderBy: [{ givenName: 'asc' }, { surname: 'asc' }],

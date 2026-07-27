@@ -14,7 +14,8 @@ export default async function ProjectTeamPage({
   if (!me) return <div className="p-6">Authentication required.</div>;
   const role = (me as any).role as string | undefined;
   const isPM = role === 'PROJECT_OPERATIONS_OFFICER' || role === 'ADMIN';
-  const isTeam = role === 'PROJECT_TEAM' || isPM;
+  const canAssign = isPM || role === 'HUMAN_RESOURCE';
+  const isTeam = role === 'PROJECT_TEAM' || canAssign;
 
   const [project, templates, team, tasks] = await Promise.all([
     prisma.project.findUnique({
@@ -45,8 +46,6 @@ export default async function ProjectTeamPage({
       estimatedHours: Number(fd.get('estimatedHours') || 0) || null,
     });
   };
-
-  console.log(isPM);
 
   return (
     <div className="p-6 space-y-6">
@@ -199,7 +198,7 @@ export default async function ProjectTeamPage({
                 </div>
 
                 {/* Assignments */}
-                {isPM && (
+                {canAssign && (
                   <form action={setAssigneesAction} className="mt-3 grid gap-2 md:grid-cols-3">
                     {team.map((u) => {
                       const assigned = task.assignments.some((a) => a.userId === u.id);

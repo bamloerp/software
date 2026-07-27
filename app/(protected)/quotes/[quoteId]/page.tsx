@@ -209,6 +209,8 @@ type LineRow = {
   itemType: string | null;
 
   labourNote: string | null;
+
+  position: number;
 };
 
 type LineGroup = {
@@ -370,6 +372,7 @@ function buildLineGroups(
       cycle,
       isCurrentCycle,
       labourNote,
+      position: line.position,
     });
 
     group.subtotal += amount;
@@ -379,6 +382,10 @@ function buildLineGroups(
   // SUPERSTRUCTURE TO RING BEAM must always have Brickwork above Door Frame Fittings.
   const sectionRowPriority = (section: string, description: string): number => {
     const desc = (description || '').toLowerCase();
+    if (section.includes('FOUNDATION') || section.includes('SUBSTRUCTURE')) {
+      if (desc.includes('setting out')) return 0;
+      if (desc.includes('site clearance')) return 1;
+    }
     if (section === 'SUPERSTRUCTURE TO RING BEAM' || section === 'SUPERSTRUCTURE BRICKWORK') {
       if (desc.startsWith('brickwork')) return 0;
       if (desc.includes('door frame')) return 1;
@@ -396,7 +403,7 @@ function buildLineGroups(
       const aPri = sectionRowPriority(group.section, a.description);
       const bPri = sectionRowPriority(group.section, b.description);
       if (aPri !== bPri) return aPri - bPri;
-      return 0;
+      return a.position - b.position;
     });
   };
   matGroups.forEach(sortRows);

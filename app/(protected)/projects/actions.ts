@@ -12,7 +12,7 @@ import { revalidatePath } from 'next/cache';
 import crypto from 'node:crypto';
 import { redirect } from 'next/navigation';
 import { getRemainingDispatchMap } from '@/lib/dispatch';
-import { recalculateRipple, ScheduleItemMinimal, addWorkingTime, inferTaskType as engineInferTaskType, ProductivitySettings as EngineProductivitySettings } from '@/lib/schedule-engine';
+import { recalculateRipple, ScheduleItemMinimal, addGap, addWorkingTime, inferTaskType as engineInferTaskType, ProductivitySettings as EngineProductivitySettings } from '@/lib/schedule-engine';
 import { getQuoteGrandTotalMinor } from '@/app/lib/payments';
 
 
@@ -3685,45 +3685,49 @@ export async function createScheduleFromQuote(projectId: string) {
   //await ensureProjectIsPlanned(projectId);
   await ensureProjectIsPaidFor(projectId);
 
-  // Idempotent: ensure only one schedule per project
-  // Idempotent: ensure only one schedule per project
   const existing = await prisma.schedule.findFirst({
     where: { projectId },
     include: { items: { include: { assignees: true } } },
   });
-  if (existing && existing.items.length > 0) {
-    return { ok: true, scheduleId: existing.id, items: existing.items };
-  }
-
-  if (existing) {
-    await prisma.schedule.delete({ where: { id: existing.id } });
-  }
 
   const quote = await prisma.quote.findFirst({
     where: { project: { id: projectId } },
-    include: { lines: true },
+    include: { lines: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }] } },
   });
   if (!quote) throw new Error('No quote found for project');
 
   const labourLines = quote.lines.filter((l) => {
     const meta = typeof l.metaJson === 'string' ? JSON.parse(l.metaJson || '{}') : (l.metaJson || {});
     const type = (l.itemType || meta.itemType || meta.type || '').toUpperCase();
-    const section = (l.section || meta.section || '').toUpperCase();
-
-    // Only include FOUNDATIONS labour items
     const isLabour = type === 'LABOUR' || meta.isLabour === true;
-    const isFoundation = section.includes('FOUNDATION') || section.includes('SUBSTRUCTURE');
-    return isLabour && isFoundation;
+    return isLabour;
+  }).sort((a, b) => {
+    const stageA = String(a.section || '').toUpperCase();
+    const stageB = String(b.section || '').toUpperCase();
+    if (stageA === stageB && (stageA.includes('FOUNDATION') || stageA.includes('SUBSTRUCTURE'))) {
+      const priority = (description: string) => {
+        const value = description.toLowerCase();
+        if (value.includes('setting out')) return 0;
+        if (value.includes('site clearance')) return 1;
+        return 2;
+      };
+      const difference = priority(a.description) - priority(b.description);
+      if (difference !== 0) return difference;
+    }
+    return a.position - b.position;
   });
 
-  const items = labourLines.map((ln) => {
+  const items = labourLines.map((ln, position) => {
     const meta = typeof ln.metaJson === 'string' ? JSON.parse(ln.metaJson || '{}') : (ln.metaJson || {});
     const title = ln.description ?? meta.title ?? 'Labour task';
     const unit = ln.unit ?? meta.unit ?? null;
     const qty = Number((ln as any).quantity ?? 0);
     const estHours = typeof meta.expectedHours === 'number' ? meta.expectedHours : undefined;
+    const stage = String(ln.section || meta.section || 'OTHER WORKS').trim();
     return {
       quoteLineId: ln.id,
+      stage,
+      position,
       title,
       description: meta.note ?? ln.description ?? '',
       unit,
@@ -3736,36 +3740,69 @@ export async function createScheduleFromQuote(projectId: string) {
     };
   });
 
-  const preferredOrder = [
-    'Site clearance',
-    'Setting out',
-    'Excavation',
-    'Concrete works',
-    'Footing brickwork',
-    'Ramming',
-    'Floor slab',
-  ];
+  if (existing) {
+    const existingByQuoteLine = new Map(
+      existing.items.filter((item) => item.quoteLineId).map((item) => [item.quoteLineId!, item]),
+    );
+    const latestExistingEnd = existing.items.reduce<Date | null>((latest, item) => {
+      if (!item.plannedEnd) return latest;
+      return !latest || item.plannedEnd > latest ? item.plannedEnd : latest;
+    }, null);
+    let nextNewTaskStart = latestExistingEnd ? addGap(latestExistingEnd, 30) : new Date();
+    const reconciledItems = items.map((item) => {
+      if (existingByQuoteLine.has(item.quoteLineId)) return item;
+      const plannedStart = new Date(nextNewTaskStart);
+      const plannedEnd = addWorkingTime(plannedStart, item.estHours ?? 10);
+      nextNewTaskStart = addGap(plannedEnd, 30);
+      return { ...item, plannedStart, plannedEnd };
+    });
 
-  items.sort((a, b) => {
-    const getOrderIndex = (title: string) => {
-      const lowerTitle = title.toLowerCase();
-      const index = preferredOrder.findIndex(key => lowerTitle.includes(key.toLowerCase()));
-      return index === -1 ? 999 : index;
-    };
-    const indexA = getOrderIndex(a.title);
-    const indexB = getOrderIndex(b.title);
-    if (indexA !== indexB) return indexA - indexB;
-    return a.quoteLineId.localeCompare(b.quoteLineId);
-  });
+    await prisma.$transaction(
+      reconciledItems.map((item) => {
+        const current = existingByQuoteLine.get(item.quoteLineId);
+        if (current) {
+          return prisma.scheduleItem.update({
+            where: { id: current.id },
+            data: {
+              stage: item.stage,
+              position: item.position,
+              title: item.title,
+              description: item.description,
+              unit: item.unit,
+              quantity: item.quantity,
+              estHours: current.estHours ?? item.estHours,
+            },
+          });
+        }
+        return prisma.scheduleItem.create({
+          data: {
+            scheduleId: existing.id,
+            ...item,
+          },
+        });
+      }),
+    );
 
-  const cleanItems = items;
+    const refreshed = await prisma.schedule.findUnique({
+      where: { id: existing.id },
+      include: {
+        items: {
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          include: { assignees: true },
+        },
+      },
+    });
+    revalidatePath(`/projects/${projectId}/schedule`);
+    revalidatePath(`/projects/${projectId}`);
+    return { ok: true, scheduleId: existing.id, items: refreshed?.items ?? [] };
+  }
 
   const schedule = await prisma.schedule.create({
     data: {
       projectId,
       createdById: user.id,
       status: 'DRAFT',
-      items: { create: cleanItems },
+      items: { create: items },
     },
     include: { items: true },
   });

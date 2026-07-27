@@ -65,6 +65,7 @@ export default async function ProjectsPage({
         'GENERAL_MANAGER',
         'MANAGING_DIRECTOR',
         'SALES_ACCOUNTS',
+        'HUMAN_RESOURCE',
       ] as any
     );
   } catch {
@@ -72,6 +73,7 @@ export default async function ProjectsPage({
   }
 
   const role = me.role as string;
+  const isAdmin = role === 'ADMIN';
   const isSeniorPM = [
     'PROJECT_COORDINATOR',
     'ADMIN',
@@ -80,6 +82,7 @@ export default async function ProjectsPage({
   ].includes(role);
   const isProjectManager = role === 'PROJECT_OPERATIONS_OFFICER';
   const isSalesAccounts = role === 'SALES_ACCOUNTS';
+  const isHr = role === 'HUMAN_RESOURCE';
 
   const {
     q: query,
@@ -95,7 +98,7 @@ export default async function ProjectsPage({
 
   let currentTab = 'active';
   if (isSeniorPM) {
-    currentTab = tab || 'assignment'; // Default tab for Senior PM
+    currentTab = tab || (isAdmin ? 'all' : 'assignment');
   } else if (isSalesAccounts) {
     currentTab = tab === 'all_payments' ? 'all_payments' : 'due_today';
   } else if (isProjectManager) {
@@ -614,7 +617,15 @@ export default async function ProjectsPage({
                       {!isSeniorPM && (
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
-                            {isProjectManager && currentTab === 'unplanned' ? (
+                            {isHr ? (
+                              <Link
+                                href={`/projects/${project.id}/schedule`}
+                                className="inline-flex items-center justify-center gap-1 rounded border border-indigo-600 bg-indigo-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-indigo-500"
+                              >
+                                <CalendarIcon className="h-3.5 w-3.5" />
+                                Assign Employees
+                              </Link>
+                            ) : isProjectManager && currentTab === 'unplanned' ? (
                               <Link
                                 href={`/projects/${project.id}/schedule`}
                                 className="inline-flex items-center justify-center gap-1 rounded border border-green-600 bg-green-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-green-500 hover:border-green-500 shadow-sm"

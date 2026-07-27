@@ -149,6 +149,7 @@ model QuoteLine {
   lineTotalMinor    BigInt
   metaJson          String?
   source            String?                      @default("System")
+  position          Int                          @default(0)
   cycle             Int                          @default(0)
   addedInVersionId  String?
   
@@ -667,6 +668,8 @@ model ScheduleItem {
   id           String               @id @default(cuid())
   scheduleId   String
   quoteLineId  String?
+  stage        String?
+  position     Int                  @default(0)
   title        String
   description  String?
   unit         String?

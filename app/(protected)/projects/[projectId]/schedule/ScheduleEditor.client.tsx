@@ -24,6 +24,9 @@ import { useRouter } from 'next/navigation';
 
 type Item = {
   id?: string | null;
+  quoteLineId?: string | null;
+  stage?: string | null;
+  position?: number | null;
   title: string;
   description?: string | null;
   unit?: string | null;
@@ -55,6 +58,9 @@ export default function ScheduleEditor({
 
   const initItems: Item[] = (schedule?.items ?? []).map((i: any) => ({
     id: i.id,
+    quoteLineId: i.quoteLineId ?? null,
+    stage: i.stage ?? null,
+    position: i.position ?? null,
     title: i.title,
     description: i.description,
     unit: i.unit,
@@ -323,6 +329,9 @@ export default function ScheduleEditor({
       if (Array.isArray(json.items)) {
         const newItems = json.items.map((i: any) => ({
           id: i.id,
+          quoteLineId: i.quoteLineId ?? null,
+          stage: i.stage ?? null,
+          position: i.position ?? null,
           title: i.title,
           description: i.description,
           unit: i.unit,
@@ -404,6 +413,17 @@ export default function ScheduleEditor({
 
         <div className="flex items-center gap-2">
           <ProductivitySettingsDialog projectId={projectId} initialSettings={productivity} />
+
+          {user?.role !== 'HUMAN_RESOURCE' && (
+            <button
+              onClick={handleExtract}
+              disabled={extracting}
+              className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <DocumentTextIcon className="h-4 w-4" />
+              {extracting ? 'Syncing...' : 'Sync Stages from Quote'}
+            </button>
+          )}
 
           <button
             onClick={handleReschedule}
@@ -516,8 +536,15 @@ export default function ScheduleEditor({
               </thead>
               <tbody className="divide-y">
                 {items.map((it, i) => (
+                  <React.Fragment key={it.id ?? i}>
+                    {(i === 0 || items[i - 1]?.stage !== it.stage) && (
+                      <tr className="bg-emerald-50">
+                        <td colSpan={9} className="px-4 py-3 text-sm font-extrabold uppercase tracking-wide text-emerald-800">
+                          {it.stage || 'Other Works'}
+                        </td>
+                      </tr>
+                    )}
                   <tr
-                    key={it.id ?? i}
                     className={cn(
                       'group transition-colors',
                       it.hasConflict ? 'bg-red-50/50 hover:bg-red-100/70' : 'hover:bg-gray-50/50'
@@ -695,6 +722,7 @@ export default function ScheduleEditor({
                       </div>
                     </td>
                   </tr>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

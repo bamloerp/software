@@ -200,8 +200,8 @@ export async function setTaskAssignees(taskId: string, entries: { userId: string
   if (!task) throw new Error('Task not found');
 
   const isPM = task.project.ProjectMember.some(m => m.userId === me.id && m.role === 'PM');
-  const isAdmin = (me as any).role === 'ADMIN';
-  if (!(isPM || isAdmin)) throw new Error('Only PM/Admin can assign');
+  const canAssign = ['ADMIN', 'HUMAN_RESOURCE'].includes((me as any).role);
+  if (!(isPM || canAssign)) throw new Error('Only PM, HR, or Admin can assign');
 
   // Replace assignments
   await prisma.taskAssignment.deleteMany({ where: { taskId } });

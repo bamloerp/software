@@ -705,7 +705,7 @@ export async function renderProjectSchedulePdf(projectId: string): Promise<PdfRe
       schedules: {
         include: {
           items: {
-            orderBy: { createdAt: "asc" },
+            orderBy: [{ position: "asc" }, { createdAt: "asc" }],
             include: {
               assignees: { select: { givenName: true, surname: true, role: true } },
             },
@@ -765,11 +765,15 @@ export async function renderProjectSchedulePdf(projectId: string): Promise<PdfRe
         <th style="text-align:left;padding:5px 6px;width:145px">Note</th>
       </tr></thead>
       <tbody>
-      ${schedule.items.map((item) => {
+      ${schedule.items.map((item, index) => {
         const workers = item.assignees
           .map((worker) => `${worker.givenName}${worker.surname ? ` ${worker.surname}` : ""}`)
           .join(", ");
-        return `<tr class="tbl-row">
+        const stageRow =
+          index === 0 || schedule.items[index - 1]?.stage !== item.stage
+            ? `<tr><td colspan="8" style="padding:7px 6px;background:#ecfdf5;color:#065f46;font-weight:800;text-transform:uppercase;">${esc(item.stage || "Other Works")}</td></tr>`
+            : "";
+        return `${stageRow}<tr class="tbl-row">
           <td>${esc(item.title || item.description || "-")}</td>
           <td class="text-center">${esc(item.unit || "-")}</td>
           <td class="text-right">${Number(item.quantity ?? 0).toLocaleString()}</td>

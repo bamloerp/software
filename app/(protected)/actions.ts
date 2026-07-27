@@ -244,6 +244,20 @@ export async function createQuote(input: unknown, currentUserId?: string) {
       throw new Error('Customer is required: please select or create a customer before saving.');
     }
 
+    const duplicateQuote = await prisma.quote.findFirst({
+      where: {
+        customerId: parsed.customerId,
+        status: { not: 'ARCHIVED' },
+        ...(parsed.draftId ? { id: { not: parsed.draftId } } : {}),
+      },
+      select: { number: true, status: true },
+    });
+    if (duplicateQuote) {
+      throw new Error(
+        `A quotation already exists for this customer${duplicateQuote.number ? ` (${duplicateQuote.number})` : ''}. Open the existing quotation instead of creating a duplicate.`,
+      );
+    }
+
     let actingUser: { id: string; role: string | undefined; office: string | null | undefined } | null = null;
 
     if (currentUserId) {
@@ -299,6 +313,7 @@ export async function createQuote(input: unknown, currentUserId?: string) {
         unit: line.unit ?? null,
         section: line.section ?? null,
         itemType: line.itemType ?? null,
+        position: idx,
         product: line.productId ? { connect: { id: line.productId } } : undefined,
         unitPriceMinor: toMinor(Number(line.unitPrice)),
         lineSubtotalMinor: toMinor(Number(calc.lineSubtotal)),
@@ -437,6 +452,7 @@ export async function createAutoQuote(input: {
             const calc = linesCalced[idx];
             return {
               description: item.code,
+              position: idx,
               quantity: 1,
               unit: item.unit ?? null,
               unitPriceMinor: toMinor(Number(item.value)),
@@ -607,19 +623,54 @@ export async function upsertCustomer(input: {
   address?: string | null;
   addressJson?: string | null;
 }) {
-  const { displayName, city = null, email = null, phone = null } = input;
+  const displayName = input.displayName.trim();
+  const city = input.city?.trim() || null;
+  const email = input.email?.trim().toLowerCase() || null;
+  const phone = input.phone?.trim() || null;
   const addressJson = typeof input.address === 'string' && input.address.trim().length
     ? JSON.stringify({ line1: input.address.trim() })
     : input.addressJson ?? null;
-  // Optimize: Check both conditions in one query to save connections
-  const existing = await prisma.customer.findFirst({
+
+  const normalize = (value: unknown) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const normalizedAddress = (() => {
+    if (!addressJson) return '';
+    try {
+      const parsed = typeof addressJson === 'string' ? JSON.parse(addressJson) : addressJson;
+      return normalize((parsed as any)?.line1 ?? (parsed as any)?.address ?? parsed);
+    } catch {
+      return normalize(addressJson);
+    }
+  })();
+
+  const candidates = await prisma.customer.findMany({
     where: {
       OR: [
         ...(email ? [{ email }] : []),
-        { displayName, city: city ?? undefined },
+        { displayName: { equals: displayName, mode: 'insensitive' } },
       ],
     },
-    select: { id: true },
+    select: { id: true, displayName: true, city: true, email: true, addressJson: true },
+  });
+
+  const existing = candidates.find((customer) => {
+    if (email && normalize(customer.email) === normalize(email)) return true;
+    let candidateAddress = '';
+    if (customer.addressJson) {
+      try {
+        const parsed =
+          typeof customer.addressJson === 'string'
+            ? JSON.parse(customer.addressJson)
+            : customer.addressJson;
+        candidateAddress = normalize((parsed as any)?.line1 ?? (parsed as any)?.address ?? parsed);
+      } catch {
+        candidateAddress = normalize(customer.addressJson);
+      }
+    }
+    const sameName = normalize(customer.displayName) === normalize(displayName);
+    const sameLocation = normalizedAddress
+      ? candidateAddress === normalizedAddress
+      : normalize(customer.city) === normalize(city);
+    return sameName && sameLocation;
   });
 
   if (existing) {

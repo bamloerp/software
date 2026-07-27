@@ -110,6 +110,7 @@ const PAGE_DEFS: PageDef[] = [
       'ACCOUNTING_CLERK',
       'GENERAL_MANAGER',
       'MANAGING_DIRECTOR',
+      'HUMAN_RESOURCE',
     ],
   },
   {

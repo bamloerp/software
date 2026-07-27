@@ -6,6 +6,10 @@ import { getProductivitySettings, computeEstimatesForItems } from '@/app/(protec
 import { detectAndNotifyConflicts } from '@/lib/conflict-detection';
 
 type ScheduleItemInput = {
+  id?: string | null;
+  quoteLineId?: string | null;
+  stage?: string | null;
+  position?: number | null;
   title?: string;
   description?: string | null;
   unit?: string | null;
@@ -23,10 +27,13 @@ export async function GET(_: Request, { params }: { params: Promise<{ projectId:
   const { projectId } = await params;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Auth required' }, { status: 401 });
+  if (!['ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'HUMAN_RESOURCE'].includes(user.role || '')) {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  }
 
   const schedule = await prisma.schedule.findFirst({
     where: { projectId },
-    include: { items: { orderBy: { createdAt: 'asc' }, include: { assignees: true } } },
+    include: { items: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], include: { assignees: true } } },
   });
   if (!schedule) return NextResponse.json({ ok: true, schedule: null });
 
@@ -42,9 +49,13 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Auth required' }, { status: 401 });
   }
+  if (!['ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'HUMAN_RESOURCE'].includes(user.role || '')) {
+    return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
+  }
 
   const body = await request.json();
   const { note, items, status } = body;
+  const isHr = user.role === 'HUMAN_RESOURCE';
 
   if (!Array.isArray(items)) {
     return NextResponse.json({ error: 'Invalid items' }, { status: 400 });
@@ -87,6 +98,9 @@ export async function POST(
   let schedule = await prisma.schedule.findFirst({ where: { projectId } });
 
   if (!schedule) {
+    if (isHr) {
+      return NextResponse.json({ error: 'A project manager must create the schedule before HR can assign employees.' }, { status: 400 });
+    }
     schedule = await prisma.schedule.create({
       data: {
         projectId,
@@ -100,17 +114,37 @@ export async function POST(
     schedule = await prisma.schedule.update({
       where: { id: schedule.id },
       data: {
-        note: note ?? null,
-        status: status ?? undefined, // Only update if provided
+        note: isHr ? undefined : note ?? null,
+        status: isHr ? undefined : status ?? undefined,
         hasConflict: hasProjectConflicts
       },
     });
   }
 
-  const createQueries = enrichedItems.map((it) =>
-    prisma.scheduleItem.create({
-      data: {
+  const incomingIds = enrichedItems
+    .map((item: ScheduleItemInput) => item.id)
+    .filter((id: string | null | undefined): id is string => Boolean(id));
+
+  await prisma.$transaction(async (tx) => {
+    // Draft rows can be removed freely. Once work is running, rows with reports are retained.
+    if (!isHr) await tx.scheduleItem.deleteMany({
+      where: {
         scheduleId: schedule.id,
+        id: { notIn: incomingIds.length ? incomingIds : ['__none__'] },
+        ...(schedule.status === 'ACTIVE' ? { reports: { none: {} } } : {}),
+      },
+    });
+
+    for (const [index, it] of enrichedItems.entries()) {
+      const employeeLinks = Array.isArray((it as any).employeeIds)
+        ? (it as any).employeeIds
+            .filter((id: any) => typeof id === 'string' && id.trim().length > 0)
+            .map((id: string) => ({ id }))
+        : null;
+      const data = {
+        quoteLineId: (it as ScheduleItemInput).quoteLineId ?? undefined,
+        stage: (it as ScheduleItemInput).stage ?? null,
+        position: (it as ScheduleItemInput).position ?? index,
         title: it.title || 'Task',
         description: it.description ?? null,
         unit: it.unit ?? null,
@@ -122,30 +156,26 @@ export async function POST(
         note: it.note ?? null,
         hasConflict: it.hasConflict ?? false,
         conflictNote: it.conflictNote ?? null,
-        assignees: Array.isArray((it as any).employeeIds)
-          ? {
-            connect: (it as any).employeeIds
-              .filter((id: any) => typeof id === 'string' && id.trim().length > 0)
-              .map((id: string) => ({ id })),
-          }
-          : undefined,
-      },
-    }),
-  );
+      };
 
-  // Get all existing item IDs so we can delete their task reports first
-  const existingItemIds = await prisma.scheduleItem
-    .findMany({ where: { scheduleId: schedule.id }, select: { id: true } })
-    .then((items) => items.map((i) => i.id));
-
-  await prisma.$transaction([
-    // Delete task reports referencing existing items (FK constraint)
-    ...(existingItemIds.length > 0
-      ? [prisma.scheduleTaskReport.deleteMany({ where: { scheduleItemId: { in: existingItemIds } } })]
-      : []),
-    prisma.scheduleItem.deleteMany({ where: { scheduleId: schedule.id } }),
-    ...createQueries,
-  ]);
+      if ((it as ScheduleItemInput).id) {
+        await tx.scheduleItem.update({
+          where: { id: (it as ScheduleItemInput).id! },
+          data: isHr
+            ? { assignees: employeeLinks ? { set: employeeLinks } : undefined }
+            : { ...data, assignees: employeeLinks ? { set: employeeLinks } : undefined },
+        });
+      } else if (!isHr) {
+        await tx.scheduleItem.create({
+          data: {
+            scheduleId: schedule.id,
+            ...data,
+            assignees: employeeLinks ? { connect: employeeLinks } : undefined,
+          },
+        });
+      }
+    }
+  });
 
   revalidatePath(`/projects/${projectId}/schedule`);
   revalidatePath(`/projects/${projectId}`);
