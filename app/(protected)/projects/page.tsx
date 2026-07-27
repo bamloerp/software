@@ -594,18 +594,40 @@ export default async function ProjectsPage({
                           className={`px-6 py-4 text-sm text-gray-500 dark:text-gray-400 ${isSeniorPM ? 'sticky right-0 z-10 bg-white border-l border-gray-100 dark:bg-gray-800 dark:border-gray-700 min-w-[260px]' : ''}`}
                         >
                           {isSeniorPM && currentTab === 'assignment' ? (
-                            <ProjectAssigner
-                              projectId={project.id}
-                              initialAssigneeId={project.assignedToId}
-                              projectManagers={projectManagers}
-                            />
+                            <div className="flex items-center gap-2">
+                              <ProjectAssigner
+                                projectId={project.id}
+                                initialAssigneeId={project.assignedToId}
+                                projectManagers={projectManagers}
+                              />
+                              {isAdmin && (
+                                <Link
+                                  href={`/projects/${project.id}`}
+                                  className="inline-flex shrink-0 items-center justify-center gap-1 rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:border-blue-500 hover:bg-blue-500"
+                                >
+                                  <EyeIcon className="h-3.5 w-3.5" />
+                                  Open
+                                </Link>
+                              )}
+                            </div>
                           ) : isSeniorPM ? (
-                            <ProjectAssigner
-                              projectId={project.id}
-                              initialAssigneeId={project.assignedToId}
-                              projectManagers={projectManagers}
-                              variant="table"
-                            />
+                            <div className="flex items-center gap-2">
+                              <ProjectAssigner
+                                projectId={project.id}
+                                initialAssigneeId={project.assignedToId}
+                                projectManagers={projectManagers}
+                                variant="table"
+                              />
+                              {isAdmin && (
+                                <Link
+                                  href={`/projects/${project.id}`}
+                                  className="inline-flex shrink-0 items-center justify-center gap-1 rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:border-blue-500 hover:bg-blue-500"
+                                >
+                                  <EyeIcon className="h-3.5 w-3.5" />
+                                  Open
+                                </Link>
+                              )}
+                            </div>
                           ) : (
                             <div className="flex items-center gap-2">
                               <UserCircleIcon className="h-4 w-4 text-gray-400" />

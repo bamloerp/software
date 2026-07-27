@@ -3682,13 +3682,16 @@ export async function createScheduleFromQuote(projectId: string) {
 
   await ensureProjectAccess(projectId, user);
 
-  //await ensureProjectIsPlanned(projectId);
-  await ensureProjectIsPaidFor(projectId);
-
   const existing = await prisma.schedule.findFirst({
     where: { projectId },
     include: { items: { include: { assignees: true } } },
   });
+
+  // Payment is required when creating a schedule, but must not prevent an
+  // already-running project from receiving newly added quotation stages.
+  if (!existing) {
+    await ensureProjectIsPaidFor(projectId);
+  }
 
   const quote = await prisma.quote.findFirst({
     where: { project: { id: projectId } },
@@ -3696,8 +3699,20 @@ export async function createScheduleFromQuote(projectId: string) {
   });
   if (!quote) throw new Error('No quote found for project');
 
+  const parseLineMeta = (value: unknown): Record<string, any> => {
+    if (!value) return {};
+    if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, any>;
+    if (typeof value !== 'string') return {};
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  };
+
   const labourLines = quote.lines.filter((l) => {
-    const meta = typeof l.metaJson === 'string' ? JSON.parse(l.metaJson || '{}') : (l.metaJson || {});
+    const meta = parseLineMeta(l.metaJson);
     const type = (l.itemType || meta.itemType || meta.type || '').toUpperCase();
     const isLabour = type === 'LABOUR' || meta.isLabour === true;
     return isLabour;
@@ -3718,7 +3733,7 @@ export async function createScheduleFromQuote(projectId: string) {
   });
 
   const items = labourLines.map((ln, position) => {
-    const meta = typeof ln.metaJson === 'string' ? JSON.parse(ln.metaJson || '{}') : (ln.metaJson || {});
+    const meta = parseLineMeta(ln.metaJson);
     const title = ln.description ?? meta.title ?? 'Labour task';
     const unit = ln.unit ?? meta.unit ?? null;
     const qty = Number((ln as any).quantity ?? 0);
@@ -3741,16 +3756,32 @@ export async function createScheduleFromQuote(projectId: string) {
   });
 
   if (existing) {
-    const existingByQuoteLine = new Map(
+    const matchedExistingByQuoteLine = new Map(
       existing.items.filter((item) => item.quoteLineId).map((item) => [item.quoteLineId!, item]),
     );
+    const normalizeTitle = (value: string | null | undefined) =>
+      String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const unmatchedLegacyByTitle = new Map<string, typeof existing.items>();
+    for (const existingItem of existing.items.filter((item) => !item.quoteLineId)) {
+      const key = normalizeTitle(existingItem.title || existingItem.description);
+      if (!key) continue;
+      const matches = unmatchedLegacyByTitle.get(key) ?? [];
+      matches.push(existingItem);
+      unmatchedLegacyByTitle.set(key, matches);
+    }
+    for (const item of items) {
+      if (matchedExistingByQuoteLine.has(item.quoteLineId)) continue;
+      const matches = unmatchedLegacyByTitle.get(normalizeTitle(item.title));
+      const legacyMatch = matches?.shift();
+      if (legacyMatch) matchedExistingByQuoteLine.set(item.quoteLineId, legacyMatch);
+    }
     const latestExistingEnd = existing.items.reduce<Date | null>((latest, item) => {
       if (!item.plannedEnd) return latest;
       return !latest || item.plannedEnd > latest ? item.plannedEnd : latest;
     }, null);
     let nextNewTaskStart = latestExistingEnd ? addGap(latestExistingEnd, 30) : new Date();
     const reconciledItems = items.map((item) => {
-      if (existingByQuoteLine.has(item.quoteLineId)) return item;
+      if (matchedExistingByQuoteLine.has(item.quoteLineId)) return item;
       const plannedStart = new Date(nextNewTaskStart);
       const plannedEnd = addWorkingTime(plannedStart, item.estHours ?? 10);
       nextNewTaskStart = addGap(plannedEnd, 30);
@@ -3759,11 +3790,12 @@ export async function createScheduleFromQuote(projectId: string) {
 
     await prisma.$transaction(
       reconciledItems.map((item) => {
-        const current = existingByQuoteLine.get(item.quoteLineId);
+        const current = matchedExistingByQuoteLine.get(item.quoteLineId);
         if (current) {
           return prisma.scheduleItem.update({
             where: { id: current.id },
             data: {
+              quoteLineId: item.quoteLineId,
               stage: item.stage,
               position: item.position,
               title: item.title,
