@@ -63,14 +63,26 @@ export async function POST(
 
   // VALIDATION FOR ACTIVATION
   if (status === 'ACTIVE') {
-    const missingAssignments = items.some((it: any) => !Array.isArray(it.employeeIds) || it.employeeIds.length === 0);
-    const missingDates = items.some((it: any) => !it.plannedStart);
+    const foundationItems = items.filter((it: any) => {
+      const stage = String(it.stage || '').trim().toUpperCase();
+      return stage.includes('FOUNDATION') || stage.includes('SUBSTRUCTURE');
+    });
+    const missingAssignments = foundationItems.some(
+      (it: any) => !Array.isArray(it.employeeIds) || it.employeeIds.length === 0,
+    );
+    const missingDates = foundationItems.some((it: any) => !it.plannedStart);
 
     if (missingAssignments) {
-      return NextResponse.json({ error: 'Cannot activate: All tasks must have at least one worker assigned.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Cannot activate: All foundation tasks must have at least one worker assigned.' },
+        { status: 400 },
+      );
     }
     if (missingDates) {
-      return NextResponse.json({ error: 'Cannot activate: All tasks must have a start date.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Cannot activate: All foundation tasks must have a start date.' },
+        { status: 400 },
+      );
     }
   }
 
