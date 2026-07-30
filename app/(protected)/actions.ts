@@ -644,16 +644,12 @@ export async function upsertCustomer(input: {
 
   const candidates = await prisma.customer.findMany({
     where: {
-      OR: [
-        ...(email ? [{ email }] : []),
-        { displayName: { equals: displayName, mode: 'insensitive' } },
-      ],
+      displayName: { equals: displayName, mode: 'insensitive' },
     },
     select: { id: true, displayName: true, city: true, email: true, addressJson: true },
   });
 
   const existing = candidates.find((customer) => {
-    if (email && normalize(customer.email) === normalize(email)) return true;
     let candidateAddress = '';
     if (customer.addressJson) {
       try {
