@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import { getProductivitySettings, computeEstimatesForItems } from '@/app/(protected)/projects/actions';
 import { detectAndNotifyConflicts } from '@/lib/conflict-detection';
+import { getCanonicalScheduleStage } from '@/lib/scheduleStageOrder';
 
 type ScheduleItemInput = {
   id?: string | null;
@@ -87,7 +88,17 @@ export async function POST(
   }
 
   const settings = await getProductivitySettings(projectId);
-  const enrichedItems = await computeEstimatesForItems(items, settings);
+  const enrichedItems = (await computeEstimatesForItems(items, settings))
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((a, b) => {
+      const rankDifference =
+        getCanonicalScheduleStage(a.item).rank - getCanonicalScheduleStage(b.item).rank;
+      return rankDifference || a.originalIndex - b.originalIndex;
+    })
+    .map(({ item }) => ({
+      ...item,
+      stage: getCanonicalScheduleStage(item).label,
+    }));
 
   // Fetch project details for notification context
   const project = await prisma.project.findUnique({

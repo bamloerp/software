@@ -21,6 +21,7 @@ import { batchCheckConflicts } from './actions';
 import { rescheduleOverdueTasks } from '../../actions';
 import { ProductivitySettingsDialog } from './ProductivitySettingsDialog';
 import { useRouter } from 'next/navigation';
+import { getCanonicalScheduleStage } from '@/lib/scheduleStageOrder';
 
 type Item = {
   id?: string | null;
@@ -537,6 +538,14 @@ export default function ScheduleEditor({
               <tbody className="divide-y">
                 {items.map((it, i) => (
                   <React.Fragment key={it.id ?? i}>
+                    {getCanonicalScheduleStage(it).rank >= 8 &&
+                      (i === 0 || getCanonicalScheduleStage(items[i - 1]).rank < 8) && (
+                        <tr className="bg-slate-800">
+                          <td colSpan={9} className="px-4 py-3 text-sm font-extrabold uppercase tracking-widest text-white">
+                            Finishings
+                          </td>
+                        </tr>
+                      )}
                     {(i === 0 || items[i - 1]?.stage !== it.stage) && (
                       <tr className="bg-emerald-50">
                         <td colSpan={9} className="px-4 py-3 text-sm font-extrabold uppercase tracking-wide text-emerald-800">

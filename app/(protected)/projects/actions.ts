@@ -9,6 +9,7 @@ import { toMinor } from '@/helpers/money';
 import { TX_OPTS } from '@/lib/db-tx';
 import { USER_ROLES, type UserRole } from '@/lib/workflow';
 import { revalidatePath } from 'next/cache';
+import { getCanonicalScheduleStage } from '@/lib/scheduleStageOrder';
 import crypto from 'node:crypto';
 import { redirect } from 'next/navigation';
 import { getRemainingDispatchMap } from '@/lib/dispatch';
@@ -3717,6 +3718,11 @@ export async function createScheduleFromQuote(projectId: string) {
     const isLabour = type === 'LABOUR' || meta.isLabour === true;
     return isLabour;
   }).sort((a, b) => {
+    const rankDifference =
+      getCanonicalScheduleStage({ stage: a.section, title: a.description }).rank -
+      getCanonicalScheduleStage({ stage: b.section, title: b.description }).rank;
+    if (rankDifference !== 0) return rankDifference;
+
     const stageA = String(a.section || '').toUpperCase();
     const stageB = String(b.section || '').toUpperCase();
     if (stageA === stageB && (stageA.includes('FOUNDATION') || stageA.includes('SUBSTRUCTURE'))) {
@@ -3738,7 +3744,11 @@ export async function createScheduleFromQuote(projectId: string) {
     const unit = ln.unit ?? meta.unit ?? null;
     const qty = Number((ln as any).quantity ?? 0);
     const estHours = typeof meta.expectedHours === 'number' ? meta.expectedHours : undefined;
-    const stage = String(ln.section || meta.section || 'OTHER WORKS').trim();
+    const stage = getCanonicalScheduleStage({
+      stage: String(ln.section || meta.section || 'OTHER WORKS'),
+      title,
+      description: meta.note ?? ln.description ?? '',
+    }).label;
     return {
       quoteLineId: ln.id,
       stage,
@@ -3814,6 +3824,33 @@ export async function createScheduleFromQuote(projectId: string) {
         });
       }),
     );
+
+    // Include retained/manual tasks in the same construction sequence. This
+    // prevents old rows from interleaving with newly synced quotation stages.
+    const allScheduleItems = await prisma.scheduleItem.findMany({
+      where: { scheduleId: existing.id },
+      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+    });
+    const orderedScheduleItems = allScheduleItems
+      .map((item, originalIndex) => ({
+        item,
+        originalIndex,
+        canonical: getCanonicalScheduleStage(item),
+      }))
+      .sort((a, b) =>
+        (a.canonical.rank - b.canonical.rank) || (a.originalIndex - b.originalIndex),
+      );
+    const positionUpdates = orderedScheduleItems.flatMap((entry, position) =>
+      entry.item.position === position && entry.item.stage === entry.canonical.label
+        ? []
+        : [
+            prisma.scheduleItem.update({
+              where: { id: entry.item.id },
+              data: { position, stage: entry.canonical.label },
+            }),
+          ],
+    );
+    if (positionUpdates.length) await prisma.$transaction(positionUpdates);
 
     const refreshed = await prisma.schedule.findUnique({
       where: { id: existing.id },
