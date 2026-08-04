@@ -100,6 +100,8 @@ const PAGE_DEFS: PageDef[] = [
     icon: 'folder',
     roles: [
       'ADMIN',
+      'DEPUTY_ADMIN',
+      'PROJECT_COORDINATOR',
       'PROJECT_OPERATIONS_OFFICER',
       'PROCUREMENT',
       'SENIOR_PROCUREMENT',

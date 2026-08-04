@@ -3,10 +3,10 @@ import { SidebarNavigation } from './SidebarNavigation';
 
 const BASE: { label:string; href:string; icon:string; roles?: string[] }[] = [
   { label: 'My Quotes', href: '/quotes?view=my', icon: 'quote', roles: ['QS','SENIOR_QS','SALES','ADMIN'] },
-  { label: 'Projects', href: '/projects', icon: 'folder', roles: ['ADMIN','PROJECT_OPERATIONS_OFFICER','PROCUREMENT','ACCOUNTS','CASHIER','ACCOUNTING_OFFICER','ACCOUNTING_AUDITOR','ACCOUNTING_CLERK','GENERAL_MANAGER','MANAGING_DIRECTOR'] },
+  { label: 'Projects', href: '/projects', icon: 'folder', roles: ['ADMIN','DEPUTY_ADMIN','PROJECT_OPERATIONS_OFFICER','PROJECT_COORDINATOR','PROCUREMENT','ACCOUNTS','CASHIER','ACCOUNTING_OFFICER','ACCOUNTING_AUDITOR','ACCOUNTING_CLERK','GENERAL_MANAGER','MANAGING_DIRECTOR'] },
   { label: 'New Quote', href: '/quotes/new', icon: 'quote', roles: ['QS','SENIOR_QS','ADMIN'] },
   { label: 'Manual Items', href: '/manual-items', icon: 'list', roles: ['SENIOR_QS','ADMIN'] },
-  { label: 'Requisitions', href: '/procurement/requisitions', icon: 'list', roles: ['PROJECT_OPERATIONS_OFFICER','PROJECT_COORDINATOR','PROCUREMENT','ADMIN'] },
+  { label: 'Requisitions', href: '/procurement/requisitions', icon: 'list', roles: ['PROJECT_OPERATIONS_OFFICER','PROJECT_COORDINATOR','PROCUREMENT','ADMIN','DEPUTY_ADMIN'] },
   { label: 'Purchase Orders', href: '/accounts/po', icon: 'list', roles: ['ACCOUNTS','ACCOUNTING_CLERK','ACCOUNTING_OFFICER','ADMIN'] },
   { label: 'Dispatches', href: '/dispatches', icon: 'truck', roles: ['PROJECT_OPERATIONS_OFFICER','SECURITY','ADMIN'] },
   { label: 'Funds', href: '/funds', icon: 'bank', roles: ['ACCOUNTS','ACCOUNTING_CLERK','ACCOUNTING_OFFICER','ACCOUNTING_AUDITOR','ADMIN'] },

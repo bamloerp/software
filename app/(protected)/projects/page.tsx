@@ -50,6 +50,7 @@ export default async function ProjectsPage({
       me.role as any,
       [
         'ADMIN',
+        'DEPUTY_ADMIN',
         'CLIENT',
         'VIEWER',
         'PROJECT_OPERATIONS_OFFICER',
@@ -73,12 +74,19 @@ export default async function ProjectsPage({
   }
 
   const role = me.role as string;
-  const isAdmin = role === 'ADMIN';
+  const isAdminLike = role === 'ADMIN' || role === 'DEPUTY_ADMIN';
   const isSeniorPM = [
     'PROJECT_COORDINATOR',
     'ADMIN',
+    'DEPUTY_ADMIN',
     'GENERAL_MANAGER',
     'MANAGING_DIRECTOR',
+  ].includes(role);
+  const canManageProjectRequisitions = [
+    'ADMIN',
+    'DEPUTY_ADMIN',
+    'PROJECT_COORDINATOR',
+    'PROJECT_OPERATIONS_OFFICER',
   ].includes(role);
   const isProjectManager = role === 'PROJECT_OPERATIONS_OFFICER';
   const isSalesAccounts = role === 'SALES_ACCOUNTS';
@@ -98,7 +106,7 @@ export default async function ProjectsPage({
 
   let currentTab = 'active';
   if (isSeniorPM) {
-    currentTab = tab || (isAdmin ? 'all' : 'assignment');
+    currentTab = tab || (isAdminLike || role === 'PROJECT_COORDINATOR' ? 'all' : 'assignment');
   } else if (isSalesAccounts) {
     currentTab = tab === 'all_payments' ? 'all_payments' : 'due_today';
   } else if (isProjectManager) {
@@ -375,7 +383,7 @@ export default async function ProjectsPage({
                       Project Operations Officer
                     </th>
                   )}
-                  {!isSeniorPM && (
+                  {(!isSeniorPM || canManageProjectRequisitions) && (
                     <th
                       scope="col"
                       className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"
@@ -390,7 +398,15 @@ export default async function ProjectsPage({
               {projects.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isSalesAccounts || isSeniorPM || isProjectManager ? 6 : 7}
+                    colSpan={
+                      isSalesAccounts || isProjectManager
+                        ? 6
+                        : isSeniorPM && canManageProjectRequisitions
+                          ? 7
+                          : isSeniorPM
+                            ? 6
+                            : 7
+                    }
                     className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"
                   >
                     <div className="flex flex-col items-center justify-center gap-2">
@@ -591,7 +607,7 @@ export default async function ProjectsPage({
                       </td>
                       {!isProjectManager && (
                         <td
-                          className={`px-6 py-4 text-sm text-gray-500 dark:text-gray-400 ${isSeniorPM ? 'sticky right-0 z-10 bg-white border-l border-gray-100 dark:bg-gray-800 dark:border-gray-700 min-w-[260px]' : ''}`}
+                          className={`px-6 py-4 text-sm text-gray-500 dark:text-gray-400 ${isSeniorPM ? 'bg-white border-l border-gray-100 dark:bg-gray-800 dark:border-gray-700 min-w-[260px]' : ''}`}
                         >
                           {isSeniorPM && currentTab === 'assignment' ? (
                             <div className="flex items-center gap-2">
@@ -600,15 +616,6 @@ export default async function ProjectsPage({
                                 initialAssigneeId={project.assignedToId}
                                 projectManagers={projectManagers}
                               />
-                              {isAdmin && (
-                                <Link
-                                  href={`/projects/${project.id}`}
-                                  className="inline-flex shrink-0 items-center justify-center gap-1 rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:border-blue-500 hover:bg-blue-500"
-                                >
-                                  <EyeIcon className="h-3.5 w-3.5" />
-                                  Open
-                                </Link>
-                              )}
                             </div>
                           ) : isSeniorPM ? (
                             <div className="flex items-center gap-2">
@@ -618,15 +625,6 @@ export default async function ProjectsPage({
                                 projectManagers={projectManagers}
                                 variant="table"
                               />
-                              {isAdmin && (
-                                <Link
-                                  href={`/projects/${project.id}`}
-                                  className="inline-flex shrink-0 items-center justify-center gap-1 rounded border border-blue-600 bg-blue-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:border-blue-500 hover:bg-blue-500"
-                                >
-                                  <EyeIcon className="h-3.5 w-3.5" />
-                                  Open
-                                </Link>
-                              )}
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
@@ -636,24 +634,42 @@ export default async function ProjectsPage({
                           )}
                         </td>
                       )}
-                      {!isSeniorPM && (
+                      {(!isSeniorPM || canManageProjectRequisitions) && (
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
-                            {isHr ? (
+                            {canManageProjectRequisitions ? (
+                              <div className="flex flex-wrap items-center justify-center gap-2">
+                                {isProjectManager && currentTab === 'unplanned' && (
+                                  <Link
+                                    href={`/projects/${project.id}/schedule`}
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-transparent bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                                  >
+                                    <CalendarIcon className="h-3.5 w-3.5" />
+                                    Create Schedule
+                                  </Link>
+                                )}
+                                <Link
+                                  href={`/projects/${project.id}/requisitions/new`}
+                                  className="inline-flex items-center gap-1.5 rounded-md border border-transparent bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                                >
+                                  <DocumentPlusIcon className="h-3.5 w-3.5" />
+                                  Create Requisition
+                                </Link>
+                                <Link
+                                  href={`/projects/${project.id}`}
+                                  className="inline-flex items-center gap-1.5 rounded-md border border-transparent bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                >
+                                  <EyeIcon className="h-3.5 w-3.5" />
+                                  Open
+                                </Link>
+                              </div>
+                            ) : isHr ? (
                               <Link
                                 href={`/projects/${project.id}/schedule`}
                                 className="inline-flex items-center justify-center gap-1 rounded border border-indigo-600 bg-indigo-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-indigo-500"
                               >
                                 <CalendarIcon className="h-3.5 w-3.5" />
                                 Assign Employees
-                              </Link>
-                            ) : isProjectManager && currentTab === 'unplanned' ? (
-                              <Link
-                                href={`/projects/${project.id}/schedule`}
-                                className="inline-flex items-center justify-center gap-1 rounded border border-green-600 bg-green-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-green-500 hover:border-green-500 shadow-sm"
-                              >
-                                <CalendarIcon className="h-3.5 w-3.5" />
-                                Create Schedule
                               </Link>
                             ) : (
                               <div className="flex flex-col gap-1 items-stretch">

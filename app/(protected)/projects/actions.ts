@@ -1980,6 +1980,7 @@ export async function createRequisitionFromQuotePicks(formData: FormData) {
   const projectId = String(formData.get('projectId') || '');
   const draftRequisitionId = String(formData.get('draftRequisitionId') || '');
   if (!projectId) throw new Error('Missing projectId');
+  await ensureProjectAccess(projectId, user);
 
   type PickRow = {
     quoteLineId: string;
@@ -3417,7 +3418,7 @@ export async function ensureProjectAccess(projectId: string, user?: Awaited<Retu
   const role = user.role as string;
 
   // 1. Absolute super-users
-  if (['ADMIN', 'PROJECT_COORDINATOR', 'MANAGING_DIRECTOR', 'GENERAL_MANAGER'].includes(role)) {
+  if (['ADMIN', 'DEPUTY_ADMIN', 'PROJECT_COORDINATOR', 'MANAGING_DIRECTOR', 'GENERAL_MANAGER'].includes(role)) {
     return; // Allowed
   }
 
@@ -3446,7 +3447,7 @@ export async function ensureProjectAccess(projectId: string, user?: Awaited<Retu
 
 export async function assignProjectToManager(projectId: string, userId: string) {
   const me = await getCurrentUser();
-  assertRoles(me?.role, ['ADMIN', 'PROJECT_COORDINATOR', 'GENERAL_MANAGER', 'MANAGING_DIRECTOR']);
+  assertRoles(me?.role, ['ADMIN', 'DEPUTY_ADMIN', 'PROJECT_COORDINATOR', 'GENERAL_MANAGER', 'MANAGING_DIRECTOR']);
 
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!targetUser) throw new Error('User not found');
