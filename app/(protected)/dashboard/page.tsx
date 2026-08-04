@@ -14,6 +14,9 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 import { ProjectAssigner } from '@/app/(protected)/projects/project-assigner';
 import { createAndRedirectDispatch } from './actions';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 async function PendingTasks({
   userId,
   role,
@@ -43,7 +46,13 @@ async function PendingTasks({
   let driverTasks: any[] = []; // Initialize driverTasks
   let driverDeliveriesCount = 0;
   const roles = {
-    PM: role === 'PROJECT_OPERATIONS_OFFICER' || role === 'ADMIN' || role === 'MANAGING_DIRECTOR',
+    PM:
+      role === 'PROJECT_OPERATIONS_OFFICER' ||
+      role === 'PROJECT_COORDINATOR' ||
+      role === 'ADMIN' ||
+      role === 'DEPUTY_ADMIN' ||
+      role === 'GENERAL_MANAGER' ||
+      role === 'MANAGING_DIRECTOR',
     SALES_ACCOUNTS:
       role === 'SALES_ACCOUNTS' ||
       role === 'ACCOUNTING_CLERK' ||
