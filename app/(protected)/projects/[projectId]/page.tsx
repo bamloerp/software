@@ -451,7 +451,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             )}
 
             {/* Requisitions Button */}
-            {!isSalesAccountsOnly && (
+            {!isSalesAccountsOnly &&
+              project.assignedToId &&
+              ['ADMIN', 'DEPUTY_ADMIN', 'PROJECT_COORDINATOR', 'PROJECT_OPERATIONS_OFFICER'].includes(role) && (
                 <Link 
                     href={`/projects/${projectId}/requisitions/new`}
                     className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.33%-16px)] group relative overflow-hidden rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 transition-all hover:-translate-y-1 hover:shadow-lg"

@@ -36,6 +36,11 @@ export default async function NewRequisitionPage({
   } catch {
     redirect('/projects');
   }
+  const assignedProject = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { assignedToId: true },
+  });
+  if (!assignedProject?.assignedToId) redirect('/projects?tab=assignment');
 
   // load quote lines for the project's quote
   const quote = await prisma.quote.findFirst({

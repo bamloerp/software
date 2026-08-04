@@ -1981,6 +1981,13 @@ export async function createRequisitionFromQuotePicks(formData: FormData) {
   const draftRequisitionId = String(formData.get('draftRequisitionId') || '');
   if (!projectId) throw new Error('Missing projectId');
   await ensureProjectAccess(projectId, user);
+  const assignedProject = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { assignedToId: true },
+  });
+  if (!assignedProject?.assignedToId) {
+    throw new Error('Assign a Project Operations Officer before creating a requisition.');
+  }
 
   type PickRow = {
     quoteLineId: string;

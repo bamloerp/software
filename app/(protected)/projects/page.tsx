@@ -217,6 +217,12 @@ export default async function ProjectsPage({
     }
   }
 
+  // The active-projects tab is specifically the PLANNED project queue.
+  // Keep this invariant even when a conflicting status query is supplied.
+  if (!isSalesAccounts && currentTab === 'active') {
+    where = { ...where, status: 'PLANNED' };
+  }
+
   // Fetch Data
   const [projects, totalCount, projectManagers] = await Promise.all([
     prisma.project.findMany({
@@ -637,12 +643,12 @@ export default async function ProjectsPage({
                       {(!isSeniorPM || canManageProjectRequisitions) && (
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
-                            {canManageProjectRequisitions ? (
+                            {canManageProjectRequisitions && project.assignedToId ? (
                               <div className="flex flex-wrap items-center justify-center gap-2">
                                 {isProjectManager && currentTab === 'unplanned' && (
                                   <Link
                                     href={`/projects/${project.id}/schedule`}
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-transparent bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                                    className="inline-flex items-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-500"
                                   >
                                     <CalendarIcon className="h-3.5 w-3.5" />
                                     Create Schedule
@@ -650,20 +656,20 @@ export default async function ProjectsPage({
                                 )}
                                 <Link
                                   href={`/projects/${project.id}/requisitions/new`}
-                                  className="inline-flex items-center gap-1.5 rounded-md border border-transparent bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                                  className="inline-flex items-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-500"
                                 >
                                   <DocumentPlusIcon className="h-3.5 w-3.5" />
                                   Create Requisition
                                 </Link>
                                 <Link
                                   href={`/projects/${project.id}`}
-                                  className="inline-flex items-center gap-1.5 rounded-md border border-transparent bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                  className="inline-flex items-center gap-1.5 rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-500"
                                 >
                                   <EyeIcon className="h-3.5 w-3.5" />
                                   Open
                                 </Link>
                               </div>
-                            ) : isHr ? (
+                            ) : canManageProjectRequisitions ? null : isHr ? (
                               <Link
                                 href={`/projects/${project.id}/schedule`}
                                 className="inline-flex items-center justify-center gap-1 rounded border border-indigo-600 bg-indigo-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-indigo-500"
@@ -673,13 +679,6 @@ export default async function ProjectsPage({
                               </Link>
                             ) : (
                               <div className="flex flex-col gap-1 items-stretch">
-                                <Link
-                                  href={`/projects/${project.id}/requisitions/new`}
-                                  className="inline-flex items-center gap-1 rounded border border-green-500 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-900/20"
-                                >
-                                  <DocumentPlusIcon className="h-3.5 w-3.5" />
-                                  Create Requisition
-                                </Link>
                                 {hasMultipurposeStock && (
                                   <Link
                                     href={`/projects/${project.id}/dispatches/stock`}
