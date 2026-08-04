@@ -202,7 +202,9 @@ export async function POST(
 
   revalidatePath(`/projects/${projectId}/schedule`);
   revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/daily-tasks`);
   revalidatePath('/projects/schedules');
+  revalidatePath('/dashboard');
 
   return NextResponse.json({ ok: true });
 }

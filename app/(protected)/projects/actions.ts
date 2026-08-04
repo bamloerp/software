@@ -242,6 +242,8 @@ export async function createScheduleTaskReport(itemId: string, input: { activity
 
   revalidatePath(`/projects/${item.schedule.projectId}/reports`);
   revalidatePath(`/projects/${item.schedule.projectId}/schedule`);
+  revalidatePath(`/projects/${item.schedule.projectId}/daily-tasks`);
+  revalidatePath('/dashboard');
 }
 
 export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' | 'ON_HOLD' | 'DONE') {

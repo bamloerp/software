@@ -47,13 +47,21 @@ export default async function DailyTasksPage({
 
   if (!project) return notFound();
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
   const schedule = await prisma.schedule.findUnique({
     where: { projectId },
     include: {
       items: {
         where: {
-          status: { not: 'DONE' },
-          plannedStart: { lte: new Date() },
+          plannedStart: { lt: tomorrow },
+          OR: [
+            { plannedEnd: { gte: today } },
+            { status: 'ACTIVE' },
+          ],
         },
         include: {
           assignees: {
@@ -121,7 +129,7 @@ export default async function DailyTasksPage({
         // ignore
       }
     }
-    return 'Uncategorized';
+    return item.stage || 'Uncategorized';
   };
 
   const grouped = schedule.items.reduce((acc, item) => {
