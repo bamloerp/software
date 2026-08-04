@@ -11,7 +11,7 @@ import { redirect } from 'next/navigation';
 export default async function ProjectSchedulePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const me = await getCurrentUser();
-  if (!me || !['ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'HUMAN_RESOURCE'].includes(me.role || '')) {
+  if (!me || !['ADMIN', 'DEPUTY_ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'HUMAN_RESOURCE'].includes(me.role || '')) {
     redirect('/dashboard');
   }
   if (me.role !== 'HUMAN_RESOURCE') {

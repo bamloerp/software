@@ -421,7 +421,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             {/* Schedule Button */}
             {!isSalesAccountsOnly && canViewSchedule && (
                 <Link 
-                    href={hasSchedule ? `/projects/${projectId}/schedule` : '#'} 
+                    href={`/projects/${projectId}/schedule`}
                     className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.33%-16px)] group relative overflow-hidden rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5 transition-all hover:-translate-y-1 hover:shadow-lg"
                 >
                     <div className="absolute right-0 top-0 -mr-4 -mt-4 h-24 w-24 rounded-full bg-orange-50 transition-all group-hover:bg-orange-100"></div>

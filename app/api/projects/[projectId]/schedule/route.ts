@@ -28,7 +28,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ projectId:
   const { projectId } = await params;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Auth required' }, { status: 401 });
-  if (!['ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'HUMAN_RESOURCE'].includes(user.role || '')) {
+  if (!['ADMIN', 'DEPUTY_ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'HUMAN_RESOURCE'].includes(user.role || '')) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
 
@@ -50,7 +50,7 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'Auth required' }, { status: 401 });
   }
-  if (!['ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'HUMAN_RESOURCE'].includes(user.role || '')) {
+  if (!['ADMIN', 'DEPUTY_ADMIN', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'HUMAN_RESOURCE'].includes(user.role || '')) {
     return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
   }
 

@@ -77,6 +77,12 @@ export default function ScheduleEditor({
   }));
 
   const [items, setItems] = useState<Item[]>(initItems);
+  const foundationItems = items.filter((item) => getCanonicalScheduleStage(item).rank === 1);
+  const foundationReady =
+    foundationItems.length > 0 &&
+    foundationItems.every(
+      (item) => item.plannedStart && Array.isArray(item.employeeIds) && item.employeeIds.length > 0,
+    );
   const [note, setNote] = useState<string>(schedule?.note ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -303,7 +309,11 @@ export default function ScheduleEditor({
 
       // Re-run conflict check after save to ensure db state is updated in background
       // though the API already does it, triggering client-side check keeps UI in sync
-      await checkAllConflicts(items);
+      // The API has already persisted conflict results. A refresh check is
+      // useful but must never make a successful schedule save look failed.
+      void checkAllConflicts(items).catch((conflictError) => {
+        console.error('[schedule-conflict-refresh]', conflictError);
+      });
 
       if (activate && (schedule?.status === 'DRAFT' || !schedule)) {
         window.location.href = '/dashboard';
@@ -763,11 +773,12 @@ export default function ScheduleEditor({
               {(schedule?.status === 'DRAFT' || !schedule) && (
                 <button
                   onClick={() => handleSave(true)}
-                  disabled={loading}
+                  disabled={loading || !foundationReady}
+                  title={foundationReady ? 'Create and activate schedule' : 'Assign workers and dates to every Foundation task first'}
                   className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow hover:bg-green-700 h-9 px-4 py-2"
                 >
                   <CheckCircleIcon className="h-4 w-4" />
-                  {loading ? 'Activating...' : 'Create Schedule'}
+                  {loading ? 'Creating...' : 'Create Schedule from Foundation'}
                 </button>
               )}
 
