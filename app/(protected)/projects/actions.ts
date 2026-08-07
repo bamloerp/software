@@ -266,7 +266,18 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
   });
   if (!item) throw new Error('Schedule item not found');
 
-  await prisma.scheduleItem.update({ where: { id: itemId }, data: { status } });
+  const completionDate = new Date();
+  completionDate.setHours(0, 0, 0, 0);
+
+  await prisma.scheduleItem.update({
+    where: { id: itemId },
+    data: {
+      status,
+      // A completed task's schedule must show when the work actually ended,
+      // rather than retaining its former estimated finish date.
+      ...(status === 'DONE' ? { plannedEnd: completionDate } : {}),
+    },
+  });
 
   // ripple effect if DONE early or late
   if (status === 'DONE' || status === 'ACTIVE') {
@@ -286,7 +297,7 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
       const updated = recalculateRipple(
         remainingItems as ScheduleItemMinimal[],
         0,
-        new Date(), // Start from now
+        status === 'DONE' ? completionDate : new Date(),
         30,
         settings
       );
