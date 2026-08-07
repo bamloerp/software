@@ -278,14 +278,10 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
     }));
     const currentIndex = scheduleItems.findIndex(it => it.id === itemId);
 
-    // Completed rows must never consume time in the new ripple. Start with
-    // the first unfinished task after the completed row (or the current row
-    // when reactivating it), then pull all remaining unfinished work forward.
-    const remainingItems = scheduleItems.filter(
-      (scheduleItem, index) =>
-        index >= (status === 'DONE' ? currentIndex + 1 : currentIndex) &&
-        scheduleItem.status !== 'DONE',
-    );
+    // Always advance by this project's explicit schedule position. Historical
+    // statuses must not allow a later task to jump over the immediate next row.
+    const nextStartIndex = status === 'DONE' ? currentIndex + 1 : currentIndex;
+    const remainingItems = scheduleItems.slice(nextStartIndex);
     if (remainingItems.length > 0) {
       const updated = recalculateRipple(
         remainingItems as ScheduleItemMinimal[],
@@ -296,12 +292,14 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
       );
 
       await prisma.$transaction(
-        updated.map(u => prisma.scheduleItem.update({
+        updated.map((u, index) => prisma.scheduleItem.update({
           where: { id: u.id! },
           data: {
             plannedStart: u.plannedStart ? new Date(u.plannedStart) : null,
             plannedEnd: u.plannedEnd ? new Date(u.plannedEnd) : null,
-            estHours: u.estHours
+            estHours: u.estHours,
+            // The immediate next task is now the reportable current task.
+            ...(status === 'DONE' && index === 0 ? { status: 'ACTIVE' } : {}),
           }
         }))
       );
