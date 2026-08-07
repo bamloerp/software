@@ -58,8 +58,6 @@ export default async function DailyTasksPage({
       items: {
         where: {
           status: { not: 'DONE' },
-          plannedStart: { lt: tomorrow },
-          assignees: { some: {} },
         },
         include: {
           assignees: {
@@ -85,9 +83,8 @@ export default async function DailyTasksPage({
             },
           },
         },
-        orderBy: {
-          plannedStart: 'asc',
-        },
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        take: 1,
       },
     },
   });
@@ -114,6 +111,12 @@ export default async function DailyTasksPage({
     );
   }
 
+  // Work is sequential: only the first unfinished row can be reported. If it
+  // has not started or has no team, no later task may jump ahead of it.
+  const reportableItems = schedule.items.filter(
+    item => item.plannedStart && item.plannedStart < tomorrow && item.assignees.length > 0,
+  );
+
   // Helper to determine category
   const getCategory = (item: any) => {
     // Try to get section from quote line metadata
@@ -130,12 +133,12 @@ export default async function DailyTasksPage({
     return item.stage || 'Uncategorized';
   };
 
-  const grouped = schedule.items.reduce((acc, item) => {
+  const grouped = reportableItems.reduce((acc, item) => {
     const category = getCategory(item);
     if (!acc[category]) acc[category] = [];
     acc[category].push(item);
     return acc;
-  }, {} as Record<string, typeof schedule.items>);
+  }, {} as Record<string, typeof reportableItems>);
 
   return (
     <div className="p-6 space-y-8 bg-gray-50 min-h-screen">

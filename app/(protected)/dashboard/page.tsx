@@ -379,11 +379,12 @@ async function PendingTasks({
           include: {
             items: {
               where: {
-                status: 'ACTIVE',
-                plannedStart: { lt: tomorrow },
-                assignees: { some: {} },
+                status: { not: 'DONE' },
               },
+              orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+              take: 1,
               include: {
+                assignees: { select: { id: true } },
                 reports: {
                   where: {
                     reportedForDate: {
@@ -401,8 +402,16 @@ async function PendingTasks({
 
     dueReportsProjects = activeProjects.filter((p) => {
       if (!p.schedules) return false;
-      // Project is "due" if any active item that should be worked on today has no report today
-      return p.schedules.items.some((item) => item.reports.length === 0);
+      // Sequential work: only the first unfinished task can make a report due.
+      const item = p.schedules.items[0];
+      return Boolean(
+        item &&
+        item.status === 'ACTIVE' &&
+        item.plannedStart &&
+        item.plannedStart < tomorrow &&
+        item.assignees?.length > 0 &&
+        item.reports.length === 0
+      );
     });
   }
 
