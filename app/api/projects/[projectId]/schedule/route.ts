@@ -21,6 +21,7 @@ type ScheduleItemInput = {
   estHours?: number | null;
   note?: string | null;
   employeeIds?: string[];
+  status?: string;
 };
 
 
@@ -62,9 +63,16 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid items' }, { status: 400 });
   }
 
+  const completedRows = await prisma.scheduleItem.findMany({
+    where: { schedule: { projectId }, status: 'DONE' },
+    select: { id: true },
+  });
+  const completedIds = new Set(completedRows.map(item => item.id));
+
   // VALIDATION FOR ACTIVATION
   if (status === 'ACTIVE') {
     const foundationItems = items.filter((it: any) => {
+      if (completedIds.has(it.id) || it.status === 'DONE') return false;
       const stage = String(it.stage || '').trim().toUpperCase();
       return stage.includes('FOUNDATION') || stage.includes('SUBSTRUCTURE');
     });
@@ -95,10 +103,15 @@ export async function POST(
         getCanonicalScheduleStage(a.item).rank - getCanonicalScheduleStage(b.item).rank;
       return rankDifference || a.originalIndex - b.originalIndex;
     })
-    .map(({ item }) => ({
-      ...item,
-      stage: getCanonicalScheduleStage(item).label,
-    }));
+    .map(({ item }) => {
+      const isDone = Boolean(item.id && completedIds.has(item.id));
+      return {
+        ...item,
+        stage: getCanonicalScheduleStage(item).label,
+        status: isDone ? 'DONE' : item.status,
+        ...(isDone ? { hasConflict: false, conflictNote: null } : {}),
+      };
+    });
 
   // Fetch project details for notification context
   const project = await prisma.project.findUnique({
@@ -154,11 +167,13 @@ export async function POST(
       where: {
         scheduleId: schedule.id,
         id: { notIn: incomingIds.length ? incomingIds : ['__none__'] },
+        status: { not: 'DONE' },
         ...(schedule.status === 'ACTIVE' ? { reports: { none: {} } } : {}),
       },
     });
 
     for (const [index, it] of enrichedItems.entries()) {
+      if ((it as ScheduleItemInput).id && completedIds.has((it as ScheduleItemInput).id!)) continue;
       const employeeLinks = Array.isArray((it as any).employeeIds)
         ? (it as any).employeeIds
             .filter((id: any) => typeof id === 'string' && id.trim().length > 0)

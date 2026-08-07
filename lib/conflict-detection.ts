@@ -10,7 +10,7 @@ export async function detectAndNotifyConflicts(
 ) {
     // 1. Identify all employees and their time ranges from the new schedule items
     const checks = items
-        .filter(i => i.employeeIds && i.employeeIds.length > 0 && i.plannedStart && i.plannedEnd)
+        .filter(i => i.status !== 'DONE' && i.employeeIds && i.employeeIds.length > 0 && i.plannedStart && i.plannedEnd)
         .map(i => ({
             start: new Date(i.plannedStart!),
             end: new Date(i.plannedEnd!),

@@ -25,6 +25,9 @@ export interface ScheduleItemMinimal {
     employees?: number | null;
     estHours?: number | null;
     employeeIds?: string[];
+    status?: string;
+    hasConflict?: boolean;
+    conflictNote?: string | null;
 }
 
 export const WORK_START_HOUR = 7;

@@ -40,6 +40,7 @@ type Item = {
   employeeIds?: string[];
   hasConflict?: boolean; // New field for conflict highlight
   conflictNote?: string | null;
+  status?: string;
 };
 export default function ScheduleEditor({
   projectId,
@@ -72,16 +73,18 @@ export default function ScheduleEditor({
     estHours: i.estHours ?? null,
     note: i.note ?? null,
     employeeIds: Array.isArray(i.assignees) ? i.assignees.map((a: any) => a.id) : [],
-    hasConflict: i.hasConflict ?? false,
-    conflictNote: i.conflictNote ?? null,
+    hasConflict: i.status === 'DONE' ? false : (i.hasConflict ?? false),
+    conflictNote: i.status === 'DONE' ? null : (i.conflictNote ?? null),
+    status: i.status ?? 'ACTIVE',
   }));
 
   const [items, setItems] = useState<Item[]>(initItems);
+  const editableItemCount = items.filter(item => item.status !== 'DONE').length;
   const foundationItems = items.filter((item) => getCanonicalScheduleStage(item).rank === 1);
   const foundationReady =
     foundationItems.length > 0 &&
     foundationItems.every(
-      (item) => item.plannedStart && Array.isArray(item.employeeIds) && item.employeeIds.length > 0,
+      (item) => item.status === 'DONE' || (item.plannedStart && Array.isArray(item.employeeIds) && item.employeeIds.length > 0),
     );
   const [note, setNote] = useState<string>(schedule?.note ?? '');
   const [loading, setLoading] = useState(false);
@@ -113,6 +116,7 @@ export default function ScheduleEditor({
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
 
   const toggleBulkSelect = (idx: number) => {
+    if (items[idx]?.status === 'DONE') return;
     setBulkSelected((prev) => {
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx);
@@ -121,10 +125,11 @@ export default function ScheduleEditor({
     });
   };
   const toggleBulkAll = () => {
-    if (bulkSelected.size === items.length) {
+    const editableIndexes = items.flatMap((item, index) => item.status === 'DONE' ? [] : [index]);
+    if (bulkSelected.size === editableIndexes.length) {
       setBulkSelected(new Set());
     } else {
-      setBulkSelected(new Set(items.map((_, i) => i)));
+      setBulkSelected(new Set(editableIndexes));
     }
   };
   const handleBulkSave = (ids: string[]) => {
@@ -155,21 +160,31 @@ export default function ScheduleEditor({
     (currentItems: Item[], startDate = projectStartDate) => {
       if (!startDate) return currentItems;
 
+      const firstEditableIndex = currentItems.findIndex(item => item.status !== 'DONE');
+      if (firstEditableIndex === -1) {
+        return currentItems.map(item => ({ ...item, hasConflict: false, conflictNote: null }));
+      }
+      const completedPrefix = currentItems.slice(0, firstEditableIndex);
+      const lastCompletedEnd = completedPrefix.at(-1)?.plannedEnd;
+      const effectiveStart = lastCompletedEnd || startDate;
+      const editableSequence = currentItems.slice(firstEditableIndex);
+
       // items in Item[] format are compatible with ScheduleItemMinimal
       const result = recalculateRipple(
-        currentItems as ScheduleItemMinimal[],
+        editableSequence as ScheduleItemMinimal[],
         0, // Start from the beginning
-        new Date(startDate),
+        new Date(effectiveStart),
         gapMinutes,
         productivity
       );
 
       // Explicitly reset conflict status when re-scheduling
-      return (result as Item[]).map((it) => ({
-        ...it,
-        hasConflict: false,
-        conflictNote: null,
-      }));
+      return [
+        ...completedPrefix.map(item => ({ ...item, hasConflict: false, conflictNote: null })),
+        ...(result as Item[]).map((item, index) => editableSequence[index].status === 'DONE'
+          ? { ...editableSequence[index], hasConflict: false, conflictNote: null }
+          : { ...item, hasConflict: false, conflictNote: null }),
+      ];
     },
     [projectStartDate, gapMinutes, productivity]
   );
@@ -182,6 +197,7 @@ export default function ScheduleEditor({
       setCheckingConflicts(true);
       try {
         const payload = scheduled
+          .filter((it) => it.status !== 'DONE')
           .map((it) => ({
             id: it.id,
             employeeIds: it.employeeIds ?? [],
@@ -194,7 +210,7 @@ export default function ScheduleEditor({
         setItems((prev) =>
           prev.map((it, idx) => {
             const rowId = it.id || `temp-${idx}`;
-            const hasConflict = result.conflictIds.includes(rowId);
+            const hasConflict = it.status !== 'DONE' && result.conflictIds.includes(rowId);
             return {
               ...it,
               hasConflict,
@@ -249,17 +265,24 @@ export default function ScheduleEditor({
 
   const handleGapChange = (newGap: number) => {
     setGapMinutes(newGap);
-    // calculateSchedule uses gapMinutes from state, so we pass current items
-    // but calculateSchedule itself has a dependency on gapMinutes.
-    // To be safe, we use the functional update or force dependencies.
-    const updated = recalculateRipple(
-      items as ScheduleItemMinimal[],
+    const firstEditableIndex = items.findIndex(item => item.status !== 'DONE');
+    if (firstEditableIndex === -1) return;
+    const completedPrefix = items.slice(0, firstEditableIndex);
+    const editableSequence = items.slice(firstEditableIndex);
+    const effectiveStart = completedPrefix.at(-1)?.plannedEnd || projectStartDate;
+    const recalculated = recalculateRipple(
+      editableSequence as ScheduleItemMinimal[],
       0,
-      new Date(projectStartDate),
+      new Date(effectiveStart),
       newGap,
       productivity
     );
-    setItems(updated as Item[]);
+    setItems([
+      ...completedPrefix,
+      ...(recalculated as Item[]).map((item, index) =>
+        editableSequence[index].status === 'DONE' ? editableSequence[index] : item,
+      ),
+    ]);
   };
 
   const updateItemsWithSchedule = (newItems: Item[]) => {
@@ -283,12 +306,14 @@ export default function ScheduleEditor({
   }
 
   function removeRow(idx: number) {
+    if (items[idx]?.status === 'DONE') return;
     const copy = [...items];
     copy.splice(idx, 1);
     updateItemsWithSchedule(copy);
   }
 
   function updateField(idx: number, key: keyof Item, value: any) {
+    if (items[idx]?.status === 'DONE') return;
     const copy = [...items];
     (copy[idx] as any)[key] = value;
     updateItemsWithSchedule(copy);
@@ -353,6 +378,7 @@ export default function ScheduleEditor({
           estHours: i.estHours,
           note: i.note,
           employeeIds: Array.isArray(i.assignees) ? i.assignees.map((a: any) => a.id) : [],
+          status: i.status ?? 'ACTIVE',
         }));
         // Apply auto-schedule logic to new items
         // We need to call calculateSchedule but it depends on state.
@@ -408,6 +434,8 @@ export default function ScheduleEditor({
               value={projectStartDate}
               min={new Date().toISOString().split('T')[0]}
               onChange={(e) => handleProjectStartChange(e.target.value)}
+              disabled={items.some(item => item.status === 'DONE')}
+              title={items.some(item => item.status === 'DONE') ? 'The project start date is locked after work is completed' : undefined}
               className="h-9 rounded-md border border-gray-300 px-3 text-sm focus:ring-emerald-500 focus:border-emerald-500"
             />
           </div>
@@ -513,8 +541,9 @@ export default function ScheduleEditor({
                   <th className="px-2 py-2.5 w-8">
                     <input
                       type="checkbox"
-                      checked={bulkSelected.size === items.length && items.length > 0}
+                      checked={bulkSelected.size === editableItemCount && editableItemCount > 0}
                       onChange={toggleBulkAll}
+                      disabled={editableItemCount === 0}
                       className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                       title="Select all for bulk assignment"
                     />
@@ -574,6 +603,7 @@ export default function ScheduleEditor({
                         type="checkbox"
                         checked={bulkSelected.has(i)}
                         onChange={() => toggleBulkSelect(i)}
+                        disabled={it.status === 'DONE'}
                         className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                       />
                     </td>
@@ -582,6 +612,7 @@ export default function ScheduleEditor({
                         <input
                           value={it.title}
                           onChange={(e) => updateField(i, 'title', e.target.value)}
+                          disabled={it.status === 'DONE'}
                           className={cn(
                             'flex h-8.5 w-full rounded-md border border-gray-200 bg-white shadow-none px-2.5 py-1.5 text-xs transition-shadow focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500',
                             it.hasConflict && 'border-red-300 bg-red-50/30'
@@ -640,6 +671,11 @@ export default function ScheduleEditor({
                             </button>
                           </div>
                         )}
+                        {it.status === 'DONE' && (
+                          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                            <CheckCircleIcon className="h-3 w-3" /> Completed · Read only
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-2">
@@ -647,6 +683,7 @@ export default function ScheduleEditor({
                         value={it.unit || ''}
                         onChange={(e) => updateField(i, 'unit', e.target.value)}
                         onBlur={(e) => updateField(i, 'unit', normalizeUnit(e.target.value))}
+                        disabled={it.status === 'DONE'}
                         placeholder="Unit"
                         className="flex h-8.5 w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-center font-bold tracking-tight shadow-none transition-shadow focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                       />
@@ -656,6 +693,7 @@ export default function ScheduleEditor({
                         type="number"
                         value={it.quantity ?? ''}
                         onChange={(e) => updateField(i, 'quantity', Number(e.target.value))}
+                        disabled={it.status === 'DONE'}
                         className="flex h-8.5 w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-center font-bold shadow-none transition-shadow focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                       />
                     </td>
@@ -675,7 +713,12 @@ export default function ScheduleEditor({
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      {it.plannedStart ? (
+                      {it.status === 'DONE' ? (
+                        <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                          <CheckCircleIcon className="h-3.5 w-3.5" />
+                          {it.employeeIds?.length ?? 0} Assigned
+                        </span>
+                      ) : it.plannedStart ? (
                         <button
                           type="button"
                           onClick={() => {
@@ -720,6 +763,7 @@ export default function ScheduleEditor({
                         <input
                           value={it.note ?? ''}
                           onChange={(e) => updateField(i, 'note', e.target.value)}
+                          disabled={it.status === 'DONE'}
                           placeholder="Add task note..."
                           className={cn(
                             'flex h-8.5 w-full rounded-md border bg-white pl-9 pr-8 text-xs transition-all',
@@ -728,7 +772,7 @@ export default function ScheduleEditor({
                               : 'border-gray-200 hover:border-gray-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
                           )}
                         />
-                        {it.note && it.note.trim().length > 0 && (
+                        {it.status !== 'DONE' && it.note && it.note.trim().length > 0 && (
                           <button
                             type="button"
                             title="Clear task note"
