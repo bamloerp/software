@@ -250,7 +250,7 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
   const user = await getCurrentUser();
   if (!user) throw new Error('Auth required');
   const role = assertRole(user.role);
-  if (!['PROJECT_OPERATIONS_OFFICER', 'ADMIN', 'MANAGING_DIRECTOR', 'GENERAL_MANAGER'].includes(role as string)) {
+  if (!['PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'ADMIN', 'DEPUTY_ADMIN', 'MANAGING_DIRECTOR', 'GENERAL_MANAGER'].includes(role as string)) {
     throw new Error('Only Ops/Admin/MD/General Manager');
   }
 
@@ -259,7 +259,7 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
     include: {
       schedule: {
         include: {
-          items: { orderBy: { createdAt: 'asc' }, include: { assignees: true } }
+          items: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], include: { assignees: true } }
         }
       }
     }
@@ -273,23 +273,30 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
     const settings = await getProductivitySettings(item.schedule.projectId);
     const scheduleItems = item.schedule.items.map(it => ({
       ...it,
+      status: it.id === itemId ? status : it.status,
       employeeIds: it.assignees.map(a => a.id)
     }));
     const currentIndex = scheduleItems.findIndex(it => it.id === itemId);
 
-    // If DONE, the next item can start as early as "now" (or next working hour)
-    const nextStartIndex = status === 'DONE' ? currentIndex + 1 : currentIndex;
-    if (nextStartIndex < scheduleItems.length) {
+    // Completed rows must never consume time in the new ripple. Start with
+    // the first unfinished task after the completed row (or the current row
+    // when reactivating it), then pull all remaining unfinished work forward.
+    const remainingItems = scheduleItems.filter(
+      (scheduleItem, index) =>
+        index >= (status === 'DONE' ? currentIndex + 1 : currentIndex) &&
+        scheduleItem.status !== 'DONE',
+    );
+    if (remainingItems.length > 0) {
       const updated = recalculateRipple(
-        scheduleItems as ScheduleItemMinimal[],
-        nextStartIndex,
+        remainingItems as ScheduleItemMinimal[],
+        0,
         new Date(), // Start from now
         30,
         settings
       );
 
       await prisma.$transaction(
-        updated.slice(nextStartIndex - currentIndex).map(u => prisma.scheduleItem.update({
+        updated.map(u => prisma.scheduleItem.update({
           where: { id: u.id! },
           data: {
             plannedStart: u.plannedStart ? new Date(u.plannedStart) : null,
@@ -303,6 +310,8 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
 
   revalidatePath(`/projects/${item.schedule.projectId}/reports`);
   revalidatePath(`/projects/${item.schedule.projectId}/schedule`);
+  revalidatePath(`/projects/${item.schedule.projectId}/daily-tasks`);
+  revalidatePath('/dashboard');
 }
 
 /* export async function recordDisbursement(projectId: string, input: { amount: number; date: string; ref?: string | null }) {

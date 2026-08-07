@@ -379,14 +379,8 @@ async function PendingTasks({
           include: {
             items: {
               where: {
+                status: 'ACTIVE',
                 plannedStart: { lt: tomorrow },
-                OR: [
-                  // Work whose planned range includes today needs today's report,
-                  // even if it was marked DONE before the schedule dates changed.
-                  { plannedEnd: { gte: today } },
-                  // Unfinished overdue work remains reportable until completed.
-                  { status: 'ACTIVE' },
-                ],
               },
               include: {
                 reports: {

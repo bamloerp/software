@@ -57,11 +57,8 @@ export default async function DailyTasksPage({
     include: {
       items: {
         where: {
+          status: { not: 'DONE' },
           plannedStart: { lt: tomorrow },
-          OR: [
-            { plannedEnd: { gte: today } },
-            { status: 'ACTIVE' },
-          ],
         },
         include: {
           assignees: {
