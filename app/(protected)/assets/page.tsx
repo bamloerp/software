@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { assertRoles } from '@/lib/workflow';
 import AssetsTableToolbar from './components/AssetsTableToolbar';
 import TablePagination from '@/components/ui/table-pagination';
+import Link from 'next/link';
 import { 
   CubeIcon, 
   TagIcon, 
@@ -31,7 +32,7 @@ export default async function AssetsPage(props: {
     redirect('/login');
   }
   try {
-    assertRoles(me.role as any, ['ADMIN', 'MANAGING_DIRECTOR', 'PROJECT_COORDINATOR'] as any);
+    assertRoles(me.role as any, ['ADMIN', 'DEPUTY_ADMIN', 'MANAGING_DIRECTOR', 'PROJECT_COORDINATOR'] as any);
   } catch {
     redirect('/projects');
   }
@@ -49,6 +50,33 @@ export default async function AssetsPage(props: {
       orderBy: { name: 'asc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
+      include: {
+        dispatchItems: {
+          where: { selected: true },
+          orderBy: { dispatch: { createdAt: 'desc' } },
+          select: {
+            id: true,
+            qty: true,
+            returnedQty: true,
+            handedOutQty: true,
+            dispatch: {
+              select: {
+                id: true,
+                status: true,
+                createdAt: true,
+                project: {
+                  select: {
+                    id: true,
+                    name: true,
+                    projectNumber: true,
+                    quote: { select: { customer: { select: { displayName: true, city: true } } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     }),
     prisma.inventoryItem.count({ where }),
   ]);
@@ -155,6 +183,9 @@ export default async function AssetsPage(props: {
                   <th scope="col" className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Unit
                   </th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Deployed To
+                  </th>
                   <th scope="col" className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Quantity On Hand
                   </th>
@@ -166,7 +197,7 @@ export default async function AssetsPage(props: {
               <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
                 {items.length === 0 ? (
                   <tr>
-                    <td className="px-6 py-12 text-center text-gray-500 dark:text-gray-400" colSpan={4}>
+                    <td className="px-6 py-12 text-center text-gray-500 dark:text-gray-400" colSpan={5}>
                       <div className="flex flex-col items-center justify-center gap-2">
                         <ArchiveBoxIcon className="h-10 w-10 text-gray-300" />
                         <p className="text-base font-medium">No assets found</p>
@@ -194,6 +225,42 @@ export default async function AssetsPage(props: {
                         <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                             {it.unit ?? 'N/A'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {it.dispatchItems.length === 0 ? (
+                          <span className="text-sm text-gray-400">Not deployed</span>
+                        ) : (
+                          <div className="space-y-2">
+                            {it.dispatchItems.map((deployment) => {
+                              const project = deployment.dispatch.project;
+                              const deployedQty = deployment.handedOutQty > 0
+                                ? deployment.handedOutQty
+                                : deployment.qty;
+                              const remainingAtProject = Math.max(0, deployedQty - Number(deployment.returnedQty ?? 0));
+                              return (
+                                <Link
+                                  key={deployment.id}
+                                  href={`/projects/${project.id}/dispatches/${deployment.dispatch.id}`}
+                                  className="block rounded-lg border border-gray-200 px-3 py-2 transition-colors hover:border-blue-300 hover:bg-blue-50 dark:border-gray-700 dark:hover:bg-gray-700"
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                                      {project.projectNumber || project.name || 'Project'}
+                                    </span>
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                                      {remainingAtProject} {it.unit ?? ''}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {project.quote.customer.displayName}
+                                    {project.quote.customer.city ? ` • ${project.quote.customer.city}` : ''}
+                                    {` • ${deployment.dispatch.status}`}
+                                  </div>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <span className={`font-mono font-medium ${Number(it.qty) > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-red-500'}`}>
@@ -240,7 +307,7 @@ async function addMultipurposeAsset(formData: FormData) {
 
   const me = await getCurrentUser();
   if (!me) redirect('/login');
-  assertRoles((me as any).role, ['ADMIN', 'MANAGING_DIRECTOR', 'PROJECT_COORDINATOR'] as any);
+  assertRoles((me as any).role, ['ADMIN', 'DEPUTY_ADMIN', 'MANAGING_DIRECTOR', 'PROJECT_COORDINATOR'] as any);
 
   const name = String(formData.get('name') || '').trim();
   const unit = String(formData.get('unit') || '').trim() || null;
