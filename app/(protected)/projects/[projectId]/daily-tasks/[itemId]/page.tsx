@@ -132,7 +132,7 @@ export default async function TaskReportPage({
     const remainingUnit = String(formData.get('remainingUnit') || item.unit || '');
     const newStatus = String(formData.get('status') || 'ACTIVE') as 'ACTIVE' | 'ON_HOLD' | 'DONE';
 
-    const reportResult = await createScheduleTaskReport(itemId, {
+    await createScheduleTaskReport(itemId, {
       activity,
       usedQty,
       usedUnit,
@@ -140,10 +140,7 @@ export default async function TaskReportPage({
       remainingUnit,
     });
 
-    if (newStatus === 'DONE' && reportResult.remainingQty > 0.000001) {
-      throw new Error('Done is only allowed when completed equals planned and remaining is zero');
-    }
-    if (reportResult.remainingQty > 0.000001 && newStatus !== item.status) {
+    if (newStatus !== item.status) {
       await updateScheduleItemStatus(itemId, newStatus);
     }
 

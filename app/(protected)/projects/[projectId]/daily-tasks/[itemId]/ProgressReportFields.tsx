@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-
 export default function ProgressReportFields({
   remainingBefore,
   unit,
@@ -11,11 +9,6 @@ export default function ProgressReportFields({
   unit?: string | null;
   currentStatus: string;
 }) {
-  const [completedToday, setCompletedToday] = useState(0);
-  const [selectedStatus, setSelectedStatus] = useState(currentStatus === 'ON_HOLD' ? 'ON_HOLD' : 'ACTIVE');
-  const remainingAfter = Math.max(0, remainingBefore - completedToday);
-  const isComplete = remainingAfter <= 0.000001;
-
   return (
     <>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -30,13 +23,7 @@ export default function ProgressReportFields({
               name="usedQty"
               step="0.01"
               min="0"
-              max={remainingBefore}
               required
-              value={completedToday || ''}
-              onChange={(event) => {
-                const value = Number(event.target.value || 0);
-                setCompletedToday(Math.min(remainingBefore, Math.max(0, value)));
-              }}
               className="block w-full rounded-lg border-gray-200 bg-gray-50 px-4 py-3 text-sm transition-colors focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
               placeholder="0.00"
             />
@@ -58,9 +45,8 @@ export default function ProgressReportFields({
               name="remainingQty"
               step="0.01"
               min="0"
-              value={Number(remainingAfter.toFixed(2))}
-              readOnly
-              className="block w-full rounded-lg border-gray-200 bg-gray-100 px-4 py-3 text-sm text-gray-700"
+              defaultValue={remainingBefore}
+              className="block w-full rounded-lg border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
             />
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
               <span className="text-gray-500 sm:text-sm">{unit}</span>
@@ -77,23 +63,15 @@ export default function ProgressReportFields({
         <select
           id="status"
           name="status"
-          value={isComplete ? 'DONE' : selectedStatus}
-          onChange={(event) => setSelectedStatus(event.target.value)}
+          defaultValue={currentStatus === 'DONE' ? 'ACTIVE' : currentStatus}
           className="block w-full rounded-lg border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:border-indigo-500 focus:bg-white focus:ring-indigo-500"
         >
-          {isComplete ? (
-            <option value="DONE">Done - Task completed</option>
-          ) : (
-            <>
-              <option value="ACTIVE">Active - Work continuing</option>
-              <option value="ON_HOLD">On Hold - Temporarily stopped</option>
-            </>
-          )}
+          <option value="ACTIVE">Active - Work continuing</option>
+          <option value="ON_HOLD">On Hold - Temporarily stopped</option>
+          <option value="DONE">Done - Task completed</option>
         </select>
         <p className="mt-2 text-xs text-gray-500">
-          {isComplete
-            ? 'Remaining work is zero, so Done is the only available status.'
-            : 'Done becomes available only when completed equals planned and remaining is zero.'}
+          Completed work may be lower or higher than the planned quantity. Select Done when the task is finished.
         </p>
       </div>
     </>
