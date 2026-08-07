@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import ReportTabs from './ReportTabs';
 import MaterialUsageList from './MaterialUsageList';
+import ProgressReportFields from './ProgressReportFields';
 
 export default async function TaskReportPage({
   params,
@@ -28,7 +29,7 @@ export default async function TaskReportPage({
   const user = await getCurrentUser();
   if (!user) redirect('/login');
 
-  if (!['PM_CLERK', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'ADMIN'].includes(user.role as string)) {
+  if (!['PM_CLERK', 'PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'ADMIN', 'DEPUTY_ADMIN'].includes(user.role as string)) {
     return <div className="p-6">Not authorized</div>;
   }
 
@@ -87,8 +88,13 @@ export default async function TaskReportPage({
     .join(', ') || 'No workers assigned';
   const workerCount = item.assignees.length;
 
-  // Calculate total completed from all reports
-  const totalCompleted = item.reports.reduce((sum, r) => sum + (r.usedQty || 0), 0);
+  // The activity list is intentionally limited, so calculate progress from
+  // every report rather than only the five reports shown below.
+  const progressTotals = await prisma.scheduleTaskReport.aggregate({
+    where: { scheduleItemId: itemId },
+    _sum: { usedQty: true },
+  });
+  const totalCompleted = Number(progressTotals._sum.usedQty ?? 0);
   const remaining = Math.max(0, (item.quantity || 0) - totalCompleted);
 
 
@@ -126,7 +132,7 @@ export default async function TaskReportPage({
     const remainingUnit = String(formData.get('remainingUnit') || item.unit || '');
     const newStatus = String(formData.get('status') || 'ACTIVE') as 'ACTIVE' | 'ON_HOLD' | 'DONE';
 
-    await createScheduleTaskReport(itemId, {
+    const reportResult = await createScheduleTaskReport(itemId, {
       activity,
       usedQty,
       usedUnit,
@@ -134,7 +140,10 @@ export default async function TaskReportPage({
       remainingUnit,
     });
 
-    if (newStatus !== item.status) {
+    if (newStatus === 'DONE' && reportResult.remainingQty > 0.000001) {
+      throw new Error('Done is only allowed when completed equals planned and remaining is zero');
+    }
+    if (reportResult.remainingQty > 0.000001 && newStatus !== item.status) {
       await updateScheduleItemStatus(itemId, newStatus);
     }
 
@@ -165,67 +174,11 @@ export default async function TaskReportPage({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label htmlFor="usedQty" className="block text-sm font-medium text-gray-700 mb-2">
-              Quantity Completed Today <span className="text-red-500">*</span>
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <input
-                type="number"
-                id="usedQty"
-                name="usedQty"
-                step="0.01"
-                min="0"
-                required
-                className="block w-full rounded-lg border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 transition-colors"
-                placeholder="0.00"
-              />
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <span className="text-gray-500 sm:text-sm">{item.unit}</span>
-              </div>
-            </div>
-            {/* Hidden input for unit if needed by backend, though we just display it visually above */}
-            <input type="hidden" name="usedUnit" value={item.unit || ''} />
-          </div>
-
-          <div>
-            <label htmlFor="remainingQty" className="block text-sm font-medium text-gray-700 mb-2">
-              Estimated Remaining
-            </label>
-            <div className="relative rounded-md shadow-sm">
-              <input
-                type="number"
-                id="remainingQty"
-                name="remainingQty"
-                step="0.01"
-                min="0"
-                defaultValue={remaining}
-                className="block w-full rounded-lg border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 transition-colors"
-              />
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                 <span className="text-gray-500 sm:text-sm">{item.unit}</span>
-              </div>
-            </div>
-            <input type="hidden" name="remainingUnit" value={item.unit || ''} />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-            Update Task Status
-          </label>
-          <select
-            id="status"
-            name="status"
-            defaultValue={item.status}
-            className="block w-full rounded-lg border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 transition-colors"
-          >
-            <option value="ACTIVE">Active - Work continuing</option>
-            <option value="ON_HOLD">On Hold - Temporarily stopped</option>
-            <option value="DONE">Done - Task completed</option>
-          </select>
-        </div>
+        <ProgressReportFields
+          remainingBefore={remaining}
+          unit={item.unit}
+          currentStatus={item.status}
+        />
       </div>
 
       <div className="flex items-center justify-end gap-4 pt-8 mt-8 border-t border-gray-100">

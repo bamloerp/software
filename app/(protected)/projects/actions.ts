@@ -186,19 +186,38 @@ export async function createScheduleTaskReport(itemId: string, input: { activity
         include: {
           items: { orderBy: { createdAt: 'asc' }, include: { assignees: true } }
         }
-      }
+      },
+      assignees: { select: { id: true } },
+      reports: { select: { usedQty: true } },
     }
   });
   if (!item) throw new Error('Schedule item not found');
+
+  if (item.assignees.length === 0) {
+    throw new Error('This task has no assigned workers and cannot be reported yet');
+  }
+
+  const plannedQty = Number(item.quantity ?? 0);
+  const previouslyCompleted = item.reports.reduce((sum, report) => sum + Number(report.usedQty ?? 0), 0);
+  const completedToday = Number(input.usedQty ?? 0);
+  const availableToComplete = Math.max(0, plannedQty - previouslyCompleted);
+  if (!Number.isFinite(completedToday) || completedToday < 0) {
+    throw new Error('Completed quantity must be zero or greater');
+  }
+  if (completedToday > availableToComplete + 0.000001) {
+    throw new Error(`Completed quantity cannot exceed the remaining planned quantity of ${availableToComplete}`);
+  }
+  const completedTotal = Math.min(plannedQty, previouslyCompleted + completedToday);
+  const remainingQty = Math.max(0, plannedQty - completedTotal);
 
   await prisma.scheduleTaskReport.create({
     data: {
       scheduleItemId: itemId,
       reporterId: user.id,
       activity: input.activity ?? null,
-      usedQty: input.usedQty ?? null,
+      usedQty: completedToday,
       usedUnit: input.usedUnit ?? null,
-      remainingQty: input.remainingQty ?? null,
+      remainingQty,
       remainingUnit: input.remainingUnit ?? null,
     },
   });
@@ -240,10 +259,17 @@ export async function createScheduleTaskReport(itemId: string, input: { activity
     );
   }
 
+  // Completion is derived from quantities, never from a manually selected
+  // status. This also covers reports submitted from the My Tasks page.
+  if (remainingQty <= 0.000001 && item.status !== 'DONE') {
+    await updateScheduleItemStatus(itemId, 'DONE');
+  }
+
   revalidatePath(`/projects/${item.schedule.projectId}/reports`);
   revalidatePath(`/projects/${item.schedule.projectId}/schedule`);
   revalidatePath(`/projects/${item.schedule.projectId}/daily-tasks`);
   revalidatePath('/dashboard');
+  return { completedTotal, remainingQty };
 }
 
 export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' | 'ON_HOLD' | 'DONE') {
@@ -265,6 +291,18 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
     }
   });
   if (!item) throw new Error('Schedule item not found');
+
+  if (status === 'DONE') {
+    const totals = await prisma.scheduleTaskReport.aggregate({
+      where: { scheduleItemId: itemId },
+      _sum: { usedQty: true },
+    });
+    const completed = Number(totals._sum.usedQty ?? 0);
+    const planned = Number(item.quantity ?? 0);
+    if (Math.abs(completed - planned) > 0.000001) {
+      throw new Error('A task can only be marked Done when completed equals planned and remaining is zero');
+    }
+  }
 
   const completionDate = new Date();
   completionDate.setUTCHours(0, 0, 0, 0);

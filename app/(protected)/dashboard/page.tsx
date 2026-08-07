@@ -381,6 +381,7 @@ async function PendingTasks({
               where: {
                 status: 'ACTIVE',
                 plannedStart: { lt: tomorrow },
+                assignees: { some: {} },
               },
               include: {
                 reports: {
