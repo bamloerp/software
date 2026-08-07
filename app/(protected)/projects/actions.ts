@@ -267,7 +267,7 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
   if (!item) throw new Error('Schedule item not found');
 
   const completionDate = new Date();
-  completionDate.setHours(0, 0, 0, 0);
+  completionDate.setUTCHours(0, 0, 0, 0);
 
   await prisma.scheduleItem.update({
     where: { id: itemId },
