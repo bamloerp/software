@@ -828,7 +828,7 @@ export default function ScheduleEditor({
                   className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow hover:bg-green-700 h-9 px-4 py-2"
                 >
                   <CheckCircleIcon className="h-4 w-4" />
-                  {loading ? 'Creating...' : 'Create Schedule from Foundation'}
+                  {loading ? 'Creating...' : 'Create Schedule'}
                 </button>
               )}
 
