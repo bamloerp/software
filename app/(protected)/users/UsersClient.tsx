@@ -171,6 +171,9 @@ export default function UsersClient({ users: initialUsers, roleOnly = false }: {
   const [newPassword, setNewPassword] = useState('');
   const [editRoleFor, setEditRoleFor] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState('');
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, string>>(
+    () => Object.fromEntries(initialUsers.map(user => [user.id, user.role])),
+  );
   const [editUserFor, setEditUserFor] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ name: string; email: string; office: string }>({ name: '', email: '', office: DEFAULT_OFFICE });
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
@@ -254,9 +257,9 @@ export default function UsersClient({ users: initialUsers, roleOnly = false }: {
     });
   }
 
-  function handleChangeRole(userId: string) {
+  function handleChangeRole(userId: string, role = selectedRole) {
     startTransition(async () => {
-      const res = await changeUserRole(userId, selectedRole);
+      const res = await changeUserRole(userId, role);
       if (!res.ok) flash('error', res.error);
       else {
         flash('success', 'Role updated');
@@ -464,7 +467,28 @@ export default function UsersClient({ users: initialUsers, roleOnly = false }: {
 
                   {/* Role */}
                   <td className="px-5 py-4">
-                    {editRoleFor === user.id ? (
+                    {roleOnly ? (
+                      <div className="flex min-w-[260px] items-center gap-2">
+                        <select
+                          aria-label={`Change role for ${user.name || user.email}`}
+                          value={roleDrafts[user.id] ?? user.role}
+                          onChange={event => setRoleDrafts(current => ({ ...current, [user.id]: event.target.value }))}
+                          className="min-w-[185px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                        >
+                          {USER_ROLES.map(role => (
+                            <option key={role} value={role}>{role.replace(/_/g, ' ')}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => handleChangeRole(user.id, roleDrafts[user.id] ?? user.role)}
+                          disabled={isPending || (roleDrafts[user.id] ?? user.role) === user.role}
+                          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Save Role
+                        </button>
+                      </div>
+                    ) : editRoleFor === user.id ? (
                       <div className="flex items-center gap-1.5">
                         <select
                           title="Change role"
