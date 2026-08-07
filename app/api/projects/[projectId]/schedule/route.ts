@@ -71,25 +71,31 @@ export async function POST(
 
   // VALIDATION FOR ACTIVATION
   if (status === 'ACTIVE') {
-    const foundationItems = items.filter((it: any) => {
-      if (completedIds.has(it.id) || it.status === 'DONE') return false;
-      const stage = String(it.stage || '').trim().toUpperCase();
-      return stage.includes('FOUNDATION') || stage.includes('SUBSTRUCTURE');
+    const firstStageRank = items.length > 0
+      ? Math.min(...items.map((item: ScheduleItemInput) => getCanonicalScheduleStage(item).rank))
+      : null;
+    const firstStageItems = items.filter((it: ScheduleItemInput) => {
+      if ((it.id && completedIds.has(it.id)) || it.status === 'DONE') return false;
+      return firstStageRank !== null && getCanonicalScheduleStage(it).rank === firstStageRank;
     });
-    const missingAssignments = foundationItems.some(
+    const firstStageItem = items.find(
+      (item: ScheduleItemInput) => firstStageRank !== null && getCanonicalScheduleStage(item).rank === firstStageRank,
+    );
+    const firstStageName = firstStageItem ? getCanonicalScheduleStage(firstStageItem).label : 'first stage';
+    const missingAssignments = firstStageItems.some(
       (it: any) => !Array.isArray(it.employeeIds) || it.employeeIds.length === 0,
     );
-    const missingDates = foundationItems.some((it: any) => !it.plannedStart);
+    const missingDates = firstStageItems.some((it: any) => !it.plannedStart);
 
     if (missingAssignments) {
       return NextResponse.json(
-        { error: 'Cannot activate: All foundation tasks must have at least one worker assigned.' },
+        { error: `Cannot activate: All ${firstStageName} tasks must have at least one worker assigned.` },
         { status: 400 },
       );
     }
     if (missingDates) {
       return NextResponse.json(
-        { error: 'Cannot activate: All foundation tasks must have a start date.' },
+        { error: `Cannot activate: All ${firstStageName} tasks must have a start date.` },
         { status: 400 },
       );
     }

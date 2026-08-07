@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { DEFAULT_OFFICE, OFFICE_OPTIONS, normalizeOffice } from '@/lib/office';
+import { USER_ROLES } from '@/lib/workflow';
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -20,10 +21,16 @@ async function requireAdmin() {
   return user;
 }
 
+async function requireRoleManager() {
+  const user = await getCurrentUser();
+  if (!user || !['ADMIN', 'HUMAN_RESOURCE'].includes(user.role || '')) return null;
+  return user;
+}
+
 /** List all users (admin only) */
 export async function getUsers() {
-  const admin = await requireAdmin();
-  if (!admin) return [];
+  const manager = await requireRoleManager();
+  if (!manager) return [];
   return prisma.user.findMany({
     select: {
       id: true,
@@ -131,9 +138,12 @@ export async function unlockUser(userId: string): Promise<ActionResult> {
 
 /** Change user role (admin only) */
 export async function changeUserRole(userId: string, role: string): Promise<ActionResult> {
-  const admin = await requireAdmin();
-  if (!admin) return { ok: false, error: 'Admin access required' };
-  if (userId === admin.id) return { ok: false, error: 'Cannot change your own role' };
+  const manager = await requireRoleManager();
+  if (!manager) return { ok: false, error: 'Role management access required' };
+  if (userId === manager.id) return { ok: false, error: 'Cannot change your own role' };
+  if (!(USER_ROLES as readonly string[]).includes(role)) {
+    return { ok: false, error: 'Invalid user role' };
+  }
 
   await prisma.user.update({
     where: { id: userId },

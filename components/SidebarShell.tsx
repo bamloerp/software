@@ -268,7 +268,7 @@ const PAGE_DEFS: PageDef[] = [
     label: 'Users',
     href: '/users',
     icon: 'users',
-    roles: ['ADMIN'],
+    roles: ['ADMIN', 'HUMAN_RESOURCE'],
   },
   {
     label: 'Assets',

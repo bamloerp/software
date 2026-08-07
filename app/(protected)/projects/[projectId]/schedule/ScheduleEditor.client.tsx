@@ -80,12 +80,18 @@ export default function ScheduleEditor({
 
   const [items, setItems] = useState<Item[]>(initItems);
   const editableItemCount = items.filter(item => item.status !== 'DONE').length;
-  const foundationItems = items.filter((item) => getCanonicalScheduleStage(item).rank === 1);
-  const foundationReady =
-    foundationItems.length > 0 &&
-    foundationItems.every(
+  const firstStageRank = items.length > 0
+    ? Math.min(...items.map(item => getCanonicalScheduleStage(item).rank))
+    : null;
+  const firstStageItems = firstStageRank === null
+    ? []
+    : items.filter(item => getCanonicalScheduleStage(item).rank === firstStageRank);
+  const firstStageReady =
+    firstStageItems.length > 0 &&
+    firstStageItems.every(
       (item) => item.status === 'DONE' || (item.plannedStart && Array.isArray(item.employeeIds) && item.employeeIds.length > 0),
     );
+  const firstStageName = firstStageItems[0] ? getCanonicalScheduleStage(firstStageItems[0]).label : 'first stage';
   const [note, setNote] = useState<string>(schedule?.note ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -817,8 +823,8 @@ export default function ScheduleEditor({
               {(schedule?.status === 'DRAFT' || !schedule) && (
                 <button
                   onClick={() => handleSave(true)}
-                  disabled={loading || !foundationReady}
-                  title={foundationReady ? 'Create and activate schedule' : 'Assign workers and dates to every Foundation task first'}
+                  disabled={loading || !firstStageReady}
+                  title={firstStageReady ? 'Create and activate schedule' : `Assign workers and dates to every ${firstStageName} task first`}
                   className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow hover:bg-green-700 h-9 px-4 py-2"
                 >
                   <CheckCircleIcon className="h-4 w-4" />

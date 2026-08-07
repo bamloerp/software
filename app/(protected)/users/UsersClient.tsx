@@ -160,7 +160,7 @@ function IconUnlock() {
 
 /* ── component ───────────────────────────────────────────── */
 
-export default function UsersClient({ users: initialUsers }: { users: UserRow[] }) {
+export default function UsersClient({ users: initialUsers, roleOnly = false }: { users: UserRow[]; roleOnly?: boolean }) {
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -172,7 +172,7 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
   const [editRoleFor, setEditRoleFor] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState('');
   const [editUserFor, setEditUserFor] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', email: '', office: DEFAULT_OFFICE });
+  const [editForm, setEditForm] = useState<{ name: string; email: string; office: string }>({ name: '', email: '', office: DEFAULT_OFFICE });
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState(1);
@@ -324,15 +324,15 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Users</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Manage accounts, roles, and access control
+            {roleOnly ? 'Manage user roles' : 'Manage accounts, roles, and access control'}
           </p>
         </div>
-        <button
+        {!roleOnly && <button
           onClick={() => { setForm({ name: '', email: '', role: 'QS', office: DEFAULT_OFFICE, password: '' }); setShowAddModal(true); }}
           className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md active:scale-[0.98]"
         >
           <IconPlus /> Add User
-        </button>
+        </button>}
       </div>
 
       {/* ── Stats Cards ───────────────────────────────── */}
@@ -415,7 +415,7 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
               <th className="hidden px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 md:table-cell">Office</th>
               <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</th>
               <th className="hidden px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 lg:table-cell">Last Login</th>
-              <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
+              {!roleOnly && <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -550,7 +550,7 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                   </td>
 
                   {/* Actions */}
-                  <td className={`relative px-5 py-4 text-right ${isExpanded ? 'z-50' : ''}`}>
+                  {!roleOnly && <td className={`relative px-5 py-4 text-right ${isExpanded ? 'z-50' : ''}`}>
                     <div className="flex items-center justify-end gap-1.5">
                       {isEditing ? (
                         <>
@@ -681,13 +681,13 @@ export default function UsersClient({ users: initialUsers }: { users: UserRow[] 
                         </button>
                       </div>
                     )}
-                  </td>
+                  </td>}
                 </tr>
               );
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-16 text-center">
+                <td colSpan={roleOnly ? 5 : 6} className="px-5 py-16 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <div className="rounded-full bg-gray-100 p-3 dark:bg-gray-800">
                       <IconUsers />
