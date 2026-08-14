@@ -291,6 +291,48 @@ export default function ScheduleEditor({
     ]);
   };
 
+  const todayString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const rescheduleFromIndex = (startIndex: number, startDate: string) => {
+    if (startIndex < 0 || !startDate) return;
+    if (items[startIndex]?.status === 'DONE') return;
+
+    const lockedPrefix = items.slice(0, startIndex);
+    const editableSequence = items.slice(startIndex);
+    const recalculated = recalculateRipple(
+      editableSequence as ScheduleItemMinimal[],
+      0,
+      new Date(startDate),
+      gapMinutes,
+      productivity
+    );
+
+    setItems([
+      ...lockedPrefix.map(item => ({ ...item, hasConflict: false, conflictNote: null })),
+      ...(recalculated as Item[]).map((item, index) =>
+        editableSequence[index].status === 'DONE'
+          ? { ...editableSequence[index], hasConflict: false, conflictNote: null }
+          : { ...item, hasConflict: false, conflictNote: null },
+      ),
+    ]);
+    setError(null);
+  };
+
+  const handleStartNextToday = () => {
+    const firstEditableIndex = items.findIndex(item => item.status !== 'DONE');
+    if (firstEditableIndex === -1) {
+      setError('All schedule tasks are already completed.');
+      return;
+    }
+    rescheduleFromIndex(firstEditableIndex, todayString());
+  };
+
   const updateItemsWithSchedule = (newItems: Item[]) => {
     const scheduled = calculateSchedule(newItems);
     setItems(scheduled);
@@ -477,6 +519,16 @@ export default function ScheduleEditor({
           >
             <ClockIcon className="h-4 w-4" />
             Reschedule Overdue
+          </button>
+
+          <button
+            type="button"
+            onClick={handleStartNextToday}
+            disabled={loading || editableItemCount === 0}
+            className="inline-flex items-center gap-2 rounded-md bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+          >
+            <CalendarIcon className="h-4 w-4" />
+            Start Next Today
           </button>
 
           <button
