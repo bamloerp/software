@@ -258,7 +258,7 @@ export default function RequisitionPickerClient({
                       Total
                     </th>
                     <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900 w-24">
-                      Used
+                      Requested
                     </th>
                     <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900 w-24">
                       Remaining
@@ -320,7 +320,7 @@ export default function RequisitionPickerClient({
                           {ln.qtyOrdered + ln.approvedExtra}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-500">
-                          {ln.alreadyRequested + ln.purchased}
+                          {ln.alreadyRequested}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-right text-sm font-medium text-gray-900">
                           {ln.remaining}
