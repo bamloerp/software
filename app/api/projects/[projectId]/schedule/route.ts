@@ -103,7 +103,17 @@ export async function POST(
 
   const settings = await getProductivitySettings(projectId);
   const enrichedItems = (await computeEstimatesForItems(items, settings))
-    .map((item, originalIndex) => ({ item, originalIndex }))
+    .map((item, originalIndex) => {
+      const incoming = items[originalIndex] as ScheduleItemInput;
+      return {
+        item: {
+          ...item,
+          plannedStart: incoming?.plannedStart ?? item.plannedStart,
+          plannedEnd: incoming?.plannedEnd ?? item.plannedEnd,
+        },
+        originalIndex,
+      };
+    })
     .sort((a, b) => {
       const rankDifference =
         getCanonicalScheduleStage(a.item).rank - getCanonicalScheduleStage(b.item).rank;
