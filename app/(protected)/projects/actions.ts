@@ -9,11 +9,10 @@ import { toMinor } from '@/helpers/money';
 import { TX_OPTS } from '@/lib/db-tx';
 import { USER_ROLES, type UserRole } from '@/lib/workflow';
 import { revalidatePath } from 'next/cache';
-import { getCanonicalScheduleStage } from '@/lib/scheduleStageOrder';
 import crypto from 'node:crypto';
 import { redirect } from 'next/navigation';
 import { getRemainingDispatchMap } from '@/lib/dispatch';
-import { recalculateRipple, ScheduleItemMinimal, addGap, addWorkingTime, inferTaskType as engineInferTaskType, ProductivitySettings as EngineProductivitySettings } from '@/lib/schedule-engine';
+import { recalculateRipple, ScheduleItemMinimal, addWorkingTime, inferTaskType as engineInferTaskType, ProductivitySettings as EngineProductivitySettings } from '@/lib/schedule-engine';
 import { getQuoteGrandTotalMinor } from '@/app/lib/payments';
 
 
@@ -186,34 +185,19 @@ export async function createScheduleTaskReport(itemId: string, input: { activity
         include: {
           items: { orderBy: { createdAt: 'asc' }, include: { assignees: true } }
         }
-      },
-      assignees: { select: { id: true } },
-      reports: { select: { usedQty: true } },
+      }
     }
   });
   if (!item) throw new Error('Schedule item not found');
-
-  if (item.assignees.length === 0) {
-    throw new Error('This task has no assigned workers and cannot be reported yet');
-  }
-
-  const completedToday = Number(input.usedQty ?? 0);
-  if (!Number.isFinite(completedToday) || completedToday < 0) {
-    throw new Error('Completed quantity must be zero or greater');
-  }
-  const remainingQty = Number(input.remainingQty ?? 0);
-  if (!Number.isFinite(remainingQty) || remainingQty < 0) {
-    throw new Error('Remaining quantity must be zero or greater');
-  }
 
   await prisma.scheduleTaskReport.create({
     data: {
       scheduleItemId: itemId,
       reporterId: user.id,
       activity: input.activity ?? null,
-      usedQty: completedToday,
+      usedQty: input.usedQty ?? null,
       usedUnit: input.usedUnit ?? null,
-      remainingQty,
+      remainingQty: input.remainingQty ?? null,
       remainingUnit: input.remainingUnit ?? null,
     },
   });
@@ -257,16 +241,13 @@ export async function createScheduleTaskReport(itemId: string, input: { activity
 
   revalidatePath(`/projects/${item.schedule.projectId}/reports`);
   revalidatePath(`/projects/${item.schedule.projectId}/schedule`);
-  revalidatePath(`/projects/${item.schedule.projectId}/daily-tasks`);
-  revalidatePath('/dashboard');
-  return { remainingQty };
 }
 
 export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' | 'ON_HOLD' | 'DONE') {
   const user = await getCurrentUser();
   if (!user) throw new Error('Auth required');
   const role = assertRole(user.role);
-  if (!['PROJECT_OPERATIONS_OFFICER', 'PROJECT_COORDINATOR', 'ADMIN', 'DEPUTY_ADMIN', 'MANAGING_DIRECTOR', 'GENERAL_MANAGER'].includes(role as string)) {
+  if (!['PROJECT_OPERATIONS_OFFICER', 'ADMIN', 'MANAGING_DIRECTOR', 'GENERAL_MANAGER'].includes(role as string)) {
     throw new Error('Only Ops/Admin/MD/General Manager');
   }
 
@@ -275,58 +256,42 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
     include: {
       schedule: {
         include: {
-          items: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], include: { assignees: true } }
+          items: { orderBy: { createdAt: 'asc' }, include: { assignees: true } }
         }
       }
     }
   });
   if (!item) throw new Error('Schedule item not found');
 
-  const completionDate = new Date();
-  completionDate.setUTCHours(0, 0, 0, 0);
-
-  await prisma.scheduleItem.update({
-    where: { id: itemId },
-    data: {
-      status,
-      // A completed task's schedule must show when the work actually ended,
-      // rather than retaining its former estimated finish date.
-      ...(status === 'DONE' ? { plannedEnd: completionDate } : {}),
-    },
-  });
+  await prisma.scheduleItem.update({ where: { id: itemId }, data: { status } });
 
   // ripple effect if DONE early or late
   if (status === 'DONE' || status === 'ACTIVE') {
     const settings = await getProductivitySettings(item.schedule.projectId);
     const scheduleItems = item.schedule.items.map(it => ({
       ...it,
-      status: it.id === itemId ? status : it.status,
       employeeIds: it.assignees.map(a => a.id)
     }));
     const currentIndex = scheduleItems.findIndex(it => it.id === itemId);
 
-    // Always advance by this project's explicit schedule position. Historical
-    // statuses must not allow a later task to jump over the immediate next row.
+    // If DONE, the next item can start as early as "now" (or next working hour)
     const nextStartIndex = status === 'DONE' ? currentIndex + 1 : currentIndex;
-    const remainingItems = scheduleItems.slice(nextStartIndex);
-    if (remainingItems.length > 0) {
+    if (nextStartIndex < scheduleItems.length) {
       const updated = recalculateRipple(
-        remainingItems as ScheduleItemMinimal[],
-        0,
-        status === 'DONE' ? completionDate : new Date(),
+        scheduleItems as ScheduleItemMinimal[],
+        nextStartIndex,
+        new Date(), // Start from now
         30,
         settings
       );
 
       await prisma.$transaction(
-        updated.map((u, index) => prisma.scheduleItem.update({
+        updated.slice(nextStartIndex - currentIndex).map(u => prisma.scheduleItem.update({
           where: { id: u.id! },
           data: {
             plannedStart: u.plannedStart ? new Date(u.plannedStart) : null,
             plannedEnd: u.plannedEnd ? new Date(u.plannedEnd) : null,
-            estHours: u.estHours,
-            // The immediate next task is now the reportable current task.
-            ...(status === 'DONE' && index === 0 ? { status: 'ACTIVE' } : {}),
+            estHours: u.estHours
           }
         }))
       );
@@ -335,8 +300,6 @@ export async function updateScheduleItemStatus(itemId: string, status: 'ACTIVE' 
 
   revalidatePath(`/projects/${item.schedule.projectId}/reports`);
   revalidatePath(`/projects/${item.schedule.projectId}/schedule`);
-  revalidatePath(`/projects/${item.schedule.projectId}/daily-tasks`);
-  revalidatePath('/dashboard');
 }
 
 /* export async function recordDisbursement(projectId: string, input: { amount: number; date: string; ref?: string | null }) {
@@ -2016,14 +1979,6 @@ export async function createRequisitionFromQuotePicks(formData: FormData) {
   const projectId = String(formData.get('projectId') || '');
   const draftRequisitionId = String(formData.get('draftRequisitionId') || '');
   if (!projectId) throw new Error('Missing projectId');
-  await ensureProjectAccess(projectId, user);
-  const assignedProject = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { assignedToId: true },
-  });
-  if (!assignedProject?.assignedToId) {
-    throw new Error('Assign a Project Operations Officer before creating a requisition.');
-  }
 
   type PickRow = {
     quoteLineId: string;
@@ -3461,7 +3416,7 @@ export async function ensureProjectAccess(projectId: string, user?: Awaited<Retu
   const role = user.role as string;
 
   // 1. Absolute super-users
-  if (['ADMIN', 'DEPUTY_ADMIN', 'PROJECT_COORDINATOR', 'MANAGING_DIRECTOR', 'GENERAL_MANAGER'].includes(role)) {
+  if (['ADMIN', 'PROJECT_COORDINATOR', 'MANAGING_DIRECTOR', 'GENERAL_MANAGER'].includes(role)) {
     return; // Allowed
   }
 
@@ -3490,7 +3445,7 @@ export async function ensureProjectAccess(projectId: string, user?: Awaited<Retu
 
 export async function assignProjectToManager(projectId: string, userId: string) {
   const me = await getCurrentUser();
-  assertRoles(me?.role, ['ADMIN', 'DEPUTY_ADMIN', 'PROJECT_COORDINATOR', 'GENERAL_MANAGER', 'MANAGING_DIRECTOR']);
+  assertRoles(me?.role, ['ADMIN', 'PROJECT_COORDINATOR', 'GENERAL_MANAGER', 'MANAGING_DIRECTOR']);
 
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!targetUser) throw new Error('User not found');
@@ -3727,76 +3682,48 @@ export async function createScheduleFromQuote(projectId: string) {
 
   await ensureProjectAccess(projectId, user);
 
+  //await ensureProjectIsPlanned(projectId);
+  await ensureProjectIsPaidFor(projectId);
+
+  // Idempotent: ensure only one schedule per project
+  // Idempotent: ensure only one schedule per project
   const existing = await prisma.schedule.findFirst({
     where: { projectId },
     include: { items: { include: { assignees: true } } },
   });
+  if (existing && existing.items.length > 0) {
+    return { ok: true, scheduleId: existing.id, items: existing.items };
+  }
 
-  // Payment is required when creating a schedule, but must not prevent an
-  // already-running project from receiving newly added quotation stages.
-  if (!existing) {
-    await ensureProjectIsPaidFor(projectId);
+  if (existing) {
+    await prisma.schedule.delete({ where: { id: existing.id } });
   }
 
   const quote = await prisma.quote.findFirst({
     where: { project: { id: projectId } },
-    include: { lines: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }] } },
+    include: { lines: true },
   });
   if (!quote) throw new Error('No quote found for project');
 
-  const parseLineMeta = (value: unknown): Record<string, any> => {
-    if (!value) return {};
-    if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, any>;
-    if (typeof value !== 'string') return {};
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-    } catch {
-      return {};
-    }
-  };
-
   const labourLines = quote.lines.filter((l) => {
-    const meta = parseLineMeta(l.metaJson);
+    const meta = typeof l.metaJson === 'string' ? JSON.parse(l.metaJson || '{}') : (l.metaJson || {});
     const type = (l.itemType || meta.itemType || meta.type || '').toUpperCase();
-    const isLabour = type === 'LABOUR' || meta.isLabour === true;
-    return isLabour;
-  }).sort((a, b) => {
-    const rankDifference =
-      getCanonicalScheduleStage({ stage: a.section, title: a.description }).rank -
-      getCanonicalScheduleStage({ stage: b.section, title: b.description }).rank;
-    if (rankDifference !== 0) return rankDifference;
+    const section = (l.section || meta.section || '').toUpperCase();
 
-    const stageA = String(a.section || '').toUpperCase();
-    const stageB = String(b.section || '').toUpperCase();
-    if (stageA === stageB && (stageA.includes('FOUNDATION') || stageA.includes('SUBSTRUCTURE'))) {
-      const priority = (description: string) => {
-        const value = description.toLowerCase();
-        if (value.includes('setting out')) return 0;
-        if (value.includes('site clearance')) return 1;
-        return 2;
-      };
-      const difference = priority(a.description) - priority(b.description);
-      if (difference !== 0) return difference;
-    }
-    return a.position - b.position;
+    // Only include FOUNDATIONS labour items
+    const isLabour = type === 'LABOUR' || meta.isLabour === true;
+    const isFoundation = section.includes('FOUNDATION') || section.includes('SUBSTRUCTURE');
+    return isLabour && isFoundation;
   });
 
-  const items = labourLines.map((ln, position) => {
-    const meta = parseLineMeta(ln.metaJson);
+  const items = labourLines.map((ln) => {
+    const meta = typeof ln.metaJson === 'string' ? JSON.parse(ln.metaJson || '{}') : (ln.metaJson || {});
     const title = ln.description ?? meta.title ?? 'Labour task';
     const unit = ln.unit ?? meta.unit ?? null;
     const qty = Number((ln as any).quantity ?? 0);
     const estHours = typeof meta.expectedHours === 'number' ? meta.expectedHours : undefined;
-    const stage = getCanonicalScheduleStage({
-      stage: String(ln.section || meta.section || 'OTHER WORKS'),
-      title,
-      description: meta.note ?? ln.description ?? '',
-    }).label;
     return {
       quoteLineId: ln.id,
-      stage,
-      position,
       title,
       description: meta.note ?? ln.description ?? '',
       unit,
@@ -3809,113 +3736,36 @@ export async function createScheduleFromQuote(projectId: string) {
     };
   });
 
-  if (existing) {
-    const matchedExistingByQuoteLine = new Map(
-      existing.items.filter((item) => item.quoteLineId).map((item) => [item.quoteLineId!, item]),
-    );
-    const normalizeTitle = (value: string | null | undefined) =>
-      String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    const unmatchedLegacyByTitle = new Map<string, typeof existing.items>();
-    for (const existingItem of existing.items.filter((item) => !item.quoteLineId)) {
-      const key = normalizeTitle(existingItem.title || existingItem.description);
-      if (!key) continue;
-      const matches = unmatchedLegacyByTitle.get(key) ?? [];
-      matches.push(existingItem);
-      unmatchedLegacyByTitle.set(key, matches);
-    }
-    for (const item of items) {
-      if (matchedExistingByQuoteLine.has(item.quoteLineId)) continue;
-      const matches = unmatchedLegacyByTitle.get(normalizeTitle(item.title));
-      const legacyMatch = matches?.shift();
-      if (legacyMatch) matchedExistingByQuoteLine.set(item.quoteLineId, legacyMatch);
-    }
-    const latestExistingEnd = existing.items.reduce<Date | null>((latest, item) => {
-      if (!item.plannedEnd) return latest;
-      return !latest || item.plannedEnd > latest ? item.plannedEnd : latest;
-    }, null);
-    let nextNewTaskStart = latestExistingEnd ? addGap(latestExistingEnd, 30) : new Date();
-    const reconciledItems = items.map((item) => {
-      if (matchedExistingByQuoteLine.has(item.quoteLineId)) return item;
-      const plannedStart = new Date(nextNewTaskStart);
-      const plannedEnd = addWorkingTime(plannedStart, item.estHours ?? 10);
-      nextNewTaskStart = addGap(plannedEnd, 30);
-      return { ...item, plannedStart, plannedEnd };
-    });
+  const preferredOrder = [
+    'Site clearance',
+    'Setting out',
+    'Excavation',
+    'Concrete works',
+    'Footing brickwork',
+    'Ramming',
+    'Floor slab',
+  ];
 
-    await prisma.$transaction(
-      reconciledItems.map((item) => {
-        const current = matchedExistingByQuoteLine.get(item.quoteLineId);
-        if (current) {
-          return prisma.scheduleItem.update({
-            where: { id: current.id },
-            data: {
-              quoteLineId: item.quoteLineId,
-              stage: item.stage,
-              position: item.position,
-              title: item.title,
-              description: item.description,
-              unit: item.unit,
-              quantity: item.quantity,
-              estHours: current.estHours ?? item.estHours,
-            },
-          });
-        }
-        return prisma.scheduleItem.create({
-          data: {
-            scheduleId: existing.id,
-            ...item,
-          },
-        });
-      }),
-    );
+  items.sort((a, b) => {
+    const getOrderIndex = (title: string) => {
+      const lowerTitle = title.toLowerCase();
+      const index = preferredOrder.findIndex(key => lowerTitle.includes(key.toLowerCase()));
+      return index === -1 ? 999 : index;
+    };
+    const indexA = getOrderIndex(a.title);
+    const indexB = getOrderIndex(b.title);
+    if (indexA !== indexB) return indexA - indexB;
+    return a.quoteLineId.localeCompare(b.quoteLineId);
+  });
 
-    // Include retained/manual tasks in the same construction sequence. This
-    // prevents old rows from interleaving with newly synced quotation stages.
-    const allScheduleItems = await prisma.scheduleItem.findMany({
-      where: { scheduleId: existing.id },
-      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-    });
-    const orderedScheduleItems = allScheduleItems
-      .map((item, originalIndex) => ({
-        item,
-        originalIndex,
-        canonical: getCanonicalScheduleStage(item),
-      }))
-      .sort((a, b) =>
-        (a.canonical.rank - b.canonical.rank) || (a.originalIndex - b.originalIndex),
-      );
-    const positionUpdates = orderedScheduleItems.flatMap((entry, position) =>
-      entry.item.position === position && entry.item.stage === entry.canonical.label
-        ? []
-        : [
-            prisma.scheduleItem.update({
-              where: { id: entry.item.id },
-              data: { position, stage: entry.canonical.label },
-            }),
-          ],
-    );
-    if (positionUpdates.length) await prisma.$transaction(positionUpdates);
-
-    const refreshed = await prisma.schedule.findUnique({
-      where: { id: existing.id },
-      include: {
-        items: {
-          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
-          include: { assignees: true },
-        },
-      },
-    });
-    revalidatePath(`/projects/${projectId}/schedule`);
-    revalidatePath(`/projects/${projectId}`);
-    return { ok: true, scheduleId: existing.id, items: refreshed?.items ?? [] };
-  }
+  const cleanItems = items;
 
   const schedule = await prisma.schedule.create({
     data: {
       projectId,
       createdById: user.id,
       status: 'DRAFT',
-      items: { create: items },
+      items: { create: cleanItems },
     },
     include: { items: true },
   });

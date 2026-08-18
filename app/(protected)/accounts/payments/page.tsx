@@ -15,6 +15,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import TablePagination from '@/components/ui/table-pagination';
 import PageSizeSelector from '@/components/ui/page-size-selector';
 import { readQuoteGrandTotal } from '@/lib/accounting';
+import { filterUnpaidProjects } from '@/lib/payment-filter';
 
 const formatMoney = (minor: bigint | number) => {
   return new Intl.NumberFormat('en-US', {
@@ -52,25 +53,36 @@ export default async function PaymentsDashboard({
     ];
   }
 
-  const [totalItems, projects] = await Promise.all([
-    prisma.project.count({ where }),
-    prisma.project.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        quote: {
-          include: {
-            customer: true,
-            lines: true,
-          },
+  const projects = await prisma.project.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      quote: {
+        include: {
+          customer: true,
+          lines: true,
         },
-        clientPayments: true,
       },
-      skip,
-      take: itemsPerPage,
-    }),
-  ]);
+      clientPayments: true,
+    },
+  });
 
+  const filteredProjects = filterUnpaidProjects(
+    projects.map((p) => ({
+      id: p.id,
+      contractValueMinor: p.quote
+        ? BigInt(Math.round(readQuoteGrandTotal(p.quote as any) * 100))
+        : 0n,
+      totalPaidMinor: p.clientPayments.reduce(
+        (sum, pay) => sum + BigInt(pay.amountMinor),
+        0n,
+      ),
+    })),
+  );
+
+  const unpaidProjectIds = new Set(filteredProjects.map((p) => p.id));
+  const visibleProjects = projects.filter((project) => unpaidProjectIds.has(project.id)).slice(skip, skip + itemsPerPage);
+  const totalItems = filteredProjects.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   return (
@@ -132,17 +144,17 @@ export default async function PaymentsDashboard({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {projects.length === 0 ? (
+              {visibleProjects.length === 0 ? (
                 <tr>
                    <td colSpan={6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-2">
-                        <p className="text-sm font-medium text-gray-900">No projects found</p>
-                        <p className="text-sm text-gray-500">Try adjusting your search</p>
+                        <p className="text-sm font-medium text-gray-900">No outstanding projects found</p>
+                        <p className="text-sm text-gray-500">All matching projects are fully paid</p>
                       </div>
                    </td>
                 </tr>
               ) : (
-                projects.map((p) => {
+                visibleProjects.map((p) => {
                   const contractValue = p.quote ? BigInt(Math.round(readQuoteGrandTotal(p.quote as any) * 100)) : 0n;
                   const totalPaid = p.clientPayments.reduce((sum, pay) => sum + BigInt(pay.amountMinor), 0n);
                   const balance = contractValue - totalPaid;

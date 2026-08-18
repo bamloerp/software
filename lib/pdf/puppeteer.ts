@@ -4,7 +4,6 @@ import puppeteer from "puppeteer-core";
 import type { PdfRenderer, PdfRequest, PdfResult } from "./index";
 import { BARMLO_LOGO_BASE64 } from "./logo";
 import { prisma } from "@/lib/db";
-import { getCanonicalScheduleStage } from "@/lib/scheduleStageOrder";
 import { readQuoteGrandTotal } from "@/lib/accounting";
 import { computeQuotePricing, describeQuoteDiscount } from "@/lib/quotePricing";
 import fs from "fs";
@@ -706,7 +705,7 @@ export async function renderProjectSchedulePdf(projectId: string): Promise<PdfRe
       schedules: {
         include: {
           items: {
-            orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+            orderBy: { createdAt: "asc" },
             include: {
               assignees: { select: { givenName: true, surname: true, role: true } },
             },
@@ -766,20 +765,11 @@ export async function renderProjectSchedulePdf(projectId: string): Promise<PdfRe
         <th style="text-align:left;padding:5px 6px;width:145px">Note</th>
       </tr></thead>
       <tbody>
-      ${schedule.items.map((item, index) => {
+      ${schedule.items.map((item) => {
         const workers = item.assignees
           .map((worker) => `${worker.givenName}${worker.surname ? ` ${worker.surname}` : ""}`)
           .join(", ");
-        const finishingsRow =
-          getCanonicalScheduleStage(item).rank >= 8 &&
-          (index === 0 || getCanonicalScheduleStage(schedule.items[index - 1]).rank < 8)
-            ? `<tr><td colspan="8" style="padding:8px 6px;background:#1e293b;color:#fff;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">Finishings</td></tr>`
-            : "";
-        const stageRow =
-          index === 0 || schedule.items[index - 1]?.stage !== item.stage
-            ? `<tr><td colspan="8" style="padding:7px 6px;background:#ecfdf5;color:#065f46;font-weight:800;text-transform:uppercase;">${esc(item.stage || "Other Works")}</td></tr>`
-            : "";
-        return `${finishingsRow}${stageRow}<tr class="tbl-row">
+        return `<tr class="tbl-row">
           <td>${esc(item.title || item.description || "-")}</td>
           <td class="text-center">${esc(item.unit || "-")}</td>
           <td class="text-right">${Number(item.quantity ?? 0).toLocaleString()}</td>

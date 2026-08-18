@@ -2,8 +2,8 @@
 import React from 'react';
 import { prisma } from '@/lib/db';
 import RequisitionPickerClient from '@/components/RequisitionPickerClient';
-import { createRequisitionFromQuotePicks, ensureProjectAccess } from '@/app/(protected)/projects/actions'; // path where your server action lives
-import { notFound, redirect } from 'next/navigation';
+import { createRequisitionFromQuotePicks } from '@/app/(protected)/projects/actions'; // path where your server action lives
+import { notFound } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { CreateRequisitionButton } from './CreateRequisitionButton';
 import QuoteHeader from '@/components/QuoteHeader';
@@ -30,17 +30,6 @@ export default async function NewRequisitionPage({
   const { projectId } = await params;
   const { draftId } = await searchParams;
   const currentUser = await getCurrentUser();
-  if (!currentUser) redirect('/dashboard');
-  try {
-    await ensureProjectAccess(projectId, currentUser);
-  } catch {
-    redirect('/projects');
-  }
-  const assignedProject = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { assignedToId: true },
-  });
-  if (!assignedProject?.assignedToId) redirect('/projects?tab=assignment');
 
   // load quote lines for the project's quote
   const quote = await prisma.quote.findFirst({
