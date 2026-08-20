@@ -3,9 +3,51 @@
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { validateGrnQuantities } from '@/lib/grn-verification';
+import type { Prisma } from '@prisma/client';
 
 function buildInventoryKey(name: string, unit: string | null | undefined) {
   return `${name.trim().toLowerCase()}::${(unit ?? '').trim().toLowerCase()}`;
+}
+
+async function addAcceptedInventory(
+  tx: Prisma.TransactionClient,
+  name: string,
+  unit: string | null,
+  quantity: number,
+) {
+  const key = buildInventoryKey(name, unit);
+  const existingByKey = await tx.inventoryItem.findUnique({ where: { key } });
+  const existing = existingByKey ?? await tx.inventoryItem.findUnique({
+    where: { name_unit: { name, unit } },
+  });
+
+  if (existing) {
+    await tx.inventoryItem.update({
+      where: { id: existing.id },
+      data: {
+        qty: { increment: quantity },
+        quantity: { increment: quantity },
+      },
+    });
+    return;
+  }
+
+  await tx.inventoryItem.upsert({
+    where: { key },
+    update: {
+      qty: { increment: quantity },
+      quantity: { increment: quantity },
+    },
+    create: {
+        key,
+        name,
+        description: name,
+        unit,
+        qty: quantity,
+        quantity,
+        category: 'MATERIAL',
+    },
+  });
 }
 
 export async function createPurchaseOrder(
@@ -410,25 +452,7 @@ export async function verifyGRN(
         if (originalItem) {
           const invName = originalItem.description;
           const invUnit = originalItem.unit;
-          const invKey = buildInventoryKey(invName, invUnit);
-
-          await tx.inventoryItem.upsert({
-            where: { name_unit: { name: invName, unit: invUnit } } as any,
-            update: {
-              qty: { increment: item.qtyAccepted },
-              quantity: { increment: item.qtyAccepted }, // keep sync
-              key: invKey // Auto-heal key if it differs
-            },
-            create: {
-              key: invKey,
-              name: invName,
-              description: invName,
-              unit: invUnit,
-              qty: item.qtyAccepted,
-              quantity: item.qtyAccepted,
-              category: 'MATERIAL'
-            }
-          });
+          await addAcceptedInventory(tx, invName, invUnit, item.qtyAccepted);
         }
       }
     }
@@ -570,25 +594,7 @@ export async function verifyMultipleGRNs(
           if (dbItem) {
             const invName = dbItem.description;
             const invUnit = dbItem.unit;
-            const invKey = buildInventoryKey(invName, invUnit);
-
-            await tx.inventoryItem.upsert({
-              where: { name_unit: { name: invName, unit: invUnit } } as any,
-              update: {
-                qty: { increment: item.qtyAccepted },
-                quantity: { increment: item.qtyAccepted },
-                key: invKey
-              },
-              create: {
-                key: invKey,
-                name: invName,
-                description: invName,
-                unit: invUnit,
-                qty: item.qtyAccepted,
-                quantity: item.qtyAccepted,
-                category: 'MATERIAL'
-              }
-            });
+            await addAcceptedInventory(tx, invName, invUnit, item.qtyAccepted);
           }
         }
       }
