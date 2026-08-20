@@ -2,6 +2,7 @@
 'use server';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { validateGrnQuantities } from '@/lib/grn-verification';
 
 function buildInventoryKey(name: string, unit: string | null | undefined) {
   return `${name.trim().toLowerCase()}::${(unit ?? '').trim().toLowerCase()}`;
@@ -446,6 +447,13 @@ export async function verifyMultipleGRNs(
 ) {
   if (items.length === 0) return;
 
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  const role = user?.role || '';
+  const isAccounts = role === 'ACCOUNTS' || role === 'ACCOUNTING_OFFICER' || role === 'ACCOUNTING_CLERK' || role === 'ADMIN';
+  if (!isAccounts) {
+    throw new Error('Unauthorized: Only Accounts or Admin can verify GRNs');
+  }
+
   // 1. Group items by GRN ID
   const itemsByGrn = new Map<string, typeof items>();
   items.forEach(item => {
@@ -459,11 +467,27 @@ export async function verifyMultipleGRNs(
 
   // We need the PO ID to revalidate and update status. 
   // Assume all items belong to same PO (enforced by UI), but valid to fetch from first GRN.
-  const firstGrn = await prisma.goodsReceivedNote.findUnique({
-    where: { id: grnIds[0] },
-    select: { purchaseOrderId: true, purchaseOrder: { select: { projectId: true } } }
+  const grns = await prisma.goodsReceivedNote.findMany({
+    where: { id: { in: grnIds } },
+    include: { items: true, purchaseOrder: { select: { projectId: true } } },
   });
+  const firstGrn = grns.find((grn) => grn.id === grnIds[0]);
   if (!firstGrn) throw new Error('GRN not found');
+
+  if (grns.length !== grnIds.length || grns.some((grn) => grn.status !== 'PENDING')) {
+    throw new Error('One or more receipts have already been verified');
+  }
+
+  if (grns.some((grn) => grn.purchaseOrderId !== firstGrn.purchaseOrderId)) {
+    throw new Error('Receipts must belong to the same purchase order');
+  }
+
+  for (const item of items) {
+    const grn = grns.find((candidate) => candidate.id === item.grnId);
+    const grnItem = grn?.items.find((candidate) => candidate.id === item.grnItemId);
+    if (!grnItem) throw new Error('Receipt item not found');
+    validateGrnQuantities(grnItem.qtyDelivered, item.qtyAccepted, item.qtyRejected);
+  }
 
   await prisma.$transaction(async (tx) => {
     // 2. Process each GRN
