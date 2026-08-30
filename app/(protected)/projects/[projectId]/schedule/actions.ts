@@ -21,6 +21,117 @@ type Settings = {
 
 type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
 
+function assertProjectHoldRole(role: string | null | undefined) {
+  if (!role || !['ADMIN', 'PROJECT_COORDINATOR'].includes(role)) {
+    throw new Error('Only admin and project coordinator can hold or resume a project.');
+  }
+}
+
+function revalidateProjectSchedulePaths(projectId: string) {
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/schedule`);
+  revalidatePath(`/projects/${projectId}/daily-tasks`);
+  revalidatePath('/projects');
+  revalidatePath('/projects/schedules');
+  revalidatePath('/dashboard');
+}
+
+export async function holdProjectSchedule(projectId: string): Promise<ActionResult> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    assertProjectHoldRole(user.role);
+
+    const schedule = await prisma.schedule.findUnique({
+      where: { projectId },
+      select: {
+        id: true,
+        items: {
+          where: { status: { not: 'DONE' } },
+          select: { id: true },
+        },
+      },
+    });
+    if (!schedule) throw new Error('Schedule not found.');
+
+    await prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: projectId },
+        data: { status: 'ON_HOLD' },
+      });
+
+      await tx.schedule.update({
+        where: { id: schedule.id },
+        data: { status: 'ON_HOLD', hasConflict: false },
+      });
+
+      for (const item of schedule.items) {
+        await tx.scheduleItem.update({
+          where: { id: item.id },
+          data: {
+            status: 'ON_HOLD',
+            hasConflict: false,
+            conflictNote: null,
+            assignees: { set: [] },
+          },
+        });
+      }
+    });
+
+    revalidateProjectSchedulePaths(projectId);
+    return { ok: true };
+  } catch (error) {
+    console.error('[holdProjectSchedule]', error);
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to put project on hold' };
+  }
+}
+
+export async function resumeProjectSchedule(projectId: string): Promise<ActionResult> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Authentication required');
+    assertProjectHoldRole(user.role);
+
+    const schedule = await prisma.schedule.findUnique({
+      where: { projectId },
+      select: {
+        id: true,
+        status: true,
+        items: {
+          where: { status: { not: 'DONE' } },
+          select: { id: true },
+        },
+      },
+    });
+    if (!schedule) throw new Error('Schedule not found.');
+
+    await prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: projectId },
+        data: { status: 'PLANNED' },
+      });
+
+      await tx.schedule.update({
+        where: { id: schedule.id },
+        data: { status: 'DRAFT', hasConflict: false },
+      });
+
+      if (schedule.items.length > 0) {
+        await tx.scheduleItem.updateMany({
+          where: { id: { in: schedule.items.map(item => item.id) } },
+          data: { status: 'ACTIVE', hasConflict: false, conflictNote: null },
+        });
+      }
+    });
+
+    revalidateProjectSchedulePaths(projectId);
+    return { ok: true };
+  } catch (error) {
+    console.error('[resumeProjectSchedule]', error);
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to resume project' };
+  }
+}
+
 export async function generateSchedulePdf(
   projectId: string,
 ): Promise<ActionResult<{ base64: string; filename: string }>> {

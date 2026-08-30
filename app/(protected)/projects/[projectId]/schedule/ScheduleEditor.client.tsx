@@ -17,7 +17,7 @@ import {
   ScheduleItemMinimal,
   ProductivitySettings,
 } from '@/lib/schedule-engine';
-import { batchCheckConflicts } from './actions';
+import { batchCheckConflicts, holdProjectSchedule, resumeProjectSchedule } from './actions';
 import { rescheduleOverdueTasks } from '../../actions';
 import { ProductivitySettingsDialog } from './ProductivitySettingsDialog';
 import { useRouter } from 'next/navigation';
@@ -48,15 +48,20 @@ export default function ScheduleEditor({
   user,
   employees,
   productivity,
+  projectStatus,
 }: {
   projectId: string;
   schedule: any | null;
   user: any | null;
   employees: Array<{ id: string; givenName: string; surname?: string | null; role: string }>;
   productivity: ProductivitySettings;
+  projectStatus?: string | null;
 }) {
   /* ... */
   const isDraft = !schedule || schedule.status === 'DRAFT';
+  const isProjectOnHold = projectStatus === 'ON_HOLD' || schedule?.status === 'ON_HOLD';
+  const canHoldProject = ['ADMIN', 'PROJECT_COORDINATOR'].includes(user?.role ?? '');
+  const isRowLocked = (item: Item) => isProjectOnHold || item.status === 'DONE';
 
   const initItems: Item[] = (schedule?.items ?? []).map((i: any) => ({
     id: i.id,
@@ -79,19 +84,20 @@ export default function ScheduleEditor({
   }));
 
   const [items, setItems] = useState<Item[]>(initItems);
-  const editableItemCount = items.filter(item => item.status !== 'DONE').length;
-  const firstStageRank = items.length > 0
-    ? Math.min(...items.map(item => getCanonicalScheduleStage(item).rank))
+  const editableItemCount = items.filter(item => !isRowLocked(item)).length;
+  const unfinishedItems = items.filter(item => item.status !== 'DONE');
+  const currentStageRank = unfinishedItems.length > 0
+    ? Math.min(...unfinishedItems.map(item => getCanonicalScheduleStage(item).rank))
     : null;
-  const firstStageItems = firstStageRank === null
+  const currentStageItems = currentStageRank === null
     ? []
-    : items.filter(item => getCanonicalScheduleStage(item).rank === firstStageRank);
-  const firstStageReady =
-    firstStageItems.length > 0 &&
-    firstStageItems.every(
+    : unfinishedItems.filter(item => getCanonicalScheduleStage(item).rank === currentStageRank);
+  const currentStageReady =
+    currentStageItems.length > 0 &&
+    currentStageItems.every(
       (item) => item.status === 'DONE' || (item.plannedStart && Array.isArray(item.employeeIds) && item.employeeIds.length > 0),
     );
-  const firstStageName = firstStageItems[0] ? getCanonicalScheduleStage(firstStageItems[0]).label : 'first stage';
+  const currentStageName = currentStageItems[0] ? getCanonicalScheduleStage(currentStageItems[0]).label : 'current stage';
   const [note, setNote] = useState<string>(schedule?.note ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,7 +128,8 @@ export default function ScheduleEditor({
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
 
   const toggleBulkSelect = (idx: number) => {
-    if (items[idx]?.status === 'DONE') return;
+    if (isProjectOnHold) return;
+    if (items[idx] && isRowLocked(items[idx])) return;
     setBulkSelected((prev) => {
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx);
@@ -131,7 +138,8 @@ export default function ScheduleEditor({
     });
   };
   const toggleBulkAll = () => {
-    const editableIndexes = items.flatMap((item, index) => item.status === 'DONE' ? [] : [index]);
+    if (isProjectOnHold) return;
+    const editableIndexes = items.flatMap((item, index) => isRowLocked(item) ? [] : [index]);
     if (bulkSelected.size === editableIndexes.length) {
       setBulkSelected(new Set());
     } else {
@@ -139,6 +147,7 @@ export default function ScheduleEditor({
     }
   };
   const handleBulkSave = (ids: string[]) => {
+    if (isProjectOnHold) return;
     const copy = [...items];
     bulkSelected.forEach((idx) => {
       copy[idx] = { ...copy[idx], employeeIds: ids };
@@ -197,6 +206,7 @@ export default function ScheduleEditor({
 
   const checkAllConflicts = useCallback(
     async (currentItems: Item[]) => {
+      if (isProjectOnHold) return;
       // Ensure we are checking against the current calculated dates
       const scheduled = calculateSchedule(currentItems);
 
@@ -230,7 +240,7 @@ export default function ScheduleEditor({
         setCheckingConflicts(false);
       }
     },
-    [calculateSchedule, projectId]
+    [calculateSchedule, isProjectOnHold, projectId]
   );
 
   // Perform initial ripple if any items are missing dates (e.g. newly extracted)
@@ -341,6 +351,7 @@ export default function ScheduleEditor({
   // --- Handlers ---
 
   function addRow() {
+    if (isProjectOnHold) return;
     const newItem: Item = {
       title: '',
       description: '',
@@ -354,6 +365,7 @@ export default function ScheduleEditor({
   }
 
   function removeRow(idx: number) {
+    if (isProjectOnHold) return;
     if (items[idx]?.status === 'DONE') return;
     const copy = [...items];
     copy.splice(idx, 1);
@@ -361,6 +373,7 @@ export default function ScheduleEditor({
   }
 
   function updateField(idx: number, key: keyof Item, value: any) {
+    if (isProjectOnHold) return;
     if (items[idx]?.status === 'DONE') return;
     const copy = [...items];
     (copy[idx] as any)[key] = value;
@@ -368,6 +381,10 @@ export default function ScheduleEditor({
   }
 
   async function handleSave(activate: boolean = false) {
+    if (isProjectOnHold) {
+      setError('Resume this project before saving schedule changes.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -395,6 +412,35 @@ export default function ScheduleEditor({
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to save schedule');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleHoldProject() {
+    if (!confirm('Put this project on hold? This will remove employee assignments from unfinished schedule tasks.')) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await holdProjectSchedule(projectId);
+      if (!res.ok) throw new Error(res.error);
+      window.location.reload();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to put project on hold');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResumeProject() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await resumeProjectSchedule(projectId);
+      if (!res.ok) throw new Error(res.error);
+      window.location.reload();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to resume project');
     } finally {
       setLoading(false);
     }
@@ -472,6 +518,12 @@ export default function ScheduleEditor({
 
   return (
     <div className="space-y-6">
+      {isProjectOnHold && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800 print:hidden">
+          This project is on hold. Employee assignments have been cleared from unfinished tasks, and daily tasks are paused until the project is resumed and the current stage is assigned.
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg shadow-sm border mb-6 print:hidden">
         <div className="flex items-center gap-4">
@@ -482,8 +534,8 @@ export default function ScheduleEditor({
               value={projectStartDate}
               min={new Date().toISOString().split('T')[0]}
               onChange={(e) => handleProjectStartChange(e.target.value)}
-              disabled={items.some(item => item.status === 'DONE')}
-              title={items.some(item => item.status === 'DONE') ? 'The project start date is locked after work is completed' : undefined}
+              disabled={isProjectOnHold || items.some(item => item.status === 'DONE')}
+              title={isProjectOnHold ? 'Resume this project before changing dates' : items.some(item => item.status === 'DONE') ? 'The project start date is locked after work is completed' : undefined}
               className="h-9 rounded-md border border-gray-300 px-3 text-sm focus:ring-emerald-500 focus:border-emerald-500"
             />
           </div>
@@ -493,6 +545,7 @@ export default function ScheduleEditor({
               type="number"
               value={gapMinutes}
               onChange={(e) => handleGapChange(Number(e.target.value))}
+              disabled={isProjectOnHold}
               className="h-9 w-24 rounded-md border border-gray-300 px-3 text-sm focus:ring-emerald-500 focus:border-emerald-500"
             />
           </div>
@@ -504,7 +557,7 @@ export default function ScheduleEditor({
           {user?.role !== 'HUMAN_RESOURCE' && (
             <button
               onClick={handleExtract}
-              disabled={extracting}
+              disabled={extracting || isProjectOnHold}
               className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
             >
               <DocumentTextIcon className="h-4 w-4" />
@@ -514,7 +567,7 @@ export default function ScheduleEditor({
 
           <button
             onClick={handleReschedule}
-            disabled={loading}
+            disabled={loading || isProjectOnHold}
             className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm ring-1 ring-inset ring-red-200 hover:bg-red-50 transition-colors"
           >
             <ClockIcon className="h-4 w-4" />
@@ -524,7 +577,7 @@ export default function ScheduleEditor({
           <button
             type="button"
             onClick={handleStartNextToday}
-            disabled={loading || editableItemCount === 0}
+            disabled={loading || isProjectOnHold || editableItemCount === 0}
             className="inline-flex items-center gap-2 rounded-md bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
           >
             <CalendarIcon className="h-4 w-4" />
@@ -533,7 +586,7 @@ export default function ScheduleEditor({
 
           <button
             onClick={() => checkAllConflicts(items)}
-            disabled={checkingConflicts}
+            disabled={checkingConflicts || isProjectOnHold}
             className={cn(
               'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium shadow-sm transition-colors',
               'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200',
@@ -544,7 +597,7 @@ export default function ScheduleEditor({
             {checkingConflicts ? 'Checking Conflicts...' : 'Check Availability'}
           </button>
 
-          {bulkSelected.size > 0 && (
+          {bulkSelected.size > 0 && !isProjectOnHold && (
             <button
               onClick={() => {
                 // Ensure at least one selected item has a start date
@@ -564,6 +617,7 @@ export default function ScheduleEditor({
 
           <button
             onClick={() => setItems([...items, { title: '', quantity: 0, employeeIds: [] }])}
+            disabled={isProjectOnHold}
             className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors"
           >
             <PlusIcon className="h-4 w-4 text-gray-500" />
@@ -661,7 +715,7 @@ export default function ScheduleEditor({
                         type="checkbox"
                         checked={bulkSelected.has(i)}
                         onChange={() => toggleBulkSelect(i)}
-                        disabled={it.status === 'DONE'}
+                        disabled={isRowLocked(it)}
                         className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                       />
                     </td>
@@ -670,7 +724,7 @@ export default function ScheduleEditor({
                         <input
                           value={it.title}
                           onChange={(e) => updateField(i, 'title', e.target.value)}
-                          disabled={it.status === 'DONE'}
+                          disabled={isRowLocked(it)}
                           className={cn(
                             'flex h-8.5 w-full rounded-md border border-gray-200 bg-white shadow-none px-2.5 py-1.5 text-xs transition-shadow focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500',
                             it.hasConflict && 'border-red-300 bg-red-50/30'
@@ -687,6 +741,7 @@ export default function ScheduleEditor({
                             </span>
                             <button
                               type="button"
+                              disabled={isProjectOnHold}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (!it.plannedStart) return;
@@ -711,6 +766,7 @@ export default function ScheduleEditor({
                             </button>
                             <button
                               type="button"
+                              disabled={isProjectOnHold}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const copy = [...items];
@@ -741,7 +797,7 @@ export default function ScheduleEditor({
                         value={it.unit || ''}
                         onChange={(e) => updateField(i, 'unit', e.target.value)}
                         onBlur={(e) => updateField(i, 'unit', normalizeUnit(e.target.value))}
-                        disabled={it.status === 'DONE'}
+                        disabled={isRowLocked(it)}
                         placeholder="Unit"
                         className="flex h-8.5 w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-center font-bold tracking-tight shadow-none transition-shadow focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                       />
@@ -751,7 +807,7 @@ export default function ScheduleEditor({
                         type="number"
                         value={it.quantity ?? ''}
                         onChange={(e) => updateField(i, 'quantity', Number(e.target.value))}
-                        disabled={it.status === 'DONE'}
+                        disabled={isRowLocked(it)}
                         className="flex h-8.5 w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-center font-bold shadow-none transition-shadow focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                       />
                     </td>
@@ -776,7 +832,7 @@ export default function ScheduleEditor({
                           <CheckCircleIcon className="h-3.5 w-3.5" />
                           {it.employeeIds?.length ?? 0} Assigned
                         </span>
-                      ) : it.plannedStart ? (
+                      ) : it.plannedStart && !isProjectOnHold ? (
                         <button
                           type="button"
                           onClick={() => {
@@ -821,7 +877,7 @@ export default function ScheduleEditor({
                         <input
                           value={it.note ?? ''}
                           onChange={(e) => updateField(i, 'note', e.target.value)}
-                          disabled={it.status === 'DONE'}
+                          disabled={isRowLocked(it)}
                           placeholder="Add task note..."
                           className={cn(
                             'flex h-8.5 w-full rounded-md border bg-white pl-9 pr-8 text-xs transition-all',
@@ -863,9 +919,33 @@ export default function ScheduleEditor({
             </div>
 
             <div className="flex gap-2">
+              {canHoldProject && !isProjectOnHold && schedule?.status === 'ACTIVE' && (
+                <button
+                  type="button"
+                  onClick={handleHoldProject}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-amber-300 bg-amber-50 text-amber-800 shadow-sm hover:bg-amber-100 h-9 px-4 py-2"
+                >
+                  <ClockIcon className="h-4 w-4" />
+                  Hold Project
+                </button>
+              )}
+
+              {canHoldProject && isProjectOnHold && (
+                <button
+                  type="button"
+                  onClick={handleResumeProject}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow hover:bg-green-700 h-9 px-4 py-2"
+                >
+                  <CheckCircleIcon className="h-4 w-4" />
+                  {loading ? 'Resuming...' : 'Resume Project'}
+                </button>
+              )}
+
               <button
                 onClick={() => handleSave(false)}
-                disabled={loading}
+                disabled={loading || isProjectOnHold}
                 className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
               >
                 <DocumentTextIcon className="h-4 w-4" />
@@ -875,8 +955,8 @@ export default function ScheduleEditor({
               {(schedule?.status === 'DRAFT' || !schedule) && (
                 <button
                   onClick={() => handleSave(true)}
-                  disabled={loading || !firstStageReady}
-                  title={firstStageReady ? 'Create and activate schedule' : `Assign workers and dates to every ${firstStageName} task first`}
+                  disabled={loading || isProjectOnHold || !currentStageReady}
+                  title={currentStageReady ? 'Create and activate schedule' : `Assign workers and dates to every ${currentStageName} task first`}
                   className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow hover:bg-green-700 h-9 px-4 py-2"
                 >
                   <CheckCircleIcon className="h-4 w-4" />
@@ -887,7 +967,7 @@ export default function ScheduleEditor({
               {schedule?.status === 'ACTIVE' && (
                 <button
                   onClick={() => handleSave(true)}
-                  disabled={loading}
+                  disabled={loading || isProjectOnHold}
                   className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-barmlo-blue text-white shadow hover:bg-barmlo-blue/90 h-9 px-4 py-2"
                 >
                   <CheckCircleIcon className="h-4 w-4" />

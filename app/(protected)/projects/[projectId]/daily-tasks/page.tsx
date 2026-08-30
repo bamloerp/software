@@ -47,6 +47,16 @@ export default async function DailyTasksPage({
 
   if (!project) return notFound();
 
+  if (project.status === 'ON_HOLD') {
+    return (
+      <div className="p-6">
+        <div className="rounded-md bg-amber-50 p-4 text-sm text-amber-800">
+          This project is on hold. Daily tasks are paused until the project is resumed and the current stage is assigned.
+        </div>
+      </div>
+    );
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -106,6 +116,16 @@ export default async function DailyTasksPage({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (schedule.status !== 'ACTIVE') {
+    return (
+      <div className="p-6">
+        <div className="rounded-md bg-amber-50 p-4 text-sm text-amber-800">
+          Daily tasks are paused until this schedule is active and the current stage has assigned employees.
         </div>
       </div>
     );

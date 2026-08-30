@@ -71,31 +71,31 @@ export async function POST(
 
   // VALIDATION FOR ACTIVATION
   if (status === 'ACTIVE') {
-    const firstStageRank = items.length > 0
-      ? Math.min(...items.map((item: ScheduleItemInput) => getCanonicalScheduleStage(item).rank))
-      : null;
-    const firstStageItems = items.filter((it: ScheduleItemInput) => {
-      if ((it.id && completedIds.has(it.id)) || it.status === 'DONE') return false;
-      return firstStageRank !== null && getCanonicalScheduleStage(it).rank === firstStageRank;
-    });
-    const firstStageItem = items.find(
-      (item: ScheduleItemInput) => firstStageRank !== null && getCanonicalScheduleStage(item).rank === firstStageRank,
+    const unfinishedItems = items.filter(
+      (item: ScheduleItemInput) => !((item.id && completedIds.has(item.id)) || item.status === 'DONE'),
     );
-    const firstStageName = firstStageItem ? getCanonicalScheduleStage(firstStageItem).label : 'first stage';
-    const missingAssignments = firstStageItems.some(
+    const currentStageRank = unfinishedItems.length > 0
+      ? Math.min(...unfinishedItems.map((item: ScheduleItemInput) => getCanonicalScheduleStage(item).rank))
+      : null;
+    const currentStageItems = unfinishedItems.filter(
+      (it: ScheduleItemInput) => currentStageRank !== null && getCanonicalScheduleStage(it).rank === currentStageRank,
+    );
+    const currentStageItem = currentStageItems[0];
+    const currentStageName = currentStageItem ? getCanonicalScheduleStage(currentStageItem).label : 'current stage';
+    const missingAssignments = currentStageItems.some(
       (it: any) => !Array.isArray(it.employeeIds) || it.employeeIds.length === 0,
     );
-    const missingDates = firstStageItems.some((it: any) => !it.plannedStart);
+    const missingDates = currentStageItems.some((it: any) => !it.plannedStart);
 
     if (missingAssignments) {
       return NextResponse.json(
-        { error: `Cannot activate: All ${firstStageName} tasks must have at least one worker assigned.` },
+        { error: `Cannot activate: All ${currentStageName} tasks must have at least one worker assigned.` },
         { status: 400 },
       );
     }
     if (missingDates) {
       return NextResponse.json(
-        { error: `Cannot activate: All ${firstStageName} tasks must have a start date.` },
+        { error: `Cannot activate: All ${currentStageName} tasks must have a start date.` },
         { status: 400 },
       );
     }
@@ -178,6 +178,13 @@ export async function POST(
     .filter((id: string | null | undefined): id is string => Boolean(id));
 
   await prisma.$transaction(async (tx) => {
+    if (!isHr && status === 'ACTIVE') {
+      await tx.project.update({
+        where: { id: projectId },
+        data: { status: 'PLANNED' },
+      });
+    }
+
     // Draft rows can be removed freely. Once work is running, rows with reports are retained.
     if (!isHr) await tx.scheduleItem.deleteMany({
       where: {

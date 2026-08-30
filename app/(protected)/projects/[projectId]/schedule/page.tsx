@@ -66,6 +66,7 @@ export default async function ProjectSchedulePage({ params }: { params: Promise<
         user={me ?? null}
         employees={employees}
         productivity={productivity}
+        projectStatus={project?.status ?? null}
       />
     </div>
   );
