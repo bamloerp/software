@@ -90,24 +90,9 @@ export default function DispatchSelector({
       });
 
       if (res.ok) {
-        toast.success(`Dispatch created for ${selectedDriverId ? 'Driver' : 'Draft'}. You can continue batching.`);
-        
-        // Update local items to reflect what was just dispatched
-        setLocalItems(prev => prev.map(item => {
-          const dispatched = selectedItems.find(si => si.id === item.id);
-          if (dispatched) {
-            return { ...item, remaining: item.remaining - dispatched.qty };
-          }
-          return item;
-        }).filter(item => item.remaining > 0)); // Remove items that are finished
-
-        // Reset form for next batch
-        setSelectedItems([]);
-        setSelectedDriverId('');
-        setDriverName('');
-        setVehicleReg('');
-        setNote('');
-        
+        toast.success(`Dispatch created for ${selectedDriverId ? 'Driver' : 'Draft'}.`);
+        router.push(`/projects/${projectId}/dispatches`);
+        router.refresh();
       } else {
         toast.error(res.error || 'Failed to create dispatch');
       }
@@ -251,7 +236,7 @@ export default function DispatchSelector({
             
             {selectedDriverId && (
               <p className="text-[10px] text-orange-600 font-medium bg-orange-50 p-2 rounded border border-orange-100 italic">
-                Note: Assigning a driver will automatically mark the dispatch as "DISPATCHED" and finalize the items.
+                Note: Assigning a driver will automatically mark the dispatch as &quot;DISPATCHED&quot; and finalize the items.
               </p>
             )}
           </div>

@@ -134,6 +134,7 @@ export async function createDispatch(
     });
 
     revalidatePath(`/projects/${projectId}`);
+    revalidatePath(`/projects/${projectId}/dispatches`);
     return { ok: true, dispatchId: dispatch.id };
   } catch (e: any) {
     return { ok: false, error: e.message || 'Failed to create dispatch' };
